@@ -666,7 +666,7 @@ rxvt_term::scr_color (unsigned int color, int fgbg) noexcept
  * Change the rendition style for following text
  */
 void
-rxvt_term::scr_rendition (int set, int style) noexcept
+rxvt_term::scr_rendition (int set, rend_t style) noexcept
 {
   if (set)
     rstyle |= style;

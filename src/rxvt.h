@@ -41,7 +41,10 @@ typedef uint32_t text_t;
 #else
 typedef uint16_t text_t; // saves lots of memory
 #endif
-typedef uint32_t rend_t;
+// The rendition (colours and attributes) of one cell. 64 bits since
+// wrxvt 9.32: the lower 32 are rxvt-unicode's layout, unchanged; the upper
+// 32 hold the attributes rxvt-unicode had no room for (RS_Faint...).
+typedef uint64_t rend_t;
 typedef  int32_t tlen_t;  // was int16_t, but this results in smaller code and memory use
 typedef  int32_t tlen_t_; // specifically for use in the line_t structure
 
@@ -1534,7 +1537,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void scr_swap_screen () noexcept;
   void scr_change_screen (int scrn);
   void scr_color (unsigned int color, int fgbg) noexcept;
-  void scr_rendition (int set, int style) noexcept;
+  void scr_rendition (int set, rend_t style) noexcept;
   void scr_add_lines (const wchar_t *str, int len, int minlines = 0) noexcept;
   void scr_backspace () noexcept;
   void scr_tab (int count, bool ht = false) noexcept;
