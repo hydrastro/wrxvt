@@ -307,6 +307,29 @@ rxvt_term::scr_reset ()
       int pend = MOD (term_start + top_row  , prev_total_rows);
       int q    = total_rows; // rewrapped row
 
+      // When the terminal gets shorter, first drop the empty lines below
+      // the cursor, and only then push lines off the top into the
+      // scrollback: otherwise the lines just above the prompt would
+      // disappear although there was room for them.
+      int drop = 0;
+
+      while (drop < prev_nrow - nrow
+             && prev_nrow - 1 - drop > screen.cur.row
+             && prev_row_buf [MOD (term_start + prev_nrow - 1 - drop, prev_total_rows)].l <= 0)
+        {
+          line_t &candidate = prev_row_buf [MOD (term_start + prev_nrow - 1 - drop, prev_total_rows)];
+          int col = 0;
+          // A logically empty line can still contain a coloured background
+          // or underline. Drop only visually default, blank rows.
+          while (col < prev_ncol && candidate.t[col] == ' '
+                 && !((candidate.r[col] ^ DEFAULT_RSTYLE) & ~RS_fontMask))
+            ++col;
+          if (col != prev_ncol) break;
+          ++drop;
+        }
+
+      p = MOD (p - drop, prev_total_rows);
+
 #if ENABLE_FRILLS
       if ((rewrap_always || top_row) && !rewrap_never)
         {
@@ -394,7 +417,7 @@ rxvt_term::scr_reset ()
 #endif
         {
           // wing, instead of wrap
-          screen.cur.row += nrow - prev_nrow;
+          screen.cur.row += nrow - prev_nrow + drop;
 
           do
             {
@@ -409,9 +432,20 @@ rxvt_term::scr_reset ()
       term_start = total_rows - nrow;
       top_row = q - term_start;
 
-      // make sure all terminal lines exist
-      while (top_row > 0)
-        scr_blank_screen_mem (ROW (--top_row), DEFAULT_RSTYLE);
+      // When the terminal gets taller but there are not enough lines
+      // (scrollback) to fill it from the top, keep the text at the top and
+      // add the new lines at the bottom, as xterm does: the content, and
+      // the cursor with it, would otherwise move down, leaving empty lines
+      // above it (e.g. the first prompt of a terminal that a tiling window
+      // manager enlarges right after it starts).
+      if (top_row > 0)
+        {
+          for (int row = q; row < total_rows; row++)
+            ::swap (row_buf [row - top_row], row_buf [row]);
+
+          screen.cur.row -= top_row;
+          top_row = 0;
+        }
 
       clamp_it (screen.cur.row, 0, nrow - 1);
       clamp_it (screen.cur.col, 0, ncol - 1);
