@@ -171,3 +171,11 @@ DEFAULT_FG, DEFAULT_BG = 0, 1
 def palette(n):
     """The colour index of palette colour n (0-255) in a dump."""
     return n + 2
+
+
+def version():
+    """The version wrxvt reports in --help ("... v9.32, based on ...")."""
+    import re
+    out = subprocess.run([binary(), '--help'], capture_output=True, text=True,
+                         env={**os.environ, 'DISPLAY': ''})
+    return re.search(r' v(\d+\.\d+)', out.stdout + out.stderr).group(1)

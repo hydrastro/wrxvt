@@ -2895,6 +2895,8 @@ rxvt_term::process_csi_seq ()
                 //
                 tt_printf ("\033[>%d;95;0c", 'U');
               }
+            else if (ch == 'q' && arg[0] == 0) /* XTVERSION: name and version */
+              tt_printf ("\033P>|wrxvt(" VERSION ")\033\\");
             break;
 
           case '?':
