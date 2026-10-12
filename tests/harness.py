@@ -10,6 +10,7 @@ Each test sends a small Python program (see inner.py) to run inside a
 fresh terminal and gets back the dict it filled in, plus any screenshots
 it asked for. Tests that need a missing tool are skipped.
 """
+import atexit
 import json
 import os
 from pathlib import Path
@@ -49,12 +50,20 @@ class Display:
             for _ in range(100):
                 if os.path.exists(f'/tmp/.X11-unix/X{number}'):
                     self.number, self.process = number, process
+                    atexit.register(self.stop)
                     return
                 if process.poll() is not None:
                     break
                 time.sleep(0.05)
             process.kill()
         raise RuntimeError('cannot start Xvfb')
+
+    def stop(self):
+        self.process.terminate()
+        try:
+            self.process.wait(5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
 
     @classmethod
     def get(cls):
