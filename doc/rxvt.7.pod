@@ -2114,6 +2114,11 @@ intermediate characters and a final character, then data up to C<ST> (or
 C<BEL>). Strings not listed here are ignored. Replies always end with the
 7-bit C<ESC \>.
 
+Control strings (these, operating system commands, and the application
+program commands C<ESC _>, privacy messages C<ESC ^> and C<ESC X> strings,
+which are all ignored) can be up to 4194304 characters long; longer ones
+are read to their end and dropped.
+
 =over
 
 =item B<< C<ESC P $ q Pt ST> >>

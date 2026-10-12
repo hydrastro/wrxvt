@@ -219,6 +219,8 @@ rxvt_term::~rxvt_term ()
 {
   termlist.erase (find (termlist.begin (), termlist.end(), this));
 
+  free (pstr.buf);
+
   emergency_cleanup ();
 
 #if ENABLE_STYLES

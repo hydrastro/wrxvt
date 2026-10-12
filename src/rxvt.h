@@ -632,6 +632,7 @@ enum {
 #define IMBUFSIZ               128     // input modifier buffer sizes
 #define KBUFSZ                 512     // size of keyboard mapping buffer
 #define SYNC_OUTPUT_TIMEOUT    0.5     // seconds a synchronized update (mode 2026) may hold the screen
+#define STRING_MAX             (1 << 22) // longest control string (OSC, DCS...) in characters
 #define CBUFSIZ                32768   // size of command buffer (longest command sequence possible)
 #define CBUFCNT                8       // never call pty_fill/cmd_parse more than this often in a row
 #define UBUFSIZ                2048    // character buffer
@@ -1297,6 +1298,17 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   char           *cmdbuf_ptr, *cmdbuf_endp;
   char            cmdbuf_base[CBUFSIZ];
 
+  // the control string (OSC, DCS, APC...) being read, see read_string
+  struct {
+    unicode_t kind;             // C1_OSC, C1_DCS, C1_APC (ignored), 0 if none
+    int osc;                    // OSC: its number
+    char params[32], inter[4];  // DCS: parameters and intermediates
+    unicode_t final;            //      and the final character
+    wchar_t *buf;
+    size_t len, size;
+    bool seen_esc, seen_syn, overflow;
+  } pstr;
+
   ptytty         *pty;
 
   // chunk contains all line_t's as well as rend_t and text_t buffers
@@ -1439,8 +1451,11 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void process_escape_seq ();
   void process_csi_seq ();
   void process_window_ops (const int *args, unsigned int nargs);
-  char *get_to_st (string_term &st);
+  void begin_string (unicode_t kind);
+  void read_string ();
+  void end_string (unicode_t terminator);
   void process_dcs_seq ();
+  void process_dcs_string (const char *s);
   void decrqss (const char *setting);
   void xtgettcap (const char *request);
   const char *tcap_value (const char *name, bool &boolean);

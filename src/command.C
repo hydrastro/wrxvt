@@ -2288,6 +2288,16 @@ rxvt_term::cmd_parse ()
   wchar_t ch = NOCHAR;
   char *seq_begin; // remember start of esc-sequence here
 
+  if (ecb_unlikely (pstr.kind))
+    try
+      {
+        read_string (); // continue the string the last input ended in
+      }
+    catch (const class out_of_input &o)
+      {
+        return;
+      }
+
   for (;;)
     {
       if (ecb_unlikely (ch == NOCHAR))
@@ -2400,8 +2410,10 @@ rxvt_term::cmd_parse ()
             }
           catch (const class out_of_input &o)
             {
-              // we ran out of input, retry later
-              cmdbuf_ptr = seq_begin;
+              // we ran out of input, retry later - except in a string,
+              // which keeps what it read and continues (see read_string)
+              if (!pstr.kind)
+                cmdbuf_ptr = seq_begin;
               break;
             }
 
@@ -2617,6 +2629,11 @@ rxvt_term::process_nonprinting (unicode_t ch)
       case 0x9d:		/* OSC */
         process_osc_seq ();
         break;
+      case 0x98:		/* SOS */
+      case 0x9e:		/* PM */
+      case 0x9f:		/* APC */
+        begin_string (C1_APC);
+        break;
 #endif
     }
 }
@@ -2795,6 +2812,14 @@ rxvt_term::process_escape_seq ()
         /* 8.3.90: OPERATING SYSTEM COMMAND (OSC) */
       case C1_OSC:		/* ESC ] */
         process_osc_seq ();
+        break;
+
+        /* 8.3.2: APPLICATION PROGRAM COMMAND, 8.3.94: PRIVACY MESSAGE,
+         * 8.3.128: START OF STRING - read and ignored */
+      case C1_APC:		/* ESC _ */
+      case C1_PM:		/* ESC ^ */
+      case C1_SOS:		/* ESC X */
+        begin_string (C1_APC);
         break;
 
         /* 8.3.106: RESET TO INITIAL STATE (RIS) */
@@ -3291,56 +3316,134 @@ rxvt_term::process_window_ops (const int *args, unsigned int nargs)
 
 /*----------------------------------------------------------------------*/
 /*
- * get input up until STRING TERMINATOR (or BEL)
- * ends_how is terminator used. returned input must be free()'d
+ * Control strings: OSC, DCS, APC, PM and SOS, up to STRING TERMINATOR
+ * (ESC \ or 0x9c, or BEL).
+ *
+ * A string can be much longer than the input buffer (an image, a copied
+ * file), so it isn't parsed again from the start each time more input
+ * arrives, like other sequences: it is collected in pstr across reads,
+ * and cmd_parse continues it before anything else.
  */
-char *
-rxvt_term::get_to_st (string_term &st)
+void
+rxvt_term::begin_string (unicode_t kind)
 {
-  unicode_t ch;
-  bool seen_esc = false;
-  unsigned int n = 0;
-  wchar_t string[CBUFSIZ];
+  pstr.kind = kind;
+  pstr.len = 0;
+  pstr.seen_esc = false;
+  pstr.seen_syn = false;
+  pstr.overflow = false;
 
-  while ((ch = cmd_getc ()) != NOCHAR)
+  read_string ();
+}
+
+// read the rest of the string, or as much as there is. Throws out_of_input
+// when the input runs out: what was read so far stays in pstr.
+void
+rxvt_term::read_string ()
+{
+  for (;;)
     {
-      if (seen_esc)
+      unicode_t ch;
+
+      if (pstr.seen_syn)
         {
-          if (ch == 0x5c)	/* 7bit ST */
-            break;
+          ch = cmd_get8 ();
+          pstr.seen_syn = false;
+        }
+      else
+        {
+          ch = cmd_getc ();
+
+          if (pstr.seen_esc)
+            {
+              if (ch == 0x5c)	/* 7bit ST */
+                end_string (ch);
+              else
+                pstr.kind = 0; /* ESC and something else: abort */
+              return;
+            }
+          else if (ch == C0_ESC)
+            {
+              pstr.seen_esc = true;
+              continue;
+            }
+          else if (ch == C0_BEL || ch == CHAR_ST)
+            {
+              end_string (ch);
+              return;
+            }
+          else if (ch == C0_SYN)
+            {
+              pstr.seen_syn = true;
+              continue;
+            }
+          else if (ch < 0x20)
+            {
+              // format effectors (BS, HT, LF, VT, FF, CR) are allowed in
+              // device control strings, and ignored
+              if (pstr.kind != C1_OSC && IN_RANGE_INC (ch, C0_BS, C0_CR))
+                continue;
+
+              pstr.kind = 0; /* other control character - abort */
+              return;
+            }
+        }
+
+      if (pstr.len + 1 >= pstr.size)
+        {
+          if (pstr.size >= STRING_MAX)
+            pstr.overflow = true; // keep reading up to the end, then drop it
           else
-            return NULL;
+            {
+              pstr.size = pstr.size ? pstr.size * 2 : 256;
+              pstr.buf = (wchar_t *)rxvt_realloc (pstr.buf, pstr.size * sizeof (wchar_t));
+            }
         }
-      else if (ch == C0_ESC)
-        {
-          seen_esc = true;
-          continue;
-        }
-      else if (ch == C0_BEL || ch == CHAR_ST)
-        break;
-      else if (ch == C0_SYN)
-        ch = cmd_get8 ();
-      else if (ch < 0x20)
-        return NULL;	/* other control character - exit */
 
-      seen_esc = false;
-
-      if (n >= ecb_array_length (string) - 1)
-        // stop at some sane length
-        return NULL;
-
-      string[n++] = ch;
+      if (!pstr.overflow)
+        pstr.buf[pstr.len++] = ch;
     }
+}
 
-  string[n++] = '\0';
+void
+rxvt_term::end_string (unicode_t terminator)
+{
+  unicode_t kind = pstr.kind;
+  pstr.kind = 0;
 
-  n = 0;
-  if (ch == 0x5c)
+  string_term st;
+  unsigned int n = 0;
+  if (terminator == 0x5c)
     st.v[n++] = C0_ESC;
-  st.v[n++] = ch;
+  st.v[n++] = terminator;
   st.v[n] = '\0';
 
-  return rxvt_wcstombs (string);
+  char *s = 0;
+  if (!pstr.overflow && (kind == C1_OSC || kind == C1_DCS))
+    {
+      pstr.buf[pstr.len] = 0;
+      s = rxvt_wcstombs (pstr.buf, pstr.len);
+    }
+
+  // don't keep a big buffer around after a big string
+  if (pstr.size > 65536)
+    {
+      free (pstr.buf);
+      pstr.buf = 0;
+      pstr.size = 0;
+    }
+  pstr.len = 0;
+
+  // APC, PM and SOS strings, and strings too long, are ignored
+  if (!s)
+    return;
+
+  if (kind == C1_OSC)
+    process_xterm_seq (pstr.osc, s, st);
+  else
+    process_dcs_string (s);
+
+  free (s);
 }
 
 /*----------------------------------------------------------------------*/
@@ -3353,7 +3456,6 @@ rxvt_term::get_to_st (string_term &st)
 void
 rxvt_term::process_dcs_seq ()
 {
-  char params[32], inter[4];
   unsigned int np = 0, ni = 0;
   unicode_t ch;
 
@@ -3363,20 +3465,21 @@ rxvt_term::process_dcs_seq ()
 
       if (IN_RANGE_INC (ch, '0', '?'))
         {
-          if (np < sizeof (params) - 1)
-            params[np++] = ch;
+          if (np < sizeof (pstr.params) - 1)
+            pstr.params[np++] = ch;
         }
       else if (IN_RANGE_INC (ch, 0x20, 0x2f))
         {
-          if (ni < sizeof (inter) - 1)
-            inter[ni++] = ch;
+          if (ni < sizeof (pstr.inter) - 1)
+            pstr.inter[ni++] = ch;
         }
       else
         break;
     }
 
-  params[np] = 0;
-  inter[ni] = 0;
+  pstr.params[np] = 0;
+  pstr.inter[ni] = 0;
+  pstr.final = ch;
 
   if (!IN_RANGE_INC (ch, 0x40, 0x7e))
     {
@@ -3384,24 +3487,23 @@ rxvt_term::process_dcs_seq ()
       if (ch == C0_ESC)
         cmd_getc ();
       else if (ch != C0_BEL && ch != CHAR_ST)
-        {
-          string_term st;
-          free (get_to_st (st));
-        }
+        begin_string (C1_APC); // read and ignored
       return;
     }
 
-  string_term st;
-  char *data = get_to_st (st);
-  if (!data)
-    return;
+  begin_string (C1_DCS);
+}
 
-  if (ch == 'q' && !strcmp (inter, "$") && !np)
-    decrqss (data);
-  else if (ch == 'q' && !strcmp (inter, "+") && !np)
-    xtgettcap (data);
+// a complete device control string: pstr has its parameters, s the data
+void
+rxvt_term::process_dcs_string (const char *s)
+{
+  bool noparams = !pstr.params[0];
 
-  free (data);
+  if (pstr.final == 'q' && !strcmp (pstr.inter, "$") && noparams)
+    decrqss (s);
+  else if (pstr.final == 'q' && !strcmp (pstr.inter, "+") && noparams)
+    xtgettcap (s);
 }
 
 /*
@@ -3638,14 +3740,8 @@ rxvt_term::process_osc_seq ()
 
   if (ch == ';')
     {
-      string_term st;
-      char *s = get_to_st (st);
-
-      if (s)
-        {
-          process_xterm_seq (arg, s, st);
-          free (s);
-        }
+      pstr.osc = arg;
+      begin_string (C1_OSC);
     }
 }
 
