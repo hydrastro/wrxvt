@@ -1141,6 +1141,13 @@ rxvt_font_x11::draw (rxvt_drawable &d, int x, int y,
 
 #if XFT
 
+#if ENABLE_EMOJI_SEQUENCES
+# include <hb.h>
+# include <hb-ft.h>
+# include <map>
+# include <vector>
+#endif
+
 struct rxvt_font_xft : rxvt_font
 {
 #if XFT_CHAR_CACHE
@@ -1173,7 +1180,86 @@ struct rxvt_font_xft : rxvt_font
 
 protected:
   XftFont *f;
+
+#if ENABLE_EMOJI_SEQUENCES
+  struct emoji_glyph
+  {
+    FT_UInt glyph;
+    FT_Pos x, y; // transformed origin relative to baseline, in 26.6 pixels
+  };
+  struct emoji_seq
+  {
+    std::vector<emoji_glyph> glyphs;
+  };
+
+  mutable std::map<text_t, emoji_seq> emoji_seqs;
+  const emoji_seq &shape_emoji (text_t c) const;
+#endif
 };
+
+#if ENABLE_EMOJI_SEQUENCES
+const rxvt_font_xft::emoji_seq &
+rxvt_font_xft::shape_emoji (text_t c) const
+{
+  std::map<text_t, emoji_seq>::const_iterator cached = emoji_seqs.find (c);
+  if (cached != emoji_seqs.end ()) return cached->second;
+
+  // Bound both successful and failed lookups. Clearing is safe: references
+  // are used only during the current has_char/draw call, never retained.
+  if (emoji_seqs.size () >= EMOJI_CACHE_ENTRIES) emoji_seqs.clear ();
+  emoji_seq &s = emoji_seqs[c];
+  uint32_t chars[EMOJI_MAX_CODEPOINTS];
+  unsigned int n = emoji_expand (c, chars);
+  if (!emoji_is_sequence (chars, n)) return s;
+
+  FT_Face face = XftLockFace (f);
+  if (!face) return s;
+  if (FT_HAS_COLOR (face))
+    {
+      // Xft can scale bitmap emoji through a FreeType matrix. Shape in the
+      // untransformed coordinate system, then transform every shaped origin.
+      // Always restore the shared face before returning it to Xft.
+      FT_Matrix matrix;
+      FT_Vector delta;
+      FT_Get_Transform (face, &matrix, &delta);
+      FT_Set_Transform (face, 0, 0);
+      hb_font_t *font = hb_ft_font_create_referenced (face);
+      hb_buffer_t *buffer = hb_buffer_create ();
+      hb_buffer_set_flags (buffer, HB_BUFFER_FLAG_REMOVE_DEFAULT_IGNORABLES);
+      hb_buffer_add_utf32 (buffer, chars, n, 0, n);
+      hb_buffer_guess_segment_properties (buffer);
+      hb_shape (font, buffer, 0, 0);
+
+      unsigned int count;
+      hb_glyph_info_t *info = hb_buffer_get_glyph_infos (buffer, &count);
+      hb_glyph_position_t *positions = hb_buffer_get_glyph_positions (buffer, 0);
+      if (hb_buffer_allocation_successful (buffer) && count && count <= EMOJI_MAX_CODEPOINTS)
+        {
+          FT_Pos x = 0, y = 0;
+          for (unsigned int i = 0; i < count; ++i)
+            {
+              if (!info[i].codepoint)
+                {
+                  s.glyphs.clear ();
+                  break; // fall back to urxvt's ordinary component rendering
+                }
+              FT_Vector origin = { x + positions[i].x_offset,
+                                   y + positions[i].y_offset };
+              FT_Vector_Transform (&origin, &matrix);
+              emoji_glyph glyph = { info[i].codepoint, origin.x, origin.y };
+              s.glyphs.push_back (glyph);
+              x += positions[i].x_advance;
+              y += positions[i].y_advance;
+            }
+        }
+      hb_buffer_destroy (buffer);
+      hb_font_destroy (font);
+      FT_Set_Transform (face, &matrix, &delta);
+    }
+  XftUnlockFace (f);
+  return s;
+}
+#endif
 
 void
 rxvt_font_xft::clear ()
@@ -1183,6 +1269,10 @@ rxvt_font_xft::clear ()
       XftFontClose (term->dpy, f);
       f = 0;
     }
+
+#if ENABLE_EMOJI_SEQUENCES
+  emoji_seqs.clear ();
+#endif
 }
 
 rxvt_fontprop
@@ -1390,6 +1480,11 @@ rxvt_font_xft::has_char (unicode_t unicode, const rxvt_fontprop *prop, bool &car
       return false;
 #endif
 
+#if ENABLE_EMOJI_SEQUENCES
+  if (ecb_expect_false (IS_COMPOSE (unicode)))
+    return !shape_emoji (unicode).glyphs.empty ();
+#endif
+
   FcChar32 chr = unicode;
 
   if (!XftCharExists (term->dpy, f, chr))
@@ -1428,8 +1523,14 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
                      const text_t *text, int len,
                      int fg, int bg)
 {
+#if ENABLE_EMOJI_SEQUENCES
+  // Shaped runs may contain more glyphs than terminal columns.
+  std::vector<XftGlyphSpec> glyph_specs;
+  glyph_specs.reserve (len);
+#else
   XftGlyphSpec *enc = rxvt_temp_buf<XftGlyphSpec> (len);
   XftGlyphSpec *ep = enc;
+#endif
 
   dTermDisplay;
   dTermGC;
@@ -1454,6 +1555,27 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
 
       while (len && *text == NOCHAR)
         text++, len--, cwidth += term->fwidth;
+
+#if ENABLE_EMOJI_SEQUENCES
+      if (ecb_expect_false (IS_COMPOSE (chr)))
+        {
+          const emoji_seq &s = shape_emoji (chr);
+          for (std::vector<emoji_glyph>::const_iterator g = s.glyphs.begin ();
+               g != s.glyphs.end (); ++g)
+            {
+              XftGlyphSpec spec;
+              spec.glyph = g->glyph;
+              spec.x = x_ + (int)lround (g->x / 64.0);
+              // HarfBuzz's positive y direction is opposite to X11's.
+              spec.y = y_ + term->fbase + (term->lineSpace >> 1)
+                       - (int)lround (g->y / 64.0);
+              glyph_specs.push_back (spec);
+            }
+
+          x_ += cwidth;
+          continue;
+        }
+#endif
 
       if (chr != ' ') // skip spaces
         {
@@ -1497,6 +1619,10 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
               xOff = extents.xOff;
             }
 
+#if ENABLE_EMOJI_SEQUENCES
+          XftGlyphSpec spec;
+          XftGlyphSpec *ep = &spec;
+#endif
           ep->glyph = glyph;
           ep->x = x_;
           ep->y = y_ + ascent;
@@ -1514,11 +1640,22 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
           // of the base character here, but we don't have that, so we use cwidth.
           ep->x += xOff ? 0 : cwidth;
 
+#if ENABLE_EMOJI_SEQUENCES
+          glyph_specs.push_back (spec);
+#else
           ++ep;
+#endif
         }
 
       x_ += cwidth;
     }
+
+#if ENABLE_EMOJI_SEQUENCES
+  // Keep the common drawing path and its background/clip handling intact.
+  XftGlyphSpec dummy;
+  XftGlyphSpec *enc = glyph_specs.empty () ? &dummy : &glyph_specs[0];
+  XftGlyphSpec *ep = enc + glyph_specs.size ();
+#endif
 
   if (buffered)
     {

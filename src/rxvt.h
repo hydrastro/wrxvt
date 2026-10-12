@@ -821,7 +821,7 @@ struct rxvt_composite_vec
 {
   vector<compose_char> v;
 
-  text_t compose (unicode_t c1, unicode_t c2 = NOCHAR);
+  text_t compose (unicode_t c1, unicode_t c2 = NOCHAR, bool dedupe = true);
   template<typename T> int expand (unicode_t c, T *r);
   int expand (unicode_t c) { return expand (c, (text_t *)0); }
   compose_char *operator [](text_t c)
@@ -833,6 +833,46 @@ struct rxvt_composite_vec
 };
 
 extern class rxvt_composite_vec rxvt_composite;
+
+#if HAVE_HARFBUZZ && XFT && UNICODE_3
+# define ENABLE_EMOJI_SEQUENCES 1
+#endif
+
+#if ENABLE_EMOJI_SEQUENCES
+# include "emoji-sequences.h"
+
+// Expand the left-linked composition chain without recursion. Spaces here
+// are padding inserted by the wide-glyph patch, never part of an emoji.
+static inline unsigned int
+emoji_expand (text_t c, uint32_t *out)
+{
+  unsigned int n = 0, depth = 0;
+  while (compose_char *cc = rxvt_composite [c])
+    {
+      if (++depth > 2 * EMOJI_MAX_CODEPOINTS) return 0;
+      if (cc->c2 != NOCHAR && cc->c2 != ' ')
+        {
+          if (n == EMOJI_MAX_CODEPOINTS) return 0;
+          out[n++] = cc->c2;
+        }
+      c = cc->c1;
+    }
+  if (n == EMOJI_MAX_CODEPOINTS) return 0;
+  out[n++] = c;
+  for (unsigned int i = 0; i < n / 2; ++i)
+    ::swap (out[i], out[n - i - 1]);
+  return n;
+}
+
+static inline bool
+emoji_join (text_t previous, unicode_t next)
+{
+  uint32_t sequence[EMOJI_MAX_CODEPOINTS];
+  unsigned int n = emoji_expand (previous, sequence);
+  return emoji_can_join (sequence, n, next);
+}
+#endif
+
 #endif
 
 #if 0

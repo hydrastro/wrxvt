@@ -92,13 +92,15 @@ rxvt_pop_locale () noexcept
 #if ENABLE_COMBINING
 class rxvt_composite_vec rxvt_composite;
 
-text_t rxvt_composite_vec::compose (unicode_t c1, unicode_t c2)
+text_t rxvt_composite_vec::compose (unicode_t c1, unicode_t c2, bool dedupe)
 {
   compose_char *cc;
 
   // break compose chains, as stupid readline really likes to duplicate
   // composing characters for some reason, near the end of a line.
-  cc = (*this)[c1];
+  // (not for emoji sequences, which repeat characters on purpose: the
+  // zero width joiners of a family, the letters of a subdivision flag)
+  cc = dedupe ? (*this)[c1] : 0;
   while (cc)
     {
       if (cc->c2 == c2) return c1;

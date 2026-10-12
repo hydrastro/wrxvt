@@ -826,6 +826,7 @@ rxvt_term::scr_scroll_text (int row1, int row2, int count) noexcept
 /*
  * Add text given in <str> of length <len> to screen struct
  */
+
 void ecb_hot
 rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
 {
@@ -959,6 +960,64 @@ rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
       if (ecb_unlikely (screen.flags & Screen_Insert))
         scr_insdel_chars (width, INSERT);
 
+#if ENABLE_EMOJI_SEQUENCES
+      // Emoji sequences (see emoji_join in rxvt.h): the second regional
+      // indicator of a flag, a skin tone after an emoji, or an emoji after
+      // a zero width joiner continue the previous character, which gets
+      // wider by the width of this one.
+      if (ecb_unlikely (width > 0
+                        && screen.cur.col > 0
+                        && !(screen.flags & Screen_WrapNext)
+                        && screen.cur.col + width <= ncol
+                        && (emoji_properties (c) & (EMOJI_REGIONAL | EMOJI_MODIFIER | EMOJI_PICTOGRAPHIC))))
+        {
+          text_t *tp = line->t + screen.cur.col - 1;
+          rend_t *rp = line->r + screen.cur.col - 1;
+
+          while (*tp == NOCHAR && tp > line->t)
+            tp--, rp--;
+
+          bool join = emoji_join (*tp, c)
+                      && !((*rp ^ rstyle) & ~RS_fontMask);
+
+          if (join)
+            {
+              line->touch ();
+
+              *tp = rxvt_composite.compose (*tp, c, false);
+              *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
+
+              do
+                {
+                  line->t[screen.cur.col] = NOCHAR;
+                  line->r[screen.cur.col] = *rp;
+
+                  if (screen.cur.col < ncol - 1)
+                    screen.cur.col++;
+                  else
+                    {
+                      line->l = ncol;
+                      if (screen.flags & Screen_Autowrap)
+                        screen.flags |= Screen_WrapNext;
+
+                      goto joined;
+                    }
+                }
+              while (--width);
+
+              // pad with spaces when overwriting a wide character
+              for (int col = screen.cur.col; col < ncol && line->t[col] == NOCHAR; col++)
+                {
+                  line->t[col] = ' ';
+                  line->r[col] = *rp;
+                }
+
+            joined:
+              continue;
+            }
+        }
+#endif
+
       if (width != 0)
         {
 #if !UNICODE_3
@@ -1063,7 +1122,14 @@ end_of_line:
               // first try to find a precomposed character
               unicode_t n = rxvt_compose (*tp, c);
               if (n == NOCHAR)
-                n = rxvt_composite.compose (*tp, c);
+                {
+#if ENABLE_EMOJI_SEQUENCES
+                  // emoji sequences repeat characters on purpose
+                  n = rxvt_composite.compose (*tp, c, !emoji_join (*tp, c));
+#else
+                  n = rxvt_composite.compose (*tp, c);
+#endif
+                }
 
               *tp = n;
               *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
