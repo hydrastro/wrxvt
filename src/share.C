@@ -44,6 +44,7 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
+#include "rxvtbuf.h"
 #include "share-page.h"
 
 #define SHARE_MAX_CLIENTS   16
@@ -52,104 +53,15 @@
 #define SHARE_MAX_BACKLOG   (4 << 20)    // unsent output before a client is dropped
 #define SHARE_LOGIN_TIME    10.          // seconds to present a key
 
-/*----------------------------------------------------------------------*/
-// a growable byte buffer (no standard library here)
-
-struct share_buf
-{
-  char *data;
-  size_t len, cap;
-
-  share_buf () : data (0), len (0), cap (0) { }
-  ~share_buf () { free (data); }
-
-  void reserve (size_t n)
-  {
-    if (len + n + 1 > cap)
-      {
-        cap = max (cap * 2, len + n + 1);
-        data = (char *)rxvt_realloc (data, cap);
-      }
-  }
-
-  void add (const void *p, size_t n)
-  {
-    reserve (n);
-    memcpy (data + len, p, n);
-    len += n;
-    data[len] = 0;
-  }
-
-  void add (const char *s) { add (s, strlen (s)); }
-  void add (char c) { add (&c, 1); }
-
-  void printf (const char *fmt, ...)
-  {
-    va_list ap;
-    va_start (ap, fmt);
-    int n = vsnprintf (0, 0, fmt, ap);
-    va_end (ap);
-    reserve (n);
-    va_start (ap, fmt);
-    vsnprintf (data + len, n + 1, fmt, ap);
-    va_end (ap);
-    len += n;
-  }
-
-  void consume (size_t n)
-  {
-    memmove (data, data + n, len - n);
-    len -= n;
-  }
-
-  void clear () { len = 0; }
-};
-
-static void
-add_utf8 (share_buf &b, unicode_t c)
-{
-  char s[4];
-  int n;
-
-  if (c < 0x80)
-    s[0] = c, n = 1;
-  else if (c < 0x800)
-    s[0] = 0xc0 | c >> 6, s[1] = 0x80 | (c & 0x3f), n = 2;
-  else if (c < 0x10000)
-    s[0] = 0xe0 | c >> 12, s[1] = 0x80 | (c >> 6 & 0x3f), s[2] = 0x80 | (c & 0x3f), n = 3;
-  else if (c < 0x110000)
-    s[0] = 0xf0 | c >> 18, s[1] = 0x80 | (c >> 12 & 0x3f), s[2] = 0x80 | (c >> 6 & 0x3f),
-    s[3] = 0x80 | (c & 0x3f), n = 4;
-  else
-    s[0] = '?', n = 1;
-
-  b.add (s, n);
-}
-
-// a character inside a JSON string
-static void
-add_json_char (share_buf &b, unicode_t c)
-{
-  if (c == '"' || c == '\\')
-    {
-      b.add ('\\');
-      b.add ((char)c);
-    }
-  else if (c < 0x20 || c == 0x7f || (c >= 0xd800 && c < 0xe000))
-    b.printf ("\\u%04x", c < 0xd800 ? c : 0xfffd);
-  else
-    add_utf8 (b, c);
-}
-
 // a JSON string from text in the locale's encoding
 static void
-add_json_string (share_buf &b, const char *s)
+add_json_string (rxvt_buf &b, const char *s)
 {
   wchar_t *ws = rxvt_mbstowcs (s ? s : "");
 
   b.add ('"');
   for (wchar_t *p = ws; *p; p++)
-    add_json_char (b, *p);
+    b.add_json_char (*p);
   b.add ('"');
 
   free (ws);
@@ -234,7 +146,7 @@ sha1 (const unsigned char *msg, size_t len, unsigned char digest[20])
 static char *
 json_get_string (const char *json, const char *name)
 {
-  share_buf key;
+  rxvt_buf key;
   key.printf ("\"%s\"", name);
 
   for (const char *p = strstr (json, key.data); p; p = strstr (p + 1, key.data))
@@ -247,7 +159,7 @@ json_get_string (const char *json, const char *name)
       if (*q++ != '"')
         return 0;
 
-      share_buf out;
+      rxvt_buf out;
       unsigned int high = 0;     // a pending high surrogate
 
       while (*q && *q != '"')
@@ -295,7 +207,7 @@ json_get_string (const char *json, const char *name)
                     }
 
                   high = 0;
-                  add_utf8 (out, c);
+                  out.add_utf8 (c);
                   continue;
                 }
               case 0:
@@ -319,7 +231,7 @@ json_get_string (const char *json, const char *name)
 static bool
 json_get_bool (const char *json, const char *name)
 {
-  share_buf key;
+  rxvt_buf key;
   key.printf ("\"%s\"", name);
 
   const char *p = strstr (json, key.data);
@@ -352,7 +264,7 @@ struct share_client
   int cursor[3];
   char *title;
 
-  share_buf in, out, message;  // message: a fragmented WebSocket message
+  rxvt_buf in, out, message;  // message: a fragmented WebSocket message
 
   share_client (share_server *server, int fd);
   ~share_client ();
@@ -363,7 +275,7 @@ struct share_client
   bool process_frames ();
   bool handle_message (const char *json);
   void send_frame (int opcode, const char *data, size_t len);
-  void send_text (const share_buf &b) { send_frame (1, b.data, b.len); }
+  void send_text (const rxvt_buf &b) { send_frame (1, b.data, b.len); }
   void send_close (int code, const char *reason);
   void respond (const char *status, const char *type, const char *body, size_t len);
 };
@@ -399,7 +311,7 @@ struct share_server
   int watching () const;
 
   void hello (share_client *c);
-  void encode_row (share_buf &b, int row);
+  void encode_row (rxvt_buf &b, int row);
   const char *color (int idx, char buf[8]);
   void send_key (const char *name, bool shift, bool ctrl, bool alt);
 };
@@ -592,7 +504,7 @@ share_client::process_http ()
 
       if (ok)
         {
-          share_buf accept;
+          rxvt_buf accept;
           accept.add (ws_key);
           accept.add ("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
@@ -658,7 +570,7 @@ share_client::send_frame (int opcode, const char *data, size_t len)
 void
 share_client::send_close (int code, const char *reason)
 {
-  share_buf b;
+  rxvt_buf b;
   b.add ((char)(code >> 8));
   b.add ((char)code);
   b.add (reason);
@@ -784,7 +696,7 @@ share_client::handle_message (const char *json)
 
       if (role == NONE)
         {
-          share_buf b;
+          rxvt_buf b;
           b.add ("{\"type\":\"error\",\"message\":\"This link doesn't work (any more): "
                  "sharing was stopped or started again.\"}");
           send_text (b);
@@ -852,7 +764,7 @@ share_server::~share_server ()
       if (c->state == share_client::WEBSOCKET && c->role != share_client::NONE)
         {
           c->out.clear ();
-          share_buf b;
+          rxvt_buf b;
           b.add ("{\"type\":\"bye\",\"message\":\"The terminal stopped sharing.\"}");
           c->send_text (b);
           c->send_close (1001, "sharing stopped");
@@ -1000,7 +912,7 @@ share_server::start (const char *&error)
 
   for (int k = 0; k < 2; k++)
     {
-      share_buf u;
+      rxvt_buf u;
       u.printf ("http://%s:%d/#%s", host, port, key[k]);
       url[k] = strdup (u.data);
     }
@@ -1062,7 +974,7 @@ void
 share_server::hello (share_client *c)
 {
   char fg[8], bg[8];
-  share_buf b;
+  rxvt_buf b;
 
   b.printf ("{\"type\":\"hello\",\"role\":\"%s\",\"cols\":%d,\"rows\":%d,\"fg\":\"%s\",\"bg\":\"%s\"}",
             c->role == share_client::CONTROL ? "control" : "view", term->ncol, term->nrow,
@@ -1074,12 +986,12 @@ share_server::hello (share_client *c)
 
 // one row of the screen: [[text, fg, bg, flags], ...]
 void
-share_server::encode_row (share_buf &b, int row)
+share_server::encode_row (rxvt_buf &b, int row)
 {
   line_t &l = ROW_of (term, row);
   bool valid = l.valid () && l.t && l.r;
   int ncol = term->ncol;
-  share_buf text;
+  rxvt_buf text;
   rend_t last = 0;
   int fg = 0, bg = 0, flags = 0;
   bool have = false, first = true;
@@ -1140,7 +1052,7 @@ share_server::encode_row (share_buf &b, int row)
         t = ' ';
 
       if (IS_IMAGE_TILE (t))
-        add_json_char (text, ' ');   // pictures are not sent (yet)
+        text.add_json_char (' ');   // pictures are not sent (yet)
 #if ENABLE_COMBINING
       else if (IS_COMPOSE (t))
         {
@@ -1151,12 +1063,12 @@ share_server::encode_row (share_buf &b, int row)
             {
               rxvt_composite.expand (t, chars);
               for (int i = 0; i < n; i++)
-                add_json_char (text, chars[i]);
+                text.add_json_char (chars[i]);
             }
         }
 #endif
       else
-        add_json_char (text, t);
+        text.add_json_char (t);
     }
 
   end_run ();
@@ -1187,7 +1099,7 @@ share_server::update_cb (ev::timer &w, int revents)
 {
   int nrow = term->nrow, ncol = term->ncol;
   uint32_t *hashes = (uint32_t *)rxvt_malloc (nrow * sizeof (uint32_t));
-  share_buf *rows = new share_buf[nrow];   // each row's JSON, made once
+  rxvt_buf *rows = new rxvt_buf[nrow];   // each row's JSON, made once
 
   for (int row = 0; row < nrow; row++)
     hashes[row] = row_hash (ROW_of (term, row), ncol);
@@ -1218,7 +1130,7 @@ share_server::update_cb (ev::timer &w, int revents)
           c->need_full = true;
         }
 
-      share_buf b;
+      rxvt_buf b;
       b.printf ("{\"type\":\"screen\",\"cols\":%d,\"rows\":%d,\"lines\":[", ncol, nrow);
       bool changed = false;
 
@@ -1280,7 +1192,7 @@ share_server::send_key (const char *name, bool shift, bool ctrl, bool alt)
     { "F6", "17" }, { "F7", "18" }, { "F8", "19" }, { "F9", "20" }, { "F10", "21" },
     { "F11", "23" }, { "F12", "24" },
   };
-  share_buf s;
+  rxvt_buf s;
 
   if (alt)
     s.add ('\033');
@@ -1328,15 +1240,7 @@ share_server::send_key (const char *name, bool shift, bool ctrl, bool alt)
 void
 rxvt_term::share_notify (const char *text)
 {
-  const char *notifier = rs[Rs_notifyCommand] ? rs[Rs_notifyCommand] : "notify-send --";
-
-  if (!*notifier)
-    return;
-
-  char *command = (char *)rxvt_malloc (strlen (notifier) + 16);
-  sprintf (command, "%s \"$1\" \"$2\"", notifier);
-  spawn (command, "wrxvt: sharing", text);
-  free (command);
+  notify_as ("wrxvt: sharing", text);
 }
 
 void
@@ -1399,7 +1303,7 @@ rxvt_term::share_copy_link (bool control)
   set_selection (text, true, true);
   free (text);
 
-  share_buf msg;
+  rxvt_buf msg;
   msg.printf (control
               ? "Link to watch AND TYPE copied (give it only to someone you trust): %s"
               : "Link to watch copied: %s\nshare:control copies the link that can type.",

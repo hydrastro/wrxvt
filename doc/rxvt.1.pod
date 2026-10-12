@@ -434,6 +434,11 @@ info.
 Share the terminal on a web page as soon as it starts, as the
 B<share:start> action does (see L<SHARING ON THE WEB>).
 
+=item B<-record> I<file>
+
+Record the terminal to I<file>, an asciinema recording, from the start
+(see the B<record:start> action).
+
 =item B<-mod> I<modifier>
 
 Override detection of Meta modifier with specified key: B<alt>,
@@ -979,6 +984,11 @@ computer is on.
 Its TCP port; the default, C<0>, takes any free port. The links say
 which.
 
+=item B<recordDirectory:> I<directory>
+
+Where B<record:start> puts recordings, as
+F<wrxvt-YYYYMMDD-HHMMSS.cast>; the default is your home directory.
+
 =item B<termName:> I<termname>
 
 Specifies the terminal type name to be set in the B<TERM> environment
@@ -1363,6 +1373,19 @@ type. For example:
 
    URxvt.keysym.C-S-F12: share:toggle
    URxvt.keysym.C-S-F11: share:control
+
+=item record:start, record:stop, record:toggle
+
+Record the terminal as an asciinema file (asciicast version 2) in
+B<recordDirectory>: what programs print, with its timing, and the
+window's size changes. What you type is not recorded, only what is
+shown. The recording begins with the screen as it is, and the window
+title starts with C<[rec]> until it stops; a notification
+(B<notifyCommand>) says where it was saved. The file is readable only by
+you. Play it with C<asciinema play>, publish it with asciinema-player,
+or make a GIF with agg. For example:
+
+   URxvt.keysym.C-S-F10: record:toggle
 
 =item EXTENSION:STRING
 

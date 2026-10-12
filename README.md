@@ -58,6 +58,9 @@ Sharing:
   link to watch and a link that can also type, each with its own random
   key, for pair programming, teaching or demos. Local by default; the
   title says when someone is watching.
+- **Recording** (`record:toggle`, `-record FILE`): asciinema files of
+  what is shown (not what is typed), for `asciinema play`, the web player
+  or agg.
 
 Shell integration:
 
@@ -97,6 +100,7 @@ URxvt.url-launcher:    firefox
 URxvt.notifyCommand:   notify-send --app-name=wrxvt --
 URxvt.keysym.C-S-F12:  share:toggle
 URxvt.keysym.C-S-F11:  share:control
+URxvt.keysym.C-S-F10:  record:toggle
 URxvt.color208:        #ff8700
 ```
 

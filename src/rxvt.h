@@ -762,9 +762,12 @@ typedef callback<int (int)> getfd_callback;
 
 #if ENABLE_FRILLS
 # define ENABLE_SHARE 1         // share.C: the terminal on a web page
+# define ENABLE_RECORD 1        // record.C: asciinema recordings
 #endif
 
 struct share_server;
+struct term_recording;
+struct rxvt_buf;
 
 /*
  * Sixel pictures (sixel.C): cells covered by a picture hold IMAGE_TILE
@@ -1476,6 +1479,20 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool open_link (int x, int y);
   void spawn (const char *command, const char *arg1, const char *arg2 = 0);
   void notify (const char *text);
+  void notify_as (const char *title, const char *text);
+
+  // the screen as text (record.C)
+  void sgr_color (rxvt_buf &b, int idx, int base);
+  void sgr_rend (rxvt_buf &b, rend_t r);
+  void rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const char *eol, bool join);
+
+#if ENABLE_RECORD
+  term_recording *recording;
+  void record_start (const char *path);
+  void record_stop (bool quiet = false);
+  void record_output (const char *data, size_t len);
+  void record_resize ();
+#endif
   char *get_title (bool icon);
   char *app_title;      // the title as programs set it, without marks like [shared]
   void update_title ();

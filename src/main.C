@@ -222,6 +222,9 @@ rxvt_term::~rxvt_term ()
 #if ENABLE_SHARE
   share_stop ();
 #endif
+#if ENABLE_RECORD
+  record_stop (true);
+#endif
   free (app_title);
 
   free (pstr.buf);
@@ -980,15 +983,20 @@ rxvt_term::update_title ()
   const char *title = app_title ? app_title : "";
   char mark[64] = "";
 
+#if ENABLE_RECORD
+  if (recording)
+    strcpy (mark, "[rec] ");
+#endif
 #if ENABLE_SHARE
   if (share)
     {
       int n = share_watching ();
+      size_t len = strlen (mark);
 
       if (n)
-        snprintf (mark, sizeof (mark), "[shared, %d watching] ", n);
+        snprintf (mark + len, sizeof (mark) - len, "[shared, %d watching] ", n);
       else
-        strcpy (mark, "[shared] ");
+        snprintf (mark + len, sizeof (mark) - len, "[shared] ");
     }
 #endif
 

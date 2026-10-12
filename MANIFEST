@@ -82,6 +82,8 @@ src/sixel.C
 src/graphics.C
 src/share.C
 src/share-page.h
+src/rxvtbuf.h
+src/record.C
 src/scrollbar-next.C
 src/scrollbar-rxvt.C
 src/scrollbar-xterm.C

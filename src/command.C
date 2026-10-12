@@ -1601,6 +1601,11 @@ rxvt_term::pty_fill ()
 
   if (r > 0)
     {
+#if ENABLE_RECORD
+      if (recording)
+        record_output (cmdbuf_endp, r);
+#endif
+
       cmdbuf_endp += r;
       return true;
     }
@@ -4577,13 +4582,10 @@ rxvt_term::open_link (int x, int y)
  * notifyCommand resource, notify-send by default, given the window
  * title and the text.
  */
+// a desktop notification with notifyCommand (title and text as $1 and $2)
 void
-rxvt_term::notify (const char *text)
+rxvt_term::notify_as (const char *title, const char *text)
 {
-  // ConEmu's progress reports (9;4;...) and other numbered subcommands
-  if (isdigit (text[0]) && text[1] == ';')
-    return;
-
   const char *notifier = rs[Rs_notifyCommand];
   if (!notifier)
     notifier = "notify-send --";
@@ -4591,12 +4593,21 @@ rxvt_term::notify (const char *text)
   if (!*notifier)
     return; // disabled
 
-  char *title = get_title (false);
-
   char *command = (char *)rxvt_malloc (strlen (notifier) + 16);
   sprintf (command, "%s \"$1\" \"$2\"", notifier);
-  spawn (command, *title ? title : RESNAME, text);
+  spawn (command, title, text);
   free (command);
+}
+
+void
+rxvt_term::notify (const char *text)
+{
+  // ConEmu's progress reports (9;4;...) and other numbered subcommands
+  if (isdigit (text[0]) && text[1] == ';')
+    return;
+
+  char *title = get_title (false);
+  notify_as (*title ? title : RESNAME, text);
   free (title);
 
 #if ENABLE_FRILLS
@@ -4767,6 +4778,22 @@ rxvt_term::builtin_action (const char *name, const char *arg)
         share ? share_stop () : share_start ();
       else if (!strcmp (arg, "control"))
         share ? share_copy_link (true) : (void)0;
+      else
+        return false;
+
+      return true;
+    }
+#endif
+
+#if ENABLE_RECORD
+  if (!strcmp (name, "record"))
+    {
+      if (!strcmp (arg, "start"))
+        record_start (0);
+      else if (!strcmp (arg, "stop"))
+        record_stop ();
+      else if (!strcmp (arg, "toggle"))
+        recording ? record_stop () : record_start (0);
       else
         return false;
 

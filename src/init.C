@@ -923,6 +923,11 @@ rxvt_term::init2 (int argc, const char *const *argv)
     share_start ();
 #endif
 
+#if ENABLE_RECORD
+  if (rs[Rs_record])
+    record_start (rs[Rs_record]);
+#endif
+
 #if ENABLE_XEMBED
   if (rs[Rs_embed])
     {

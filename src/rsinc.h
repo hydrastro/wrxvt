@@ -9,6 +9,8 @@
   def (notifyCommand)
   def (shareAddress)
   def (sharePort)
+  def (record)
+  def (recordDirectory)
   def (color)
   reserve (color, TOTAL_COLORS)
   def (font)
