@@ -1628,9 +1628,15 @@ rxvt_term::pty_cb (ev::io &w, int revents)
   make_current ();
 
   if (revents & ev::READ)
-    // loop, but don't allow a single term to monopolize us
-    for (int i = CBUFCNT; i-- && pty_fill (); )
-      cmd_parse ();
+    {
+      // loop, but don't allow a single term to monopolize us
+      for (int i = CBUFCNT; i-- && pty_fill (); )
+        cmd_parse ();
+
+#if ENABLE_SHARE
+      share_changed ();
+#endif
+    }
 
   if (revents & ev::WRITE)
     pty_write ();
@@ -3629,6 +3635,10 @@ rxvt_term::get_title (bool icon)
   XTextProperty prop;
   char *title = 0;
 
+  // without the [shared] mark
+  if (!icon && app_title)
+    return strdup (app_title);
+
   if (XGetTextProperty (dpy, parent, &prop, icon ? XA_WM_ICON_NAME : XA_WM_NAME))
     {
       char **list;
@@ -4223,8 +4233,8 @@ rxvt_term::xtgettcap (const char *request)
  */
 static const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-static char *
-base64_encode (const char *data, unsigned int len)
+char *
+rxvt_base64_encode (const char *data, unsigned int len)
 {
   char *out = (char *)rxvt_malloc ((len + 2) / 3 * 4 + 1);
   char *p = out;
@@ -4281,7 +4291,7 @@ rxvt_base64_decode (char *str)
 void
 rxvt_term::selection_report (char target, const char *data, unsigned int len)
 {
-  char *encoded = base64_encode (data ? data : "", data ? len : 0);
+  char *encoded = rxvt_base64_encode (data ? data : "", data ? len : 0);
 
   tt_printf ("\033]52;%c;", target);
   tt_write (encoded, strlen (encoded));
@@ -4355,7 +4365,14 @@ rxvt_term::process_selection_seq (char *str, string_term &st)
 
   data[len] = 0;
   wchar_t *text = rxvt_mbstowcs (data, len);
+  set_selection (text, primary, clipboard);
+  free (text);
+}
 
+// own the primary selection and/or the clipboard, with this text
+void
+rxvt_term::set_selection (const wchar_t *text, bool primary, bool clipboard)
+{
   if (primary)
     {
       selection_clear (false);
@@ -4371,8 +4388,6 @@ rxvt_term::process_selection_seq (char *str, string_term &st)
       selection.clip_len = wcslen (text);
       selection_grab (CurrentTime, true);
     }
-
-  free (text);
 }
 
 /*----------------------------------------------------------------------*/
@@ -4740,6 +4755,24 @@ rxvt_term::builtin_action (const char *name, const char *arg)
 
       return true;
     }
+
+#if ENABLE_SHARE
+  if (!strcmp (name, "share"))
+    {
+      if (!strcmp (arg, "start"))
+        share_start ();
+      else if (!strcmp (arg, "stop"))
+        share_stop ();
+      else if (!strcmp (arg, "toggle"))
+        share ? share_stop () : share_start ();
+      else if (!strcmp (arg, "control"))
+        share ? share_copy_link (true) : (void)0;
+      else
+        return false;
+
+      return true;
+    }
+#endif
 
   if (!strcmp (name, "prompt"))
     {

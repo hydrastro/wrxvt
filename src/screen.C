@@ -218,6 +218,10 @@ rxvt_term::scr_reset ()
   scr_overlay_off ();
 #endif
 
+#if ENABLE_SHARE
+  share_changed (); // a new size for the viewers
+#endif
+
   view_start = 0;
   num_scr = 0;
 

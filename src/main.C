@@ -219,6 +219,11 @@ rxvt_term::~rxvt_term ()
 {
   termlist.erase (find (termlist.begin (), termlist.end(), this));
 
+#if ENABLE_SHARE
+  share_stop ();
+#endif
+  free (app_title);
+
   free (pstr.buf);
 
 #if ENABLE_SIXEL
@@ -963,9 +968,44 @@ rxvt_term::set_utf8_property (Atom prop, const char *str, int len)
 void
 rxvt_term::set_title (const char *str)
 {
+  free (app_title);
+  app_title = strdup (str ? str : "");
+  update_title ();
+}
+
+// the window title: the program's, after marks for sharing
+void
+rxvt_term::update_title ()
+{
+  const char *title = app_title ? app_title : "";
+  char mark[64] = "";
+
+#if ENABLE_SHARE
+  if (share)
+    {
+      int n = share_watching ();
+
+      if (n)
+        snprintf (mark, sizeof (mark), "[shared, %d watching] ", n);
+      else
+        strcpy (mark, "[shared] ");
+    }
+#endif
+
+  char *str = (char *)rxvt_malloc (strlen (mark) + strlen (title) + 1);
+  strcpy (str, mark);
+  strcat (str, title);
+
   set_mbstring_property (XA_WM_NAME, str);
 #if ENABLE_EWMH
   set_utf8_property (xa[XA_NET_WM_NAME], str);
+#endif
+
+  free (str);
+  XFlush (dpy);   // also when called outside the X event loop (sharing)
+
+#if ENABLE_SHARE
+  share_changed ();
 #endif
 }
 

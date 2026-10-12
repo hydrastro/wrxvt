@@ -80,6 +80,8 @@ src/rxvtdaemon.h
 src/screen.C
 src/sixel.C
 src/graphics.C
+src/share.C
+src/share-page.h
 src/scrollbar-next.C
 src/scrollbar-rxvt.C
 src/scrollbar-xterm.C

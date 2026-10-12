@@ -7,6 +7,8 @@
   def (reverseVideo)
   def (chdir)
   def (notifyCommand)
+  def (shareAddress)
+  def (sharePort)
   def (color)
   reserve (color, TOTAL_COLORS)
   def (font)

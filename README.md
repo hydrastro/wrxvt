@@ -52,6 +52,13 @@ Talking to programs:
 - Control strings of any length (big OSC 52 copies). APC, PM and SOS
   strings are ignored instead of printed.
 
+Sharing:
+
+- **Share the terminal on a web page** (`share:start`, `-share`): a
+  link to watch and a link that can also type, each with its own random
+  key, for pair programming, teaching or demos. Local by default; the
+  title says when someone is watching.
+
 Shell integration:
 
 - **OSC 7**: the shell's directory is put on the window as `_WRXVT_CWD`,
@@ -88,6 +95,8 @@ URxvt.keysym.C-S-Up:   prompt:previous
 URxvt.keysym.C-S-Down: prompt:next
 URxvt.url-launcher:    firefox
 URxvt.notifyCommand:   notify-send --app-name=wrxvt --
+URxvt.keysym.C-S-F12:  share:toggle
+URxvt.keysym.C-S-F11:  share:control
 URxvt.color208:        #ff8700
 ```
 

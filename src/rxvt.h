@@ -157,6 +157,7 @@ void rxvt_init ();
 // misc.C
 char *           rxvt_wcstombs                    (const wchar_t *str, int len = -1);
 int              rxvt_base64_decode               (char *str);
+char *           rxvt_base64_encode               (const char *data, unsigned int len);
 wchar_t *        rxvt_mbstowcs                    (const char *str, int len = -1);
 char *           rxvt_wcstoutf8                   (const wchar_t *str, int len = -1);
 wchar_t *        rxvt_utf8towcs                   (const char *str, int len = -1);
@@ -758,6 +759,12 @@ typedef callback<void (const char *)> log_callback;
 typedef callback<int (int)> getfd_callback;
 
 /****************************************************************************/
+
+#if ENABLE_FRILLS
+# define ENABLE_SHARE 1         // share.C: the terminal on a web page
+#endif
+
+struct share_server;
 
 /*
  * Sixel pictures (sixel.C): cells covered by a picture hold IMAGE_TILE
@@ -1470,6 +1477,20 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void spawn (const char *command, const char *arg1, const char *arg2 = 0);
   void notify (const char *text);
   char *get_title (bool icon);
+  char *app_title;      // the title as programs set it, without marks like [shared]
+  void update_title ();
+  void set_selection (const wchar_t *text, bool primary, bool clipboard);
+
+#if ENABLE_SHARE
+  // sharing the terminal on a web page (share.C)
+  share_server *share;
+  void share_start ();
+  void share_stop ();
+  void share_copy_link (bool control);
+  void share_changed ();
+  void share_notify (const char *text);
+  int share_watching ();
+#endif
 
   // the title stack (CSI 22 t, CSI 23 t)
   struct title_stack_entry { char *title, *icon; } title_stack[TITLE_STACK_MAX];

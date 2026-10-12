@@ -429,6 +429,11 @@ Enable "insecure" mode, which currently enables most of the escape
 sequences that echo strings. See the resource B<insecure> for more
 info.
 
+=item B<-share>
+
+Share the terminal on a web page as soon as it starts, as the
+B<share:start> action does (see L<SHARING ON THE WEB>).
+
 =item B<-mod> I<modifier>
 
 Override detection of Meta modifier with specified key: B<alt>,
@@ -961,6 +966,19 @@ C<ESC ] 9 ; text ST>: it is run by F</bin/sh> with the window title and
 the text as two more arguments. The default is C<notify-send -->; an
 empty value ignores notifications.
 
+=item B<shareAddress:> I<address>
+
+The IP address the web server of a shared terminal listens on (see
+L<SHARING ON THE WEB>). The default, C<127.0.0.1>, lets only this
+computer connect. Any other address needs the B<insecure> option, since
+the connection is not encrypted: C<0.0.0.0> means every network the
+computer is on.
+
+=item B<sharePort:> I<number>
+
+Its TCP port; the default, C<0>, takes any free port. The links say
+which.
+
 =item B<termName:> I<termname>
 
 Specifies the terminal type name to be set in the B<TERM> environment
@@ -1336,6 +1354,16 @@ and the bindings:
    URxvt.keysym.C-S-Up: prompt:previous
    URxvt.keysym.C-S-Down: prompt:next
 
+=item share:start, share:stop, share:toggle, share:control
+
+Start or stop sharing the terminal on a web page (see L<SHARING ON THE
+WEB>). B<share:start> copies the link to watch to the clipboard (again,
+when already sharing); B<share:control> copies the link that can also
+type. For example:
+
+   URxvt.keysym.C-S-F12: share:toggle
+   URxvt.keysym.C-S-F11: share:control
+
 =item EXTENSION:STRING
 
 An action of this form invokes the action B<STRING>, if any, provided
@@ -1453,6 +1481,57 @@ Turn on/off ISO 14755 (default enabled).
 Turn on/off ISO 14755 5.2 mode (default enabled).
 
 =back
+
+=head1 SHARING ON THE WEB
+
+The B<share:start> action (or the B<-share> option) makes the terminal
+a small web server, so that others can follow it in a browser: for pair
+programming, teaching or a demo. It makes two links, each with its own
+random key:
+
+=over
+
+=item the link to watch
+
+shows the screen as it changes, read-only. B<share:start> copies it to
+the clipboard;
+
+=item the link to type
+
+shows it and sends the keys typed on the page (and pastes) to the
+terminal, as if typed here. B<share:control> copies it. Give it only to
+someone you would let use your keyboard.
+
+=back
+
+Both links are also on the window, in the C<_WRXVT_SHARE> property
+(C<xprop _WRXVT_SHARE>), one per line. The window title starts with
+C<[shared]>, and says how many people have a link open; programs asking
+for the title still get their own. A notification (B<notifyCommand>)
+tells when someone opens a link.
+
+B<share:stop> disconnects everybody, and the links stop working: the
+next B<share:start> makes new keys. Sharing also ends with the
+terminal.
+
+The key is the part of the link after C<#>: browsers don't send it in
+requests, and the page removes it from the address bar once open. The
+server only answers its own page (other web sites can't connect), and
+drops connections that don't give a key within 10 seconds.
+
+The connection itself is plain HTTP. That is fine on C<127.0.0.1>, the
+default B<shareAddress>; to share with another computer either let it
+reach this one through ssh:
+
+   ssh -L 8080:127.0.0.1:PORT you@this-computer   # then open
+   http://127.0.0.1:8080/#KEY                    # on the other one
+
+or put a TLS proxy (Caddy, nginx) in front, or, on a network you trust,
+set B<shareAddress> and start with B<-insecure>.
+
+The page shows the text, colours and attributes, not pictures (sixel and
+other images appear as blank cells). The terminal keeps its own size:
+the page scales the text to fit.
 
 =head1 THE SCROLLBAR
 

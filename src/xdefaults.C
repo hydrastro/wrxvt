@@ -99,6 +99,8 @@ optList[] = {
               SWCH ("ic", Opt_iconic, 0, NULL),	/* short form */
               STRG (Rs_chdir, "chdir", "cd", "string", "start shell in this directory"),
               RSTRG (Rs_notifyCommand, "notifyCommand", "string"),
+              RSTRG (Rs_shareAddress, "shareAddress", "address"),
+              RSTRG (Rs_sharePort, "sharePort", "number"),
               SWCH ("dockapp", Opt_dockapp, 0, "start as dockapp"),
               BOOL (Rs_reverseVideo, "reverseVideo", "rv", Opt_reverseVideo, 0, "reverse video"),
               BOOL (Rs_loginShell, "loginShell", "ls", Opt_loginShell, 0, "login shell"),
@@ -140,6 +142,7 @@ optList[] = {
               BOOL (Rs_disablePasteBrackets, "disablePasteBrackets", "dpb", Opt_disablePasteBrackets, 0, "paste bracket suppression"),
               BOOL (Rs_tripleclickwords, "tripleclickwords", "tcw", Opt_tripleclickwords, 0, "triple click word selection"),
               BOOL (Rs_insecure, "insecure", "insecure", Opt_insecure, 0, "enable possibly insecure escape sequences"),
+              SWCH ("share", Opt_share, 0, "share the terminal on a web page"),
               BOOL (Rs_cursorUnderline, "cursorUnderline", "uc", Opt_cursorUnderline, 0, "underline cursor"),
 #endif
 #if CURSOR_BLINK
