@@ -175,6 +175,7 @@ def cell(screen, row, col):
     # underline style and colour (see RS_ulStyleShift, RS_ulColor in rxvt.h)
     info['ul_style'] = (rend >> 36) & 7 if 'Uline' in attrs else None
     info['ul_color'] = (rend >> 40) & 0x1ff if rend >> 39 & 1 else None
+    info['link'] = rend >> 49 & 0x7fff   # hyperlink index (OSC 8), 0 for none
     return info
 
 

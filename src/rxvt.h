@@ -407,6 +407,11 @@ enum { UL_single, UL_double, UL_curly, UL_dotted, UL_dashed };
 #define RS_ulColorMask          ((rend_t)RS_colorMask << RS_ulColorShift)
 #define GET_ULCOLOR(x)          ((int)(((x) & RS_ulColorMask) >> RS_ulColorShift))
 
+// hyperlink (OSC 8): an index into the link table (links), 0 for none
+#define RS_linkShift            49
+#define RS_linkMask             ((rend_t)LINK_MAX << RS_linkShift)
+#define GET_LINK(x)             ((int)(((x) & RS_linkMask) >> RS_linkShift))
+
 #define RS_baseattrMask         (RS_Italic | RS_Bold | RS_Blink | RS_RVid | RS_Uline \
                                  | RS_Faint | RS_Strike | RS_Overline | RS_Conceal \
                                  | RS_ulStyleMask | RS_ulColor | RS_ulColorMask)
@@ -440,6 +445,7 @@ enum {
   XTerm_title            =  2,
   XTerm_property         =  3,      // change X property
   XTerm_cwd              =  7,      // the shell's current directory, as file://host/path
+  XTerm_hyperlink        =  8,      // ESC ] 8 ; params ; URI ST: following text links to URI
   XTerm_Color            =  4,      // change colors
   XTerm_Color00          = 10,      // change fg color
   XTerm_Color01          = 11,      // change bg color
@@ -638,6 +644,7 @@ enum {
 #define IMBUFSIZ               128     // input modifier buffer sizes
 #define KBUFSZ                 512     // size of keyboard mapping buffer
 #define SYNC_OUTPUT_TIMEOUT    0.5     // seconds a synchronized update (mode 2026) may hold the screen
+#define LINK_MAX               0x7fff  // hyperlinks a terminal remembers (15 rendition bits)
 #define STRING_MAX             (1 << 22) // longest control string (OSC, DCS...) in characters
 #define CBUFSIZ                32768   // size of command buffer (longest command sequence possible)
 #define CBUFCNT                8       // never call pty_fill/cmd_parse more than this often in a row
@@ -1367,6 +1374,13 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool jump_to_prompt (int dir);
   bool builtin_action (const char *name, const char *arg);
   void set_cwd (const char *uri);
+  void process_hyperlink (char *str);
+  const char *link_at (int x, int y);
+  bool open_link (int x, int y);
+
+  // hyperlinks (OSC 8), indexed by the RS_link bits; 0 is unused
+  struct hyperlink { char *id, *uri; } *links;
+  unsigned int link_next;
   void color_scheme_check ();
   int reported_color_scheme;
   void cmdbuf_reify ();

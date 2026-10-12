@@ -57,6 +57,8 @@
 #endif
 
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 
 #if LINUX_YIELD_HACK
 # include <time.h>
@@ -2274,6 +2276,11 @@ rxvt_term::button_release (XButtonEvent &ev)
           && ev.button == Button1 && MEvent.clicks <= 1)
         selection_extend (ev.x, ev.y, 0);
 
+      // control-click on a hyperlink opens it
+      if (ev.button == Button1 && ev.state & ControlMask && MEvent.clicks <= 1
+          && open_link (ev.x, ev.y))
+        return;
+
       switch (ev.button)
         {
           case Button1:
@@ -3976,6 +3983,137 @@ rxvt_term::set_cwd (const char *uri)
 }
 
 /*
+ * OSC 8: ESC ] 8 ; params ; URI ST makes the text that follows a link to
+ * URI, up to ESC ] 8 ; ; ST. params can have id=ID: separate pieces of
+ * text with the same ID and URI are one link.
+ */
+void
+rxvt_term::process_hyperlink (char *str)
+{
+  char *uri = strchr (str, ';');
+  if (!uri)
+    return;
+
+  *uri++ = 0;
+
+  rstyle &= ~RS_linkMask;
+
+  if (!*uri)
+    return; // the end of the link
+
+  // URIs are printable ASCII (anything else is percent-encoded)
+  size_t len = 0;
+  for (const char *p = uri; *p; p++, len++)
+    if (!IN_RANGE_INC (*p, 0x21, 0x7e) || len > 8192)
+      return;
+
+  const char *id = "";
+  for (char *param = strtok (str, ":"); param; param = strtok (0, ":"))
+    if (!strncmp (param, "id=", 3))
+      id = param + 3;
+
+  if (!links)
+    links = (hyperlink *)rxvt_calloc (LINK_MAX + 1, sizeof (hyperlink));
+
+  // the same link as a recent one: use its index
+  unsigned int idx = 0;
+
+  for (unsigned int i = 0, n = link_next; i < 256 && links[n].uri; i++, n = n > 1 ? n - 1 : LINK_MAX)
+    if (!strcmp (links[n].uri, uri) && !strcmp (links[n].id, id))
+      {
+        idx = n;
+        break;
+      }
+
+  if (!idx)
+    {
+      // a new one, replacing the oldest when the table is full
+      link_next = link_next % LINK_MAX + 1;
+      idx = link_next;
+
+      free (links[idx].id);
+      free (links[idx].uri);
+      links[idx].id = strdup (id);
+      links[idx].uri = strdup (uri);
+    }
+
+  rstyle |= (rend_t)idx << RS_linkShift;
+}
+
+// the URI of the hyperlink at pixel x, y of the window, or 0
+const char *
+rxvt_term::link_at (int x, int y)
+{
+  if (!links)
+    return 0;
+
+  int row = Pixel2Row (y);
+  int col = Pixel2Col (x);
+
+  if (!IN_RANGE_EXC (row, 0, nrow) || !IN_RANGE_EXC (col, 0, ncol))
+    return 0;
+
+  line_t &l = ROW (view_start + row);
+
+  if (!l.valid ())
+    return 0;
+
+  int idx = GET_LINK (l.r[col]);
+
+  return idx ? links[idx].uri : 0;
+}
+
+/*
+ * Open the hyperlink at x, y with the url-launcher resource (the same
+ * as the matcher extension's), xdg-open by default.
+ */
+bool
+rxvt_term::open_link (int x, int y)
+{
+  const char *uri = link_at (x, y);
+  if (!uri)
+    return false;
+
+  const char *launcher = x_resource ("url-launcher");
+  if (!launcher || !*launcher)
+    launcher = "xdg-open";
+
+  char *command = (char *)rxvt_malloc (strlen (launcher) + 8);
+  sprintf (command, "%s \"$1\"", launcher);
+
+  // fork twice, so the launcher is not our child and needs no reaping
+  pid_t pid = fork ();
+
+  if (pid == 0)
+    {
+      if (fork () == 0)
+        {
+          setsid ();
+
+          // nothing of the terminal: not the pty, nor the X connection
+          int null = open ("/dev/null", O_RDWR);
+          dup2 (null, STDIN_FILENO);
+          for (int fd = 3; fd < 1024; fd++)
+            close (fd);
+
+          if (env)
+            environ = env;
+
+          execl ("/bin/sh", "sh", "-c", command, "sh", uri, (char *)0);
+        }
+
+      _exit (0);
+    }
+
+  free (command);
+
+  if (pid > 0)
+    waitpid (pid, 0, 0);
+
+  return true;
+}
+
+/*
  * Scroll so that the previous (dir < 0) or next (dir > 0) prompt marked
  * with OSC 133 ; A is the top line; the next one after the last prompt
  * is the bottom of the screen.
@@ -4311,6 +4449,10 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
 
       case XTerm_cwd:
         set_cwd (str);
+        break;
+
+      case XTerm_hyperlink:
+        process_hyperlink (str);
         break;
 
       case Shell_mark:

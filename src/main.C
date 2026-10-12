@@ -221,6 +221,17 @@ rxvt_term::~rxvt_term ()
 
   free (pstr.buf);
 
+  if (links)
+    {
+      for (int i = 0; i <= LINK_MAX; i++)
+        {
+          free (links[i].id);
+          free (links[i].uri);
+        }
+
+      free (links);
+    }
+
   emergency_cleanup ();
 
 #if ENABLE_STYLES

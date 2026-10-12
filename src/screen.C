@@ -108,7 +108,7 @@ rxvt_term::scr_blank_line (line_t &l, unsigned int col, unsigned int width, rend
 
   l.touch ();
 
-  efs &= ~RS_baseattrMask; // remove italic etc. fontstyles
+  efs &= ~(RS_baseattrMask | RS_linkMask); // remove italic etc. fontstyles, and links
   efs = SET_FONT (efs, FONTSET (efs)->find_space_font ());
 
   text_t *et = l.t + col;
@@ -140,7 +140,7 @@ rxvt_term::scr_kill_char (line_t &l, int col) const noexcept
   while (col > 0 && l.t[col] == NOCHAR)
     col--;
 
-  rend_t rend = l.r[col] & ~RS_baseattrMask;
+  rend_t rend = l.r[col] & ~(RS_baseattrMask | RS_linkMask);
   rend = SET_FONT (rend, FONTSET (rend)->find_space_font ());
 
   l.touch ();
@@ -794,7 +794,7 @@ rxvt_term::scr_rendition (int set, rend_t style) noexcept
   if (set)
     rstyle |= style;
   else if (style == ~RS_None)
-    rstyle = DEFAULT_RSTYLE;
+    rstyle = DEFAULT_RSTYLE | (rstyle & RS_linkMask); // SGR 0 doesn't end a hyperlink
   else
     rstyle &= ~style;
 }
@@ -2672,6 +2672,14 @@ rxvt_term::scr_refresh () noexcept
                 XSetForeground (dpy, gc, pix_colors[fore]);
 
               draw_underline (xpixel, ypixel, Width2Pixel (count), font, rend);
+            }
+
+          // hyperlinks without an underline of their own get a dashed one
+          if (ecb_unlikely (rend & RS_linkMask && !(rend & RS_Uline) && font->descent > 1 && fore != back))
+            {
+              XSetForeground (dpy, gc, pix_colors[fore]);
+              draw_underline (xpixel, ypixel, Width2Pixel (count), font,
+                              (rend & ~RS_ulStyleMask) | ((rend_t)UL_dashed << RS_ulStyleShift));
             }
 
           if (ecb_unlikely (rend & (RS_Strike | RS_Overline) && fore != back))
