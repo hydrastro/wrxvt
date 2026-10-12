@@ -4409,6 +4409,17 @@ rxvt_term::process_osc_seq ()
       pstr.osc = arg;
       begin_string (C1_OSC);
     }
+  else if (ch == C0_BEL || ch == CHAR_ST || (ch == C0_ESC && cmd_getc () == '\\'))
+    {
+      // no text at all: ESC ] 104 ST resets all colours, for example
+      string_term st;
+      st.v[0] = ch == C0_ESC ? C0_ESC : ch;
+      st.v[1] = ch == C0_ESC ? '\\' : 0;
+      st.v[2] = 0;
+
+      char empty[1] = "";
+      process_xterm_seq (arg, empty, st);
+    }
 }
 
 static unsigned int
@@ -4538,6 +4549,16 @@ rxvt_term::process_color_seq (int report, int color, const char *str, string_ter
   else
     set_window_color (color, str);
 }
+
+#ifdef XTERM_COLOR_CHANGE
+// a colour back to its configured value
+void
+rxvt_term::reset_color (int idx)
+{
+  if (initial_colors[idx] && (!rs[Rs_color + idx] || strcmp (rs[Rs_color + idx], initial_colors[idx])))
+    set_window_color (idx, initial_colors[idx]);
+}
+#endif
 
 /*
  * XTerm escape sequences: ESC ] Ps;Pt (ST|BEL)
@@ -4686,6 +4707,50 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
       case XTerm_notify:
         notify (str);
         break;
+
+#ifdef XTERM_COLOR_CHANGE
+      case XTerm_resetColor:
+        if (!*str)
+          for (color = minCOLOR; color <= maxTermCOLOR; color++)
+            reset_color (color);
+        else
+          for (buf = str; *buf; )
+            {
+              color = atoi (buf) + minCOLOR;
+
+              if (IN_RANGE_INC (color, minCOLOR, maxTermCOLOR))
+                reset_color (color);
+
+              buf = strchr (buf, ';');
+              if (!buf)
+                break;
+              buf++;
+            }
+        break;
+
+      case XTerm_resetColor00 ... XTerm_resetColor_HTC:
+        {
+          // the colours of OSC 10 to 19, one less of them each
+          static const int colors[] = {
+            Color_fg, Color_bg,
+# ifndef NO_CURSORCOLOR
+            Color_cursor,
+# else
+            -1,
+# endif
+            Color_pointer_fg, Color_pointer_bg, -1, -1,
+# ifdef OPTION_HC
+            Color_HC, -1, Color_HTC,
+# else
+            -1, -1, -1,
+# endif
+          };
+
+          if (colors[op - XTerm_resetColor00] >= 0)
+            reset_color (colors[op - XTerm_resetColor00]);
+        }
+        break;
+#endif
 
       case Shell_mark:
         // A: a prompt starts here. B (command typed), C (its output

@@ -794,6 +794,9 @@ rxvt_term::init_resources (int argc, const char *const *argv)
   if (!rs[Rs_color + Color_border])
     rs[Rs_color + Color_border] = rs[Rs_color + Color_bg];
 
+  // what OSC 104 and 110-119 go back to
+  memcpy (initial_colors, rs + Rs_color, sizeof (initial_colors));
+
   return cmd_argv;
 }
 

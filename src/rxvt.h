@@ -474,6 +474,10 @@ enum {
 
   Rxvt_dumpscreen        = 55,      // dump scrollback and all of screen
 
+  XTerm_resetColor       = 104,     // reset palette colours (all, or the ones listed)
+  XTerm_resetColor00     = 110,     // reset the foreground; 111 background, 112 cursor...
+  XTerm_resetColor_HTC   = 119,
+
   URxvt_locale           = 701,     // change locale
   URxvt_version          = 702,     // request version
 
@@ -1377,6 +1381,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool builtin_action (const char *name, const char *arg);
   void change_font_size (int delta);
   int default_cursor_style;
+  const char *initial_colors[NRS_COLORS]; // the colours as configured
+  void reset_color (int idx);
   char *font_orig[4];   // the fonts before font-size changes
   int font_delta;
   bool font_size_set;
