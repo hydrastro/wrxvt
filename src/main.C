@@ -985,6 +985,9 @@ done:
   update_fade_color (idx);
   recolor_cursor ();
   scr_recolor ();
+
+  if (idx == Color_fg || idx == Color_bg)
+    color_scheme_check ();
 #endif /* XTERM_COLOR_CHANGE */
 }
 

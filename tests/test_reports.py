@@ -85,5 +85,32 @@ class DcsParsing(TerminalTest):
         self.assertEqual(run.result['row'], 'abcd')
 
 
+class ColorScheme(TerminalTest):
+    def test_dark(self):
+        run = self.run_in_terminal(r"""result['reply'] = query('\x1b[?996n')""")
+        self.assertEqual(run.result['reply'], '\x1b[?997;1n')
+
+    def test_light(self):
+        run = self.run_in_terminal(r"""result['reply'] = query('\x1b[?996n')""",
+                                   args=['-bg', 'white', '-fg', 'black'])
+        self.assertEqual(run.result['reply'], '\x1b[?997;2n')
+
+    def test_updates(self):
+        run = self.run_in_terminal(r"""
+            result['mode'] = query('\x1b[?2031$p')
+            write('\x1b[?2031h')
+            result['to_light'] = query('\x1b]11;white\x07', r'n$')
+            result['same'] = query('\x1b]11;#eeeeee\x07', r'n$', timeout=0.5)
+            result['to_dark'] = query('\x1b]11;#202020\x07', r'n$')
+            write('\x1b[?2031l')
+            result['off'] = query('\x1b]11;white\x07', r'n$', timeout=0.5)
+        """)
+        self.assertEqual(run.result['mode'], '\x1b[?2031;2$y')
+        self.assertEqual(run.result['to_light'], '\x1b[?997;2n')
+        self.assertEqual(run.result['same'], '')
+        self.assertEqual(run.result['to_dark'], '\x1b[?997;1n')
+        self.assertEqual(run.result['off'], '')
+
+
 if __name__ == '__main__':
     unittest.main()

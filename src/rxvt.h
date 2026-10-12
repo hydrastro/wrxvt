@@ -620,6 +620,7 @@ enum {
 #define PrivMode_FocusEvent     (1UL<<26)
 #define PrivMode_ExtMouseSGR    (1UL<<27)
 #define PrivMode_SyncOutput     (1UL<<28) // mode 2026: hold the screen until the update is complete
+#define PrivMode_ColorScheme    (1UL<<29) // mode 2031: report dark/light changes
 
 #define PrivMode_mouse_report   (PrivMode_MouseX10|PrivMode_MouseX11|PrivMode_MouseBtnEvent|PrivMode_MouseAnyEvent)
 
@@ -1357,6 +1358,9 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void flush_cb (ev::timer &w, int revents); ev::timer flush_ev;
   void sync_cb (ev::timer &w, int revents); ev::timer sync_ev;
   void sync_output (bool on);
+  int color_scheme ();
+  void color_scheme_check ();
+  int reported_color_scheme;
   void cmdbuf_reify ();
   void cmdbuf_append (const char *str, size_t count);
   bool pty_fill ();

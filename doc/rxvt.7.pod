@@ -1675,6 +1675,11 @@ Device Status Report (DSR)
 
 =end table
 
+=item B<< C<ESC [ ? 996 n> >>
+
+Report the colour scheme: B<< C<ESC [ ? 997 ; 1 n> >> if the background
+is dark, B<< C<ESC [ ? 997 ; 2 n> >> if it is light. See also mode 2031.
+
 =item B<< C<ESC [ Ps SP q> >>
 
 Set Cursor Style (DECSCUSR)
@@ -2102,6 +2107,15 @@ Unlike XTerm, coordinates larger than 2015 will work fine.
 So that a program that never ends an update can't freeze the window, the
 update also ends by itself half a second after it began. C<CSI ? 2026 $ p>
 (DECRQM) tells whether the mode is supported and set.
+
+=item B<< C<Pm = 2031> >> (Colour scheme updates)
+
+=begin table
+
+	B<< C<h> >>	Report the colour scheme (as C<ESC [ ? 997 ; Ps n>, see C<ESC [ ? 996 n>) whenever it changes between dark and light
+	B<< C<l> >>	Don't
+
+=end table
 
 =back
 

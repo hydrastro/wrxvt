@@ -1033,6 +1033,38 @@ rxvt_term::refresh_check ()
 }
 
 /*
+ * The colour scheme, as programs ask for it with CSI ? 996 n: 1 for
+ * dark, 2 for light, from the background colour.
+ */
+int
+rxvt_term::color_scheme ()
+{
+  rgba bg = pix_colors_focused[Color_bg];
+
+  // relative luminance (ITU-R BT.709) of the gamma-encoded values: the
+  // perceived lightness, which is what tells dark from light
+  unsigned long luminance = 2126UL * bg.r + 7152UL * bg.g + 722UL * bg.b;
+
+  return luminance > 10000UL * rgba::MAX_CC / 2 ? 2 : 1;
+}
+
+// with mode 2031 set, tell the program when the scheme changes
+void
+rxvt_term::color_scheme_check ()
+{
+  if (!(priv_modes & PrivMode_ColorScheme))
+    return;
+
+  int scheme = color_scheme ();
+
+  if (scheme != reported_color_scheme)
+    {
+      reported_color_scheme = scheme;
+      tt_printf ("\033[?997;%dn", scheme);
+    }
+}
+
+/*
  * Synchronized output (mode 2026): while it's set, changes to the screen
  * are not drawn, so a program can redraw everything and have it appear
  * at once, without flicker or half-drawn frames. A program that never
@@ -2969,6 +3001,8 @@ rxvt_term::process_csi_seq ()
               process_terminal_mode (ch, priv, nargs, arg);
             if (prev_ch == '$' && ch == 'p')
               process_terminal_mode (ch, priv, nargs, arg);
+            if (ch == CSI_DSR && arg[0] == 996) /* the colour scheme: dark or light */
+              tt_printf ("\033[?997;%dn", color_scheme ());
             break;
 
           case '!':
@@ -4357,6 +4391,7 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                   { 2004, PrivMode_BracketPaste },
 #endif
                   { 2026, PrivMode_SyncOutput },
+                  { 2031, PrivMode_ColorScheme },
                 };
 
   if (nargs == 0)
@@ -4518,6 +4553,9 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
               break;
             case 2026:		/* synchronized output */
               sync_output (state);
+              break;
+            case 2031:		/* colour scheme updates */
+              reported_color_scheme = color_scheme ();
               break;
             default:
               break;
