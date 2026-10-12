@@ -1437,6 +1437,10 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void process_window_ops (const int *args, unsigned int nargs);
   char *get_to_st (string_term &st);
   void process_dcs_seq ();
+  void decrqss (const char *setting);
+  void xtgettcap (const char *request);
+  const char *tcap_value (const char *name, bool &boolean);
+  void sgr_string (rend_t r, char *buf, size_t len) const;
   void process_osc_seq ();
   void process_color_seq (int report, int color, const char *str, string_term &st);
   void process_xterm_seq (int op, char *str, string_term &st);

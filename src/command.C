@@ -3306,20 +3306,281 @@ rxvt_term::get_to_st (string_term &st)
 /*----------------------------------------------------------------------*/
 /*
  * process DEVICE CONTROL STRING `ESC P ... (ST|BEL)' or `0x90 ... (ST|BEL)'
+ *
+ * DCS Pp... Pi... F data ST: parameters (digits ; : < = > ?), then
+ * intermediates (0x20-0x2f), then the final byte (0x40-0x7e) and the data.
  */
 void
 rxvt_term::process_dcs_seq ()
 {
-  /*
-   * Not handled yet
-   */
+  char params[32], inter[4];
+  unsigned int np = 0, ni = 0;
+  unicode_t ch;
+
+  for (;;)
+    {
+      ch = cmd_getc ();
+
+      if (IN_RANGE_INC (ch, '0', '?'))
+        {
+          if (np < sizeof (params) - 1)
+            params[np++] = ch;
+        }
+      else if (IN_RANGE_INC (ch, 0x20, 0x2f))
+        {
+          if (ni < sizeof (inter) - 1)
+            inter[ni++] = ch;
+        }
+      else
+        break;
+    }
+
+  params[np] = 0;
+  inter[ni] = 0;
+
+  if (!IN_RANGE_INC (ch, 0x40, 0x7e))
+    {
+      // an empty string (ESC P ESC \) or garbage: skip to the terminator
+      if (ch == C0_ESC)
+        cmd_getc ();
+      else if (ch != C0_BEL && ch != CHAR_ST)
+        {
+          string_term st;
+          free (get_to_st (st));
+        }
+      return;
+    }
 
   string_term st;
-  char *s = get_to_st (st);
-  if (s)
-    free (s);
+  char *data = get_to_st (st);
+  if (!data)
+    return;
 
-  return;
+  if (ch == 'q' && !strcmp (inter, "$") && !np)
+    decrqss (data);
+  else if (ch == 'q' && !strcmp (inter, "+") && !np)
+    xtgettcap (data);
+
+  free (data);
+}
+
+/*
+ * The SGR sequence that recreates rendition r: "0;1;38:5:208".
+ */
+void
+rxvt_term::sgr_string (rend_t r, char *buf, size_t len) const
+{
+  int n = snprintf (buf, len, "0");
+
+#define SGR_ADD(...) n += snprintf (buf + n, n < (int)len ? len - n : 0, __VA_ARGS__)
+
+  if (r & RS_Bold)      SGR_ADD (";1");
+  if (r & RS_Faint)     SGR_ADD (";2");
+  if (r & RS_Italic)    SGR_ADD (";3");
+  if (r & RS_Uline)
+    {
+      if (GET_ULSTYLE (r) == UL_single)
+        SGR_ADD (";4");
+      else
+        SGR_ADD (";4:%d", GET_ULSTYLE (r) + 1);
+    }
+  if (r & RS_Blink)     SGR_ADD (";5");
+  if (r & RS_RVid)      SGR_ADD (";7");
+  if (r & RS_Conceal)   SGR_ADD (";8");
+  if (r & RS_Strike)    SGR_ADD (";9");
+  if (r & RS_Overline)  SGR_ADD (";53");
+
+  struct { int color, base; } colors[] = {
+    { (int)GET_BASEFG (r), 30 },
+    { (int)GET_BASEBG (r), 40 },
+    { r & RS_ulColor ? GET_ULCOLOR (r) : -1, 50 },
+  };
+
+  for (auto &c : colors)
+    {
+      int idx = c.color;
+
+      if (idx < minCOLOR || idx > maxTermCOLOR24)
+        continue; // the default colour (or none)
+
+      if (c.base != 50 && idx <= maxCOLOR)
+        SGR_ADD (";%d", c.base + idx - minCOLOR);
+#if !ENABLE_MINIMAL
+      else if (c.base != 50 && IN_RANGE_INC (idx, minBrightCOLOR, maxBrightCOLOR))
+        SGR_ADD (";%d", c.base + 60 + idx - minBrightCOLOR);
+#endif
+      else if (idx <= maxTermCOLOR)
+        SGR_ADD (";%d:5:%d", c.base + 8, idx - minCOLOR);
+      else
+        {
+          uint32_t rgb = rgb24_color[idx - minTermCOLOR24];
+          SGR_ADD (";%d:2::%d:%d:%d", c.base + 8, (rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
+        }
+    }
+
+#undef SGR_ADD
+}
+
+/*
+ * DECRQSS, request selection or setting: DCS $ q Pt ST
+ * answered with DCS 1 $ r <the sequence that sets it> ST,
+ * or DCS 0 $ r ST for settings we don't report.
+ */
+void
+rxvt_term::decrqss (const char *setting)
+{
+  char reply[256];
+
+  if (!strcmp (setting, "m"))           // SGR
+    {
+      sgr_string (rstyle, reply, sizeof (reply) - 1);
+      strcat (reply, "m");
+    }
+  else if (!strcmp (setting, "r"))      // DECSTBM, the scroll region
+    snprintf (reply, sizeof (reply), "%d;%dr", screen.tscroll + 1, screen.bscroll + 1);
+  else if (!strcmp (setting, " q"))     // DECSCUSR, the cursor style
+    {
+      int blink = 0;
+#ifdef CURSOR_BLINK
+      blink = option (Opt_cursorBlink);
+#endif
+      snprintf (reply, sizeof (reply), "%d q", cursor_type * 2 + (blink ? 1 : 2));
+    }
+  else if (!strcmp (setting, "t"))      // DECSLPP, lines per page
+    snprintf (reply, sizeof (reply), "%dt", nrow);
+  else if (!strcmp (setting, "\"q"))    // DECSCA: no protected characters
+    strcpy (reply, "0\"q");
+  else if (!strcmp (setting, "\"p"))    // DECSCL: a VT220-class terminal, 7-bit replies
+    strcpy (reply, "62;1\"p");
+  else
+    {
+      tt_printf ("\033P0$r\033\\");
+      return;
+    }
+
+  tt_printf ("\033P1$r%s\033\\", reply);
+}
+
+/*
+ * XTGETTCAP: DCS + q <hex name>;<hex name>... ST
+ * answered for each name with DCS 1 + r <hex name>=<hex value> ST
+ * (just the name for a boolean), or DCS 0 + r <hex name> ST.
+ */
+static int
+hex_digit (char c)
+{
+  return IN_RANGE_INC (c, '0', '9') ? c - '0'
+       : IN_RANGE_INC (c, 'a', 'f') ? c - 'a' + 10
+       : IN_RANGE_INC (c, 'A', 'F') ? c - 'A' + 10
+       : -1;
+}
+
+const char *
+rxvt_term::tcap_value (const char *name, bool &boolean)
+{
+  static char number[16];
+
+  boolean = false;
+
+  if (!strcmp (name, "TN") || !strcmp (name, "name"))
+    return rs[Rs_term_name] ? rs[Rs_term_name] : TERMENV;
+
+  if (!strcmp (name, "Co") || !strcmp (name, "colors"))
+    {
+      snprintf (number, sizeof (number), "%d", maxTermCOLOR - minCOLOR + 1);
+      return number;
+    }
+
+  static const struct { const char *name, *value; } caps[] = {
+    // 24-bit colours (SGR 38:2, 48:2)
+    { "RGB",    "8/8/8" },
+    { "Tc",     0 },
+    // styled and coloured underlines (SGR 4:N, 58)
+    { "Smulx",  "\033[4:%p1%dm" },
+    { "Setulc", "\033[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm" },
+    { "ol",     "\033[59m" },
+    // crossed-out text (SGR 9)
+    { "smxx",   "\033[9m" },
+    { "rmxx",   "\033[29m" },
+    // dim, overline
+    { "dim",    "\033[2m" },
+    { "Smol",   "\033[53m" },
+    { "Rmol",   "\033[55m" },
+    // cursor styles (DECSCUSR)
+    { "Ss",     "\033[%p1%d q" },
+    { "Se",     "\033[0 q" },
+    // bracketed paste
+    { "BE",     "\033[?2004h" },
+    { "BD",     "\033[?2004l" },
+    { "PS",     "\033[200~" },
+    { "PE",     "\033[201~" },
+    // focus events
+    { "fe",     "\033[?1004h" },
+    { "fd",     "\033[?1004l" },
+    // XTVERSION, the request for the terminal's name and version
+    { "XR",     "\033[>0q" },
+  };
+
+  for (auto &cap : caps)
+    if (!strcmp (name, cap.name))
+      {
+        boolean = !cap.value;
+        return cap.value ? cap.value : "";
+      }
+
+  return 0;
+}
+
+void
+rxvt_term::xtgettcap (const char *request)
+{
+  const char *p = request;
+
+  while (*p)
+    {
+      const char *end = strchr (p, ';');
+      if (!end)
+        end = p + strlen (p);
+
+      char name[64];
+      unsigned int n = 0;
+      bool valid = (end - p) % 2 == 0 && end > p && (end - p) / 2 < (int)sizeof (name);
+
+      for (const char *q = p; valid && q < end; q += 2)
+        {
+          int hi = hex_digit (q[0]), lo = hex_digit (q[1]);
+          if (hi < 0 || lo < 0)
+            valid = false;
+          else
+            name[n++] = hi * 16 + lo;
+        }
+      name[n] = 0;
+
+      bool boolean;
+      const char *value = valid ? tcap_value (name, boolean) : 0;
+
+      int len = end - p;
+      if (!value)
+        tt_printf ("\033P0+r%.*s\033\\", len, p);
+      else if (boolean)
+        tt_printf ("\033P1+r%.*s\033\\", len, p);
+      else
+        {
+          // DCS 1 + r name = value in hex (every byte becomes two
+          // characters, so this can be longer than tt_printf allows)
+          size_t vlen = strlen (value);
+          size_t size = len + 2 * vlen + 16;
+          char *reply = (char *)rxvt_malloc (size);
+          int r = snprintf (reply, size, "\033P1+r%.*s=", len, p);
+          for (size_t i = 0; i < vlen; i++)
+            r += sprintf (reply + r, "%02X", (unsigned char)value[i]);
+          r += sprintf (reply + r, "\033\\");
+          tt_write (reply, r);
+          free (reply);
+        }
+
+      p = *end ? end + 1 : end;
+    }
 }
 
 /*----------------------------------------------------------------------*/

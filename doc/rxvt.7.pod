@@ -2092,6 +2092,48 @@ Unlike XTerm, coordinates larger than 2015 will work fine.
 
 =back
 
+X<DCS>
+
+=head2 Device Control Strings
+
+C<ESC P> (or the 8-bit C<0x90>) starts a device control string: parameters,
+intermediate characters and a final character, then data up to C<ST> (or
+C<BEL>). Strings not listed here are ignored. Replies always end with the
+7-bit C<ESC \>.
+
+=over
+
+=item B<< C<ESC P $ q Pt ST> >>
+
+Request Selection or Setting (DECRQSS). The reply is C<< ESC P 1 $ r I<seq> ST >>,
+where I<seq> is the sequence that sets the current value, or C<ESC P 0 $ r ST>
+for settings not reported. B<< C<Pt> >> is one of:
+
+=begin table
+
+	B<< C<m> >>	the current rendition, e.g. C<0;1;4:3;38:5:208m> (24-bit colours as C<38:2::R:G:B>)
+	B<< C<r> >>	the scroll region (DECSTBM)
+	B<< C<SP q> >>	the cursor style (DECSCUSR)
+	B<< C<t> >>	the number of lines (DECSLPP)
+	B<< C<" q> >>	character protection (DECSCA): always C<0>
+	B<< C<" p> >>	the conformance level (DECSCL): C<62;1>
+
+=end table
+
+=item B<< C<ESC P + q Pt ST> >>
+
+Request termcap/terminfo capabilities (XTGETTCAP). B<< C<Pt> >> is a list of
+capability names in hexadecimal, separated by C<;>. Each one is answered
+separately: C<< ESC P 1 + r I<name>=I<value> ST >> with the value in
+hexadecimal (only the name for a boolean), or C<< ESC P 0 + r I<name> ST >>
+for an unknown name. The names known are C<TN> (and C<name>), C<Co> (and
+C<colors>), C<RGB>, C<Tc>, C<Smulx>, C<Setulc>, C<ol>, C<smxx>, C<rmxx>,
+C<dim>, C<Smol>, C<Rmol>, C<Ss>, C<Se>, C<BE>, C<BD>, C<PS>, C<PE>, C<fe>,
+C<fd> and C<XR>: the features of this terminal that its terminfo entry
+doesn't describe.
+
+=back
+
 X<XTerm>
 
 =head2 XTerm Operating System Commands
