@@ -429,6 +429,16 @@ Enable "insecure" mode, which currently enables most of the escape
 sequences that echo strings. See the resource B<insecure> for more
 info.
 
+=item B<-share>
+
+Share the terminal on a web page as soon as it starts, as the
+B<share:start> action does (see L<SHARING ON THE WEB>).
+
+=item B<-record> I<file>
+
+Record the terminal to I<file>, an asciinema recording, from the start
+(see the B<record:start> action).
+
 =item B<-mod> I<modifier>
 
 Override detection of Meta modifier with specified key: B<alt>,
@@ -631,11 +641,13 @@ colours. The canonical names are as follows: 0=black, 1=red, 2=green,
 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white, but the actual colour
 names used are listed in the B<COLOURS AND GRAPHICS> section.
 
-Colours higher than 15 cannot be set using resources (yet), but can be
-changed using an escape command (see @@RXVT_NAME@@(7)).
+Colours 16 and up can be set the same way (B<color16> to B<color255>,
+or B<color87> in an 88-colour build), and changed with an escape
+sequence (see @@RXVT_NAME@@(7)).
 
-Colours 16-79 form a standard 4x4x4 colour cube (the same as xterm with
-88 colour support). Colours 80-87 are evenly spaces grey steps.
+With 256 colours, colours 16-231 form a 6x6x6 colour cube and 232-255
+are grey steps (as in xterm). With 88 colours, 16-79 form a 4x4x4 cube
+and 80-87 are grey steps.
 
 =item B<colorBD:> I<colour>
 
@@ -944,10 +956,60 @@ WM, the rxvt-unicode window will not have window decorations; option B<-bl>.
 
 =item B<skipBuiltinGlyphs:> I<boolean>
 
-Compile I<frills>: Disable the usage of the built-in block graphics/line
-drawing characters and just rely on what the specified fonts provide. Use
-this if you have a good font and want to use its block graphic glyphs;
-option B<-sbg>.
+Compile I<frills>: Disable the usage of the built-in glyphs and just rely
+on what the specified fonts provide. The terminal draws box drawing and
+block elements (U+2500-U+259F), braille patterns (U+2800-U+28FF, used for
+plots and graphs), the powerline arrows and semicircles (U+E0B0-U+E0B7)
+and sextants (U+1FB00-U+1FB3B) itself, so they fill their cells exactly
+and join up. Use this if you have a good font and want to use its
+glyphs; option B<-sbg>.
+
+=item B<notifyCommand:> I<command>
+
+The command that shows desktop notifications programs send with
+C<ESC ] 9 ; text ST>: it is run by F</bin/sh> with the window title and
+the text as two more arguments. The default is C<notify-send -->; an
+empty value ignores notifications.
+
+=item B<shareAddress:> I<address>
+
+The IP address the web server of a shared terminal listens on (see
+L<SHARING ON THE WEB>). The default, C<127.0.0.1>, lets only this
+computer connect. Any other address needs the B<insecure> option, since
+the connection is not encrypted: C<0.0.0.0> means every network the
+computer is on.
+
+=item B<sharePort:> I<number>
+
+Its TCP port; the default, C<0>, takes any free port. The links say
+which.
+
+=item B<recordDirectory:> I<directory>
+
+Where B<record:start> puts recordings, as
+F<wrxvt-YYYYMMDD-HHMMSS.cast>; the default is your home directory.
+
+=item B<imageMemory:> I<MiB>
+
+How much memory the pictures of a terminal (sixel, kitty, iTerm2) may
+take, 256 by default; half of it for the pictures kitty programs keep for
+later. Past it, the oldest pictures go, and their cells become blank, so
+a program can't make the terminal use all the memory with pictures. A
+smaller value suits an old computer; fractions work (C<0.5>).
+
+=item B<notifyLongCommand:> I<seconds>
+
+A notification (B<notifyCommand>) when a command that ran at least this
+long ends while the window is not in front, with the command and its exit
+status, for builds and tests you went away from. The shell has to mark its
+commands (C<ESC ] 133 ; C ST> before, C<ESC ] 133 ; D ; >I<status>C< ST>
+after, see B<prompt:previous>). The default, C<0>, never notifies.
+
+=item B<scrollbackCommand:> I<command>
+
+What B<scrollback:pager> runs, with F</bin/sh> and the file as one more
+argument. The default opens it with C<less -R +G> in a new window and
+removes the file when C<less> ends.
 
 =item B<termName:> I<termname>
 
@@ -1292,6 +1354,95 @@ this:
    URxvt.keysym.C-M-c: builtin-string:
    URxvt.keysym.C-M-v: builtin-string:
 
+=item font-size:increase, font-size:decrease, font-size:reset
+
+Make all fonts one step bigger or smaller (a pixel for C<pixelsize=>, a
+point for C<size=>, and the pixel size of X core font names), or as
+configured again. The window keeps its size if the window manager
+decides it (tiling), otherwise it keeps its rows and columns. For
+example:
+
+   URxvt.keysym.C-plus:  font-size:increase
+   URxvt.keysym.C-minus: font-size:decrease
+   URxvt.keysym.C-0:     font-size:reset
+
+These are the action names of the popular C<font-size> perl extension,
+which is no longer needed for them, and its C<font-size.step> resource
+sets the step here too (other actions of the extension, like
+C<incglobal>, still go to it if it is installed).
+
+=item prompt:previous, prompt:next
+
+Scroll back to the previous shell prompt, so that it is the top line, or
+forward to the next one (or the bottom, after the last prompt). The shell
+has to mark its prompts with C<ESC ] 133 ; A ST> (see @@RXVT_NAME@@(7));
+for bash, for example:
+
+   PS0+='\e]133;C\e\\'
+   PS1='\[\e]133;A\e\\\]'"$PS1"'\[\e]133;B\e\\\]'
+
+and the bindings:
+
+   URxvt.keysym.C-S-Up: prompt:previous
+   URxvt.keysym.C-S-Down: prompt:next
+
+=item prompt:copy-output
+
+Copy the output of the last command to the clipboard and the primary
+selection: from where it started (C<ESC ] 133 ; C ST>, which the C<PS0>
+above sends) to the prompt after it; while a command still runs, its
+output so far. With a shell that marks only its prompts, what is between
+the last two.
+
+   URxvt.keysym.C-S-o: prompt:copy-output
+
+=item share:start, share:stop, share:toggle, share:control
+
+Start or stop sharing the terminal on a web page (see L<SHARING ON THE
+WEB>). B<share:start> copies the link to watch to the clipboard (again,
+when already sharing); B<share:control> copies the link that can also
+type. For example:
+
+   URxvt.keysym.C-S-F12: share:toggle
+   URxvt.keysym.C-S-F11: share:control
+
+=item record:start, record:stop, record:toggle
+
+Record the terminal as an asciinema file (asciicast version 2) in
+B<recordDirectory>: what programs print, with its timing, and the
+window's size changes. What you type is not recorded, only what is
+shown. The recording begins with the screen as it is, and the window
+title starts with C<[rec]> until it stops; a notification
+(B<notifyCommand>) says where it was saved. The file is readable only by
+you. Play it with C<asciinema play>, publish it with asciinema-player,
+or make a GIF with agg. For example:
+
+   URxvt.keysym.C-S-F10: record:toggle
+
+=item hints:open, hints:copy, hints:insert
+
+Pick something on the screen with the keyboard: a label of one or two
+letters appears on every link (OSC 8 hyperlinks and URLs), file path (a
+word with a slash; a C<:line:column> after it is left out) and git hash.
+Typing a label opens it with B<url-launcher> (B<hints:open>; relative
+paths from the shell's directory), copies it to the clipboard and the
+primary selection (B<hints:copy>), or types it at the cursor
+(B<hints:insert>). Escape, or a key no label starts with, gives up.
+While the labels show, the program's output waits. For example:
+
+   URxvt.keysym.C-S-o: hints:open
+   URxvt.keysym.C-S-y: hints:copy
+
+=item scrollback:pager
+
+Open the whole scrollback and screen, with their colours, in a pager:
+by default C<less> in a new window, at the end, to search (C</>, C<?>)
+and copy with its keys. Lines the window wrapped are one line there.
+The text goes through a file only you can read, removed when the pager
+ends (see B<scrollbackCommand>).
+
+   URxvt.keysym.C-S-Prior: scrollback:pager
+
 =item EXTENSION:STRING
 
 An action of this form invokes the action B<STRING>, if any, provided
@@ -1410,6 +1561,57 @@ Turn on/off ISO 14755 5.2 mode (default enabled).
 
 =back
 
+=head1 SHARING ON THE WEB
+
+The B<share:start> action (or the B<-share> option) makes the terminal
+a small web server, so that others can follow it in a browser: for pair
+programming, teaching or a demo. It makes two links, each with its own
+random key:
+
+=over
+
+=item the link to watch
+
+shows the screen as it changes, read-only. B<share:start> copies it to
+the clipboard;
+
+=item the link to type
+
+shows it and sends the keys typed on the page (and pastes) to the
+terminal, as if typed here. B<share:control> copies it. Give it only to
+someone you would let use your keyboard.
+
+=back
+
+Both links are also on the window, in the C<_WRXVT_SHARE> property
+(C<xprop _WRXVT_SHARE>), one per line. The window title starts with
+C<[shared]>, and says how many people have a link open; programs asking
+for the title still get their own. A notification (B<notifyCommand>)
+tells when someone opens a link.
+
+B<share:stop> disconnects everybody, and the links stop working: the
+next B<share:start> makes new keys. Sharing also ends with the
+terminal.
+
+The key is the part of the link after C<#>: browsers don't send it in
+requests, and the page removes it from the address bar once open. The
+server only answers its own page (other web sites can't connect), and
+drops connections that don't give a key within 10 seconds.
+
+The connection itself is plain HTTP. That is fine on C<127.0.0.1>, the
+default B<shareAddress>; to share with another computer either let it
+reach this one through ssh:
+
+   ssh -L 8080:127.0.0.1:PORT you@this-computer   # then open
+   http://127.0.0.1:8080/#KEY                    # on the other one
+
+or put a TLS proxy (Caddy, nginx) in front, or, on a network you trust,
+set B<shareAddress> and start with B<-insecure>.
+
+The page shows the text, colours and attributes, not pictures (sixel and
+other images appear as blank cells). The terminal keeps its own size:
+the page scales the text to fit.
+
 =head1 THE SCROLLBAR
 
 Lines of text that scroll off the top of the B<@@RXVT_NAME@@> window
@@ -1472,6 +1674,17 @@ CLIPBOARD selection, while the second binding causes the value of the
 CLIPBOARD selection to be inserted.
 
 =back
+
+=head1 DRAG AND DROP
+
+Files dragged onto the window from a file manager (Thunar, Nautilus,
+Dolphin...) or a browser are typed as their paths, quoted for the shell
+where needed and followed by a space, ready for a command:
+
+   cp '/home/me/My Music/song.flac' /tmp/notes.txt
+
+Dragged text is pasted. Both arrive as one paste, so bracketed paste
+applies, and a shell takes them as text, not as commands to run.
 
 =head1 CHANGING FONTS
 
@@ -1569,14 +1782,20 @@ high-intensity (potentially bold/blink) versions of the same, and 72 (or
 240 in 256 colour mode) colours arranged in an 4x4x4 (or 6x6x6) colour RGB
 cube plus a 8 (24) colour greyscale ramp.
 
+The colours follow the X resources: when they change (C<xrdb -merge>,
+a script switching between a dark and a light theme), open windows take
+the new colours at once, as if they had just started. Colours given on
+the command line (B<-fg>, B<-bg>, B<--color>I<n>...) stay as they are,
+and programs that asked for colour scheme reports (mode 2031) are told
+when the background went from dark to light or back.
+
 B<@@RXVT_NAME@@> supports direct 24-bit fg/bg RGB colour escapes
-C< ESC [ 38 ; 2 ; R ; G ; Bm > / C< ESC [ 48 ; 2; R ; G ; Bm >. However the
-number of 24-bit colours that can be used is limited: an internal 7x7x5 (256
-colour mode) or 6x6x4 (88 colour mode) colour cube is used to index into the
-24-bit colour space. When indexing collisions happen, the nearest old colour in
-the cube will be adapted to the new 24-bit RGB colour. That means one cannot
-use many similar 24-bit colours. It's typically not a problem in common
-scenarios.
+C< ESC [ 38 ; 2 ; R ; G ; Bm > / C< ESC [ 48 ; 2; R ; G ; Bm > (and with
+colons, C<38:2::R:G:B>). Up to 245 different 24-bit colours (144 in 88
+colour mode) can be on the screen and in the scrollback at once, each
+exactly; colours no longer used anywhere make room for new ones. Text
+never changes colour once drawn: beyond that number, new text gets the
+nearest colour already in use.
 
 Here is a list of the ANSI colours with their names.
 

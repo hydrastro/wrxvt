@@ -1,0 +1,16 @@
+# configure output
+/Makefile
+/config.h
+/config.log
+/config.status
+/config.cache
+/autom4te.cache/
+# libev is a separate CVS module, checked out here (see INSTALL)
+/libev/
+# nix build results
+/result
+/result-*
+*.o
+*~
+/_inst/
+__pycache__/

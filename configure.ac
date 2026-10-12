@@ -229,6 +229,13 @@ AC_ARG_ENABLE(font-styles,
     support_styles=$enableval
   fi])
 
+AC_ARG_ENABLE(emoji-sequences,
+  [AS_HELP_STRING([--enable-emoji-sequences],
+     [draw flags, skin tones, families... as one emoji (needs harfbuzz)])],
+  [if test x$enableval = xyes -o x$enableval = xno; then
+    support_emoji_sequences=$enableval
+  fi])
+
 AC_ARG_ENABLE(pixbuf,
   [AS_HELP_STRING([--enable-pixbuf],
      [enable integration with gdk-pixbuf for background images])],
@@ -354,10 +361,10 @@ AC_ARG_WITH(res-class,
   [RESCLASS="$withval"])
 AC_DEFINE_UNQUOTED(RESCLASS,"$RESCLASS", [Resource class])
 
-RXVTNAME=urxvt
+RXVTNAME=wrxvt
 AC_ARG_WITH(name,
   [AS_HELP_STRING([--with-name=NAME],
-     [set the basename for the installed binaries (default: urxvt)])],
+     [set the basename for the installed binaries (default: wrxvt)])],
   [RXVTNAME="$withval"])
 AC_DEFINE_UNQUOTED(RXVTNAME,"$RXVTNAME", [Binary base name])
 
@@ -655,6 +662,25 @@ if test x$support_xft = xyes && test x$rxvt_have_xrender = xyes; then
   if test x$support_xft = xyes; then
     AC_DEFINE(XFT, 1, Define to enable xft support)
   fi
+fi
+
+if test x$support_emoji_sequences = xyes; then
+  dnl The shaping cache uses the C++ standard library, not just libsupc++.
+  LINKER="$CXX"
+  if test x$support_xft != xyes || test x$rxvt_have_xrender != xyes || test x$support_unicode3 != xyes \
+     || test x$support_combining != xyes; then
+    AC_MSG_ERROR([--enable-emoji-sequences needs --enable-xft --enable-unicode3 --enable-combining])
+  fi
+  if ! "$PKG_CONFIG" --atleast-version=2.11 freetype2; then
+    AC_MSG_ERROR([--enable-emoji-sequences needs freetype2 >= 2.11])
+  fi
+  RXVT_CHECK_MODULES([HARFBUZZ], [harfbuzz freetype2], [
+    X_LIBS="$HARFBUZZ_LIBS $X_LIBS"
+    CPPFLAGS="$CPPFLAGS $HARFBUZZ_CFLAGS"
+    AC_DEFINE(HAVE_HARFBUZZ, 1, Define to draw emoji sequences with harfbuzz)
+  ], [
+    AC_MSG_ERROR([--enable-emoji-sequences needs harfbuzz and freetype2 >= 2.11])
+  ])
 fi
 
 if test x$support_image = xyes && test x$rxvt_have_xrender = xyes; then

@@ -39,7 +39,7 @@ COMMON = \
 	command.o rxvtfont.o init.o main.o misc.o \
 	screen.o scrollbar.o scrollbar-next.o scrollbar-rxvt.o \
 	scrollbar-xterm.o scrollbar-plain.o xdefaults.o encoding.o \
-	rxvttoolkit.o rxvtutil.o keyboard.o rxvtimg.o \
+	rxvttoolkit.o rxvtutil.o keyboard.o rxvtimg.o sixel.o graphics.o share.o record.o dnd.o scrollback.o hints.o \
 	ev_cpp.o @PERL_O@
 
 COMMON_DAEMON = rxvtdaemon.o
@@ -159,6 +159,7 @@ command.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h ../config.h
 command.o: ../libev/ev++.h ../libev/ev.h callback.h rxvtimg.h scrollbar.h
 command.o: rxvtperl.h hookinc.h rsinc.h optinc.h version.h command.h
 command.o: keyboard.h
+command.o: rxvtbuf.h
 encoding.o: ../config.h encoding.h rxvtutil.h ecb.h estl.h emman.h
 encoding.o: table/iso8859_1.h table/iso8859_15.h table/iso8859_2.h
 encoding.o: table/iso8859_3.h table/iso8859_4.h table/iso8859_5.h
@@ -250,9 +251,24 @@ scrollbar.o: rxvtperl.h hookinc.h rsinc.h optinc.h
 xdefaults.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
 xdefaults.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h ../config.h
 xdefaults.o: ../libev/ev++.h ../libev/ev.h callback.h rxvtimg.h scrollbar.h
-xdefaults.o: rxvtperl.h hookinc.h rsinc.h optinc.h version.h keyboard.h
+xdefaults.o: rxvtperl.h hookinc.h rsinc.h optinc.h version.h keyboard.h colorres.h
 rxvtperl.o: ../config.h ev_cpp.h ../config.h ../libev/ev++.h ../libev/ev.h
 rxvtperl.o: rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h emman.h
 rxvtperl.o: rxvtfont.h rxvttoolkit.h callback.h rxvtimg.h scrollbar.h
 rxvtperl.o: rxvtperl.h hookinc.h rsinc.h optinc.h keyboard.h perlxsi.c
 rxvtperl.o: iom_perl.h
+
+sixel.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+sixel.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h
+graphics.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+graphics.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h
+share.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+share.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h share-page.h rxvtbuf.h
+record.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+record.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h
+dnd.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+dnd.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h
+scrollback.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+scrollback.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h
+hints.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+hints.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h

@@ -265,6 +265,23 @@ rxvt_font::clear_rect (rxvt_drawable &d, int x, int y, int w, int h, int color) 
 
 /////////////////////////////////////////////////////////////////////////////
 
+#ifdef BUILTIN_GLYPHS
+// characters drawn by the built-in font: their glyphs are geometric, and
+// fonts often get them wrong (gaps between lines, dots off the grid) or
+// lack them
+static inline bool
+is_builtin_glyph (unicode_t c)
+{
+  return (0x2500 <= c && c <= 0x259f)     // box drawing, block elements
+      || (0x2800 <= c && c <= 0x28ff)     // braille patterns (plots, graphs)
+      || (0xe0b0 <= c && c <= 0xe0b7)     // powerline arrows and semicircles
+#if UNICODE_3
+      || (0x1fb00 <= c && c <= 0x1fb3b)   // sextants (legacy computing)
+#endif
+      ;
+}
+#endif
+
 struct rxvt_font_default : rxvt_font
 {
   struct rxvt_fontset *fs;
@@ -311,8 +328,7 @@ struct rxvt_font_default : rxvt_font
       return true;
 
 #ifdef BUILTIN_GLYPHS
-    if (unicode >= 0x2500 && unicode <= 0x259f &&
-        !term->option (Opt_skipBuiltinGlyphs))
+    if (is_builtin_glyph (unicode) && !term->option (Opt_skipBuiltinGlyphs))
       return true;
 #endif
 
@@ -360,6 +376,11 @@ rxvt_font_default::draw (rxvt_drawable &d, int x, int y,
       int width = text - tp;
       int fwidth = term->fwidth * width;
 
+#if ENABLE_SIXEL
+      if (IS_IMAGE_TILE (t))
+        term->draw_image_tile (d, gc, x, y, t);
+      else
+#endif
 #ifdef BUILTIN_GLYPHS
       if (0x2500 <= t && t <= 0x259f)
         {
@@ -441,6 +462,84 @@ rxvt_font_default::draw (rxvt_drawable &d, int x, int y,
                 }
             }
         }
+      else if (0x2800 <= t && t <= 0x28ff)
+        {
+          // braille: dots 1-3 and 7 down the left, 4-6 and 8 down the right
+          static const unsigned char dot_col[8] = { 0, 0, 0, 1, 1, 1, 0, 1 };
+          static const unsigned char dot_row[8] = { 0, 1, 2, 0, 1, 2, 3, 3 };
+
+          int W = fwidth, H = term->fheight;
+          int size = max (1, min (W / 2, H / 4) * 2 / 3); // the dots fill 2/3 of their grid
+
+          for (int i = 0; i < 8; i++)
+            if ((t - 0x2800) & (1 << i))
+              {
+                int cx = x + W * (2 * dot_col[i] + 1) / 4;
+                int cy = y + H * (2 * dot_row[i] + 1) / 8;
+
+                if (size >= 4)
+                  XFillArc (disp, d, gc, cx - size / 2, cy - size / 2, size, size, 0, 360 * 64);
+                else
+                  XFillRectangle (disp, d, gc, cx - size / 2, cy - size / 2, size, size);
+              }
+        }
+      else if (0xe0b0 <= t && t <= 0xe0b7)
+        {
+          // powerline: E0B0 E0B1 a solid and a thin arrow pointing right,
+          // E0B2 E0B3 left; E0B4-E0B7 the same as semicircles
+          int W = fwidth, H = term->fheight;
+          bool left = t & 2, thin = t & 1;
+
+          if (t <= 0xe0b3)
+            {
+              XPoint p[3] = {
+                { (short)(left ? x + W - 1 : x), (short)y },
+                { (short)(left ? x : x + W - 1), (short)(y + (H - 1) / 2) },
+                { (short)(left ? x + W - 1 : x), (short)(y + H - 1) },
+              };
+
+              if (thin)
+                XDrawLines (disp, d, gc, p, 3, CoordModeOrigin);
+              else
+                {
+                  // a filled polygon leaves out its right and bottom edges
+                  p[left ? 0 : 1].x++;
+                  p[2].y++;
+                  XFillPolygon (disp, d, gc, p, 3, Convex, CoordModeOrigin);
+                }
+            }
+          else
+            {
+              // the circle's centre is on the cell edge the shape is flat
+              // on; cx is the left of its bounding box
+              int cx = left ? x : x - W;
+              int start = left ? 90 * 64 : 270 * 64;
+
+              if (thin)
+                XDrawArc (disp, d, gc, cx, y, 2 * W - 1, H - 1, start, 180 * 64);
+              else
+                XFillArc (disp, d, gc, cx, y, 2 * W, H, start, 180 * 64);
+            }
+        }
+#if UNICODE_3
+      else if (0x1fb00 <= t && t <= 0x1fb3b)
+        {
+          // sextants: the 2x3 block patterns, in order, without the four
+          // in block elements (empty, full, left and right half)
+          int bits = t - 0x1fb00 + 1;
+          if (bits >= 21) bits++;
+          if (bits >= 42) bits++;
+
+          int W = fwidth, H = term->fheight;
+          int xs[3] = { x, x + W / 2, x + W };
+          int ys[4] = { y, y + H / 3, y + H - H / 3, y + H };
+
+          for (int i = 0; i < 6; i++)
+            if (bits & (1 << i))
+              XFillRectangle (disp, d, gc, xs[i & 1], ys[i / 2],
+                              xs[(i & 1) + 1] - xs[i & 1], ys[i / 2 + 1] - ys[i / 2]);
+        }
+#endif
 #else
       if (0)
         ;
@@ -1141,6 +1240,13 @@ rxvt_font_x11::draw (rxvt_drawable &d, int x, int y,
 
 #if XFT
 
+#if ENABLE_EMOJI_SEQUENCES
+# include <hb.h>
+# include <hb-ft.h>
+# include <map>
+# include <vector>
+#endif
+
 struct rxvt_font_xft : rxvt_font
 {
 #if XFT_CHAR_CACHE
@@ -1173,7 +1279,86 @@ struct rxvt_font_xft : rxvt_font
 
 protected:
   XftFont *f;
+
+#if ENABLE_EMOJI_SEQUENCES
+  struct emoji_glyph
+  {
+    FT_UInt glyph;
+    FT_Pos x, y; // transformed origin relative to baseline, in 26.6 pixels
+  };
+  struct emoji_seq
+  {
+    std::vector<emoji_glyph> glyphs;
+  };
+
+  mutable std::map<text_t, emoji_seq> emoji_seqs;
+  const emoji_seq &shape_emoji (text_t c) const;
+#endif
 };
+
+#if ENABLE_EMOJI_SEQUENCES
+const rxvt_font_xft::emoji_seq &
+rxvt_font_xft::shape_emoji (text_t c) const
+{
+  std::map<text_t, emoji_seq>::const_iterator cached = emoji_seqs.find (c);
+  if (cached != emoji_seqs.end ()) return cached->second;
+
+  // Bound both successful and failed lookups. Clearing is safe: references
+  // are used only during the current has_char/draw call, never retained.
+  if (emoji_seqs.size () >= EMOJI_CACHE_ENTRIES) emoji_seqs.clear ();
+  emoji_seq &s = emoji_seqs[c];
+  uint32_t chars[EMOJI_MAX_CODEPOINTS];
+  unsigned int n = emoji_expand (c, chars);
+  if (!emoji_is_sequence (chars, n)) return s;
+
+  FT_Face face = XftLockFace (f);
+  if (!face) return s;
+  if (FT_HAS_COLOR (face))
+    {
+      // Xft can scale bitmap emoji through a FreeType matrix. Shape in the
+      // untransformed coordinate system, then transform every shaped origin.
+      // Always restore the shared face before returning it to Xft.
+      FT_Matrix matrix;
+      FT_Vector delta;
+      FT_Get_Transform (face, &matrix, &delta);
+      FT_Set_Transform (face, 0, 0);
+      hb_font_t *font = hb_ft_font_create_referenced (face);
+      hb_buffer_t *buffer = hb_buffer_create ();
+      hb_buffer_set_flags (buffer, HB_BUFFER_FLAG_REMOVE_DEFAULT_IGNORABLES);
+      hb_buffer_add_utf32 (buffer, chars, n, 0, n);
+      hb_buffer_guess_segment_properties (buffer);
+      hb_shape (font, buffer, 0, 0);
+
+      unsigned int count;
+      hb_glyph_info_t *info = hb_buffer_get_glyph_infos (buffer, &count);
+      hb_glyph_position_t *positions = hb_buffer_get_glyph_positions (buffer, 0);
+      if (hb_buffer_allocation_successful (buffer) && count && count <= EMOJI_MAX_CODEPOINTS)
+        {
+          FT_Pos x = 0, y = 0;
+          for (unsigned int i = 0; i < count; ++i)
+            {
+              if (!info[i].codepoint)
+                {
+                  s.glyphs.clear ();
+                  break; // fall back to urxvt's ordinary component rendering
+                }
+              FT_Vector origin = { x + positions[i].x_offset,
+                                   y + positions[i].y_offset };
+              FT_Vector_Transform (&origin, &matrix);
+              emoji_glyph glyph = { info[i].codepoint, origin.x, origin.y };
+              s.glyphs.push_back (glyph);
+              x += positions[i].x_advance;
+              y += positions[i].y_advance;
+            }
+        }
+      hb_buffer_destroy (buffer);
+      hb_font_destroy (font);
+      FT_Set_Transform (face, &matrix, &delta);
+    }
+  XftUnlockFace (f);
+  return s;
+}
+#endif
 
 void
 rxvt_font_xft::clear ()
@@ -1183,6 +1368,10 @@ rxvt_font_xft::clear ()
       XftFontClose (term->dpy, f);
       f = 0;
     }
+
+#if ENABLE_EMOJI_SEQUENCES
+  emoji_seqs.clear ();
+#endif
 }
 
 rxvt_fontprop
@@ -1253,6 +1442,7 @@ rxvt_font_xft::load (const rxvt_fontprop &prop, bool force_prop)
     return false;
 
   int ftheight = 0;
+  int attempts = 0;
   bool success = true;
 
   for (;;)
@@ -1342,6 +1532,11 @@ rxvt_font_xft::load (const rxvt_fontprop &prop, bool force_prop)
       else
         ftheight = prop.height - 1;
 
+      // it doesn't get smaller (a cell of a pixel or two): keep this size,
+      // rather than asking for the same one forever
+      if (ftheight < 1 || ++attempts > 32)
+        break;
+
       XftFontClose (disp, f);
       FcPatternDel (match, FC_PIXEL_SIZE);
       FcPatternAddInteger (match, FC_PIXEL_SIZE, ftheight);
@@ -1390,6 +1585,11 @@ rxvt_font_xft::has_char (unicode_t unicode, const rxvt_fontprop *prop, bool &car
       return false;
 #endif
 
+#if ENABLE_EMOJI_SEQUENCES
+  if (ecb_expect_false (IS_COMPOSE (unicode)))
+    return !shape_emoji (unicode).glyphs.empty ();
+#endif
+
   FcChar32 chr = unicode;
 
   if (!XftCharExists (term->dpy, f, chr))
@@ -1428,8 +1628,14 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
                      const text_t *text, int len,
                      int fg, int bg)
 {
+#if ENABLE_EMOJI_SEQUENCES
+  // Shaped runs may contain more glyphs than terminal columns.
+  std::vector<XftGlyphSpec> glyph_specs;
+  glyph_specs.reserve (len);
+#else
   XftGlyphSpec *enc = rxvt_temp_buf<XftGlyphSpec> (len);
   XftGlyphSpec *ep = enc;
+#endif
 
   dTermDisplay;
   dTermGC;
@@ -1454,6 +1660,27 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
 
       while (len && *text == NOCHAR)
         text++, len--, cwidth += term->fwidth;
+
+#if ENABLE_EMOJI_SEQUENCES
+      if (ecb_expect_false (IS_COMPOSE (chr)))
+        {
+          const emoji_seq &s = shape_emoji (chr);
+          for (std::vector<emoji_glyph>::const_iterator g = s.glyphs.begin ();
+               g != s.glyphs.end (); ++g)
+            {
+              XftGlyphSpec spec;
+              spec.glyph = g->glyph;
+              spec.x = x_ + (int)lround (g->x / 64.0);
+              // HarfBuzz's positive y direction is opposite to X11's.
+              spec.y = y_ + term->fbase + (term->lineSpace >> 1)
+                       - (int)lround (g->y / 64.0);
+              glyph_specs.push_back (spec);
+            }
+
+          x_ += cwidth;
+          continue;
+        }
+#endif
 
       if (chr != ' ') // skip spaces
         {
@@ -1497,6 +1724,10 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
               xOff = extents.xOff;
             }
 
+#if ENABLE_EMOJI_SEQUENCES
+          XftGlyphSpec spec;
+          XftGlyphSpec *ep = &spec;
+#endif
           ep->glyph = glyph;
           ep->x = x_;
           ep->y = y_ + ascent;
@@ -1514,11 +1745,22 @@ rxvt_font_xft::draw (rxvt_drawable &d, int x, int y,
           // of the base character here, but we don't have that, so we use cwidth.
           ep->x += xOff ? 0 : cwidth;
 
+#if ENABLE_EMOJI_SEQUENCES
+          glyph_specs.push_back (spec);
+#else
           ++ep;
+#endif
         }
 
       x_ += cwidth;
     }
+
+#if ENABLE_EMOJI_SEQUENCES
+  // Keep the common drawing path and its background/clip handling intact.
+  XftGlyphSpec dummy;
+  XftGlyphSpec *enc = glyph_specs.empty () ? &dummy : &glyph_specs[0];
+  XftGlyphSpec *ep = enc + glyph_specs.size ();
+#endif
 
   if (buffered)
     {

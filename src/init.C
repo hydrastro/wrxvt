@@ -626,6 +626,11 @@ rxvt_term::init_resources (int argc, const char *const *argv)
 
   cmd_argv = get_options (argc, argv);
 
+#if ENABLE_RESOURCE_RELOAD
+  for (int i = 0; i < NRS_COLORS; i++)
+    colors_from_options[i] = rs[Rs_color + i];
+#endif
+
   if (!(display = displays.get (rs[Rs_display_name])))
     rxvt_fatal ("can't open display %s, aborting.\n", rs[Rs_display_name]);
 
@@ -634,6 +639,10 @@ rxvt_term::init_resources (int argc, const char *const *argv)
 
   set (display);
   extract_resources ();
+
+#if ENABLE_RESOURCE_RELOAD
+  resources_ev.start (display, display->root);
+#endif
 
 #if ENABLE_FRILLS
   if (rs[Rs_visual])
@@ -794,6 +803,9 @@ rxvt_term::init_resources (int argc, const char *const *argv)
   if (!rs[Rs_color + Color_border])
     rs[Rs_color + Color_border] = rs[Rs_color + Color_bg];
 
+  // what OSC 104 and 110-119 go back to
+  memcpy (initial_colors, rs + Rs_color, sizeof (initial_colors));
+
   return cmd_argv;
 }
 
@@ -843,6 +855,15 @@ rxvt_term::init2 (int argc, const char *const *argv)
   init_vars ();
 
   const char **cmd_argv = init_resources (argc, argv);
+
+  // the configured cursor as a DECSCUSR style, for CSI 0 SP q
+  default_cursor_style = (option (Opt_cursorUnderline) ? 3 : 1)
+#ifdef CURSOR_BLINK
+                         + !option (Opt_cursorBlink)
+#else
+                         + 1
+#endif
+                         ;
 
 #ifdef KEYSYM_RESOURCE
   keyboard->register_done ();
@@ -905,6 +926,20 @@ rxvt_term::init2 (int argc, const char *const *argv)
     pty_ev.start (pty->pty, ev::READ);
 
   HOOK_INVOKE ((this, HOOK_START, DT_END));
+
+#if ENABLE_DND
+  dnd_init ();
+#endif
+
+#if ENABLE_SHARE
+  if (option (Opt_share))
+    share_start ();
+#endif
+
+#if ENABLE_RECORD
+  if (rs[Rs_record])
+    record_start (rs[Rs_record]);
+#endif
 
 #if ENABLE_XEMBED
   if (rs[Rs_embed])

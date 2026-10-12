@@ -92,13 +92,15 @@ rxvt_pop_locale () noexcept
 #if ENABLE_COMBINING
 class rxvt_composite_vec rxvt_composite;
 
-text_t rxvt_composite_vec::compose (unicode_t c1, unicode_t c2)
+text_t rxvt_composite_vec::compose (unicode_t c1, unicode_t c2, bool dedupe)
 {
   compose_char *cc;
 
   // break compose chains, as stupid readline really likes to duplicate
   // composing characters for some reason, near the end of a line.
-  cc = (*this)[c1];
+  // (not for emoji sequences, which repeat characters on purpose: the
+  // zero width joiners of a family, the letters of a subdivision flag)
+  cc = dedupe ? (*this)[c1] : 0;
   while (cc)
     {
       if (cc->c2 == c2) return c1;
@@ -185,7 +187,12 @@ rxvt_term::rxvt_term ()
   bell_ev.set             <rxvt_term, &rxvt_term::bell_cb>    (this);
 #endif
   child_ev.set            <rxvt_term, &rxvt_term::child_cb>   (this);
+#if ENABLE_RESOURCE_RELOAD
+  resources_ev.set        <rxvt_term, &rxvt_term::resources_cb> (this);
+  resources_reload_ev.set <rxvt_term, &rxvt_term::resources_reload_cb> (this);
+#endif
   flush_ev.set            <rxvt_term, &rxvt_term::flush_cb>   (this);
+  sync_ev.set             <rxvt_term, &rxvt_term::sync_cb>    (this);
   destroy_ev.set          <rxvt_term, &rxvt_term::destroy_cb> (this);
   pty_ev.set              <rxvt_term, &rxvt_term::pty_cb>     (this);
   termwin_ev.set          <rxvt_term, &rxvt_term::x_cb>       (this);
@@ -215,6 +222,52 @@ rxvt_term::emergency_cleanup ()
 rxvt_term::~rxvt_term ()
 {
   termlist.erase (find (termlist.begin (), termlist.end(), this));
+
+#if ENABLE_SHARE
+  share_stop ();
+#endif
+#if ENABLE_RECORD
+  record_stop (true);
+#endif
+  free (app_title);
+  free (command_text);
+  free (shell_cwd);
+#if ENABLE_HINTS
+  if (hints)
+    hints_end ();
+#endif
+  free (kitty_note.id);
+  free (kitty_note.title);
+  free (kitty_note.body);
+
+  free (pstr.buf);
+
+#if ENABLE_SIXEL
+  for (int i = 0; i < SIXEL_SLOTS; i++)
+    free_image (i);
+  kitty_forget (0);
+  free (kitty_pending.data);
+#endif
+
+  for (int i = 0; i < 4; i++)
+    free (font_orig[i]);
+
+  for (int i = 0; i < title_depth; i++)
+    {
+      free (title_stack[i].title);
+      free (title_stack[i].icon);
+    }
+
+  if (links)
+    {
+      for (int i = 0; i <= LINK_MAX; i++)
+        {
+          free (links[i].id);
+          free (links[i].uri);
+        }
+
+      free (links);
+    }
 
   emergency_cleanup ();
 
@@ -328,11 +381,16 @@ rxvt_term::destroy ()
 #if ENABLE_PERL
       rootwin_ev.stop (display);
 #endif
+#if ENABLE_RESOURCE_RELOAD
+      resources_ev.stop (display);
+      resources_reload_ev.stop ();
+#endif
       termwin_ev.stop (display);
       vt_ev.stop (display);
     }
 
   flush_ev.stop ();
+  sync_ev.stop ();
   pty_ev.stop ();
 #ifdef CURSOR_BLINK
   cursor_blink_ev.stop ();
@@ -611,6 +669,12 @@ rxvt_init ()
 {
   assert (("fontMask must not overlap other RS masks",
            0 == (RS_fontMask & (RS_Sel | RS_baseattrMask | RS_customMask | RS_bgMask | RS_fgMask))));
+
+  // Before any resource database exists: libX11 1.8 turns on locking
+  // when the first display opens, and a database made before that (the
+  // command line's -xrm and -keysym options) has no lock, so freeing it
+  // with the display would crash.
+  XInitThreads ();
 
   rxvt_get_ttymode (&rxvt_term::def_tio);
 
@@ -924,9 +988,49 @@ rxvt_term::set_utf8_property (Atom prop, const char *str, int len)
 void
 rxvt_term::set_title (const char *str)
 {
+  free (app_title);
+  app_title = strdup (str ? str : "");
+  update_title ();
+}
+
+// the window title: the program's, after marks for sharing
+void
+rxvt_term::update_title ()
+{
+  const char *title = app_title ? app_title : "";
+  char mark[64] = "";
+
+#if ENABLE_RECORD
+  if (recording)
+    strcpy (mark, "[rec] ");
+#endif
+#if ENABLE_SHARE
+  if (share)
+    {
+      int n = share_watching ();
+      size_t len = strlen (mark);
+
+      if (n)
+        snprintf (mark + len, sizeof (mark) - len, "[shared, %d watching] ", n);
+      else
+        snprintf (mark + len, sizeof (mark) - len, "[shared] ");
+    }
+#endif
+
+  char *str = (char *)rxvt_malloc (strlen (mark) + strlen (title) + 1);
+  strcpy (str, mark);
+  strcat (str, title);
+
   set_mbstring_property (XA_WM_NAME, str);
 #if ENABLE_EWMH
   set_utf8_property (xa[XA_NET_WM_NAME], str);
+#endif
+
+  free (str);
+  XFlush (dpy);   // also when called outside the X event loop (sharing)
+
+#if ENABLE_SHARE
+  share_changed ();
 #endif
 }
 
@@ -979,6 +1083,9 @@ done:
   update_fade_color (idx);
   recolor_cursor ();
   scr_recolor ();
+
+  if (idx == Color_fg || idx == Color_bg)
+    color_scheme_check ();
 #endif /* XTERM_COLOR_CHANGE */
 }
 

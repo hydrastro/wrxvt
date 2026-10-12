@@ -51,12 +51,16 @@
 #include "rxvtperl.h"
 #include "version.h"
 #include "command.h"
+#include "rxvtbuf.h"
 
 #ifdef KEYSYM_RESOURCE
 # include "keyboard.h"
 #endif
 
 #include <signal.h>
+#include <fcntl.h>
+#include <X11/XKBlib.h>
+#include <sys/wait.h>
 
 #if LINUX_YIELD_HACK
 # include <time.h>
@@ -417,6 +421,14 @@ rxvt_term::key_press (XKeyEvent &ev)
 #if ISO_14755
   if (iso14755buf & ISO_14755_52)
     return;
+#endif
+
+#if ENABLE_HINTS
+  if (hints)
+    {
+      hints_key (ev);
+      return;
+    }
 #endif
 
   /*
@@ -847,7 +859,8 @@ rxvt_term::key_press (XKeyEvent &ev)
               iso14755buf = 0;
             }
         }
-      else if (option (Opt_iso14755) &&
+      // (not when a program asked for every key with the kitty protocol)
+      else if (option (Opt_iso14755) && !kbd_flags[current_screen] &&
                ((ctrl && (keysym == XK_Shift_L || keysym == XK_Shift_R))
                 || (shft && (keysym == XK_Control_L || keysym == XK_Control_R))))
         if (!(iso14755buf & ISO_14755_STARTED))
@@ -869,10 +882,318 @@ rxvt_term::key_press (XKeyEvent &ev)
 #endif
     }
 
+  if (keysym != NoSymbol && kbd_flags[current_screen] && kitty_key (ev, keysym, false))
+    return;
+
   if (len <= 0)
     return;			/* not mapped */
 
   tt_write_user_input (kbuf, (unsigned int)len);
+}
+
+/*
+ * The kitty keyboard protocol (https://sw.kovidgoyal.net/kitty/keyboard-protocol/):
+ *
+ *   CSI ? u              query the flags: CSI ? flags u
+ *   CSI > flags u        push the current flags and set new ones
+ *   CSI < n u            pop n entries (1 if missing)
+ *   CSI = flags ; mode u set (1), add (2) or remove (3) flags
+ *
+ * Each screen has its own flags and stack.
+ */
+void
+rxvt_term::process_kbd_seq (unicode_t priv, unsigned int nargs, const int *arg)
+{
+  int scr = current_screen;
+  unsigned char &flags = kbd_flags[scr];
+  int value = nargs ? arg[0] & 31 : 0;
+
+  switch (priv)
+    {
+      case '?':
+        tt_printf ("\033[?%du", flags);
+        break;
+
+      case '>':
+        if (kbd_depth[scr] == KBD_STACK)
+          {
+            // full: forget the oldest
+            memmove (kbd_stack[scr], kbd_stack[scr] + 1, KBD_STACK - 1);
+            kbd_depth[scr]--;
+          }
+
+        kbd_stack[scr][kbd_depth[scr]++] = flags;
+        flags = value;
+        break;
+
+      case '<':
+        for (int n = max (1, nargs ? arg[0] : 1); n--; )
+          flags = kbd_depth[scr] ? kbd_stack[scr][--kbd_depth[scr]] : 0;
+        break;
+
+      case '=':
+        {
+          int mode = nargs > 1 && arg[1] ? arg[1] : 1;
+
+          if (mode == 1)
+            flags = value;
+          else if (mode == 2)
+            flags |= value;
+          else if (mode == 3)
+            flags &= ~value;
+        }
+        break;
+    }
+
+  // telling repeats from new presses needs the X server to send the
+  // release only when the key is let go
+  if (flags & KBD_EVENT_TYPES && !kbd_detectable_repeat)
+    {
+      Bool supported;
+      XkbSetDetectableAutoRepeat (dpy, True, &supported);
+      kbd_detectable_repeat = true;
+    }
+}
+
+// keys that don't produce text, and their numbers and final characters
+static const struct
+{
+  KeySym sym;
+  unsigned short number;
+  char final;
+} kitty_functional_keys[] = {
+  { XK_Escape,           27, 'u' },
+  { XK_Return,           13, 'u' },
+  { XK_Tab,               9, 'u' },
+  { XK_ISO_Left_Tab,      9, 'u' },
+  { XK_BackSpace,       127, 'u' },
+  { XK_Insert,            2, '~' },
+  { XK_Delete,            3, '~' },
+  { XK_Left,              1, 'D' },
+  { XK_Right,             1, 'C' },
+  { XK_Up,                1, 'A' },
+  { XK_Down,              1, 'B' },
+  { XK_Prior,             5, '~' },
+  { XK_Next,              6, '~' },
+  { XK_Home,              1, 'H' },
+  { XK_End,               1, 'F' },
+  { XK_Caps_Lock,     57358, 'u' },
+  { XK_Scroll_Lock,   57359, 'u' },
+  { XK_Num_Lock,      57360, 'u' },
+  { XK_Print,         57361, 'u' },
+  { XK_Pause,         57362, 'u' },
+  { XK_Menu,          57363, 'u' },
+  { XK_F1,                1, 'P' },
+  { XK_F2,                1, 'Q' },
+  { XK_F3,               13, '~' },
+  { XK_F4,                1, 'S' },
+  { XK_F5,               15, '~' },
+  { XK_F6,               17, '~' },
+  { XK_F7,               18, '~' },
+  { XK_F8,               19, '~' },
+  { XK_F9,               20, '~' },
+  { XK_F10,              21, '~' },
+  { XK_F11,              23, '~' },
+  { XK_F12,              24, '~' },
+  { XK_KP_Decimal,    57409, 'u' },
+  { XK_KP_Divide,     57410, 'u' },
+  { XK_KP_Multiply,   57411, 'u' },
+  { XK_KP_Subtract,   57412, 'u' },
+  { XK_KP_Add,        57413, 'u' },
+  { XK_KP_Enter,      57414, 'u' },
+  { XK_KP_Equal,      57415, 'u' },
+  { XK_KP_Separator,  57416, 'u' },
+  { XK_KP_Left,       57417, 'u' },
+  { XK_KP_Right,      57418, 'u' },
+  { XK_KP_Up,         57419, 'u' },
+  { XK_KP_Down,       57420, 'u' },
+  { XK_KP_Prior,      57421, 'u' },
+  { XK_KP_Next,       57422, 'u' },
+  { XK_KP_Home,       57423, 'u' },
+  { XK_KP_End,        57424, 'u' },
+  { XK_KP_Insert,     57425, 'u' },
+  { XK_KP_Delete,     57426, 'u' },
+  { XK_KP_Begin,      57427, 'u' },
+  { XK_Shift_L,       57441, 'u' },
+  { XK_Control_L,     57442, 'u' },
+  { XK_Alt_L,         57443, 'u' },
+  { XK_Super_L,       57444, 'u' },
+  { XK_Hyper_L,       57445, 'u' },
+  { XK_Meta_L,        57446, 'u' },
+  { XK_Shift_R,       57447, 'u' },
+  { XK_Control_R,     57448, 'u' },
+  { XK_Alt_R,         57449, 'u' },
+  { XK_Super_R,       57450, 'u' },
+  { XK_Hyper_R,       57451, 'u' },
+  { XK_Meta_R,        57452, 'u' },
+  { XK_ISO_Level3_Shift, 57453, 'u' },
+  { XK_ISO_Level5_Shift, 57454, 'u' },
+};
+
+// the one character a key lookup produced, or 0
+static unicode_t
+single_char (const char *buf, int len)
+{
+  if (len <= 0)
+    return 0;
+
+  wchar_t w[4];
+  mbstate_t mbs = { };
+  const char *src = buf;
+  size_t n = mbsrtowcs (w, &src, 4, &mbs);
+
+  return n == 1 && w[0] >= 0x20 && w[0] != 0x7f ? w[0] : 0;
+}
+
+/*
+ * The key event in the kitty keyboard protocol, written to the pty, when
+ * the flags ask for an escape sequence; false leaves the key to the usual
+ * (legacy) encoding.
+ */
+bool
+rxvt_term::kitty_key (XKeyEvent &ev, KeySym keysym, bool release)
+{
+  int flags = kbd_flags[current_screen];
+  bool all = flags & KBD_ALL_KEYS;
+
+  int type = 1; // press
+  if (release)
+    type = 3;
+  else
+    {
+      bool down = kbd_down[ev.keycode >> 3] & (1 << (ev.keycode & 7));
+      kbd_down[ev.keycode >> 3] |= 1 << (ev.keycode & 7);
+
+      if (down)
+        type = 2; // repeat
+    }
+
+  if (!(flags & KBD_EVENT_TYPES))
+    type = 1;
+
+  int mods = 0;
+  if (ev.state & ShiftMask)      mods |= 1;
+  if (ev.state & ModMetaMask)    mods |= 2;
+  if (ev.state & ControlMask)    mods |= 4;
+  if (ev.state & Mod4Mask && Mod4Mask != ModMetaMask) mods |= 8; // super
+  if (ev.state & LockMask)       mods |= 64;
+  if (ev.state & ModNumLockMask) mods |= 128;
+
+  // a modifier key's own event has the state before it: report the state after
+  int own = 0;
+  switch (keysym)
+    {
+      case XK_Shift_L: case XK_Shift_R:     own = 1; break;
+      case XK_Alt_L: case XK_Alt_R:
+      case XK_Meta_L: case XK_Meta_R:       own = 2; break;
+      case XK_Control_L: case XK_Control_R: own = 4; break;
+      case XK_Super_L: case XK_Super_R:     own = 8; break;
+      case XK_Caps_Lock:                    own = 64; break;
+      case XK_Num_Lock:                     own = 128; break;
+    }
+
+  if (own && own < 64)
+    mods = release ? mods & ~own : mods | own;
+
+  // lock keys only count with "report all keys"
+  if (!all)
+    mods &= ~(64 | 128);
+
+  bool modified = mods & (2 | 4 | 8); // modifiers that change what a key means
+
+  int number = 0;
+  char final = 'u';
+
+  for (auto &k : kitty_functional_keys)
+    if (k.sym == keysym)
+      {
+        number = k.number;
+        final = k.final;
+        break;
+      }
+
+  if (IN_RANGE_INC (keysym, XK_F13, XK_F35))
+    number = 57376 + keysym - XK_F13;
+  else if (IN_RANGE_INC (keysym, XK_KP_0, XK_KP_9))
+    number = 57399 + keysym - XK_KP_0;
+
+  char seq[128];
+  int n;
+
+  if (number)
+    {
+      bool plain_control = keysym == XK_Return || keysym == XK_Tab || keysym == XK_BackSpace
+                           || keysym == XK_KP_Enter;
+      // keypad keys that type text: digits, operators
+      bool keypad_text = IN_RANGE_INC (number, 57399, 57416) && number != 57414;
+      bool modifier = number >= 57441;
+
+      if (!all)
+        {
+          // Enter, Tab and Backspace stay plain (so a shell is usable after
+          // a program left the mode on), keypad keys type their text, and
+          // lone modifiers are not keys: none of them has release events
+          bool plain = plain_control ? !(mods & (1 | 2 | 4 | 8))
+                     : keypad_text ? !modified
+                     : modifier;
+
+          if (plain)
+            return release;
+        }
+
+      if (final == 'u' || final == '~')
+        n = snprintf (seq, sizeof (seq), "\033[%d", number);
+      else
+        n = snprintf (seq, sizeof (seq), "\033[%s", mods || type != 1 ? "1" : "");
+
+      if (mods || type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, ";%d", mods + 1);
+      if (type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, ":%d", type);
+
+      seq[n++] = final;
+    }
+  else
+    {
+      // a text key: its code is the character without shift
+      XKeyEvent plain = ev;
+      char buf[32];
+      KeySym sym;
+
+      plain.state &= ~(ControlMask | ModMetaMask | Mod4Mask);
+      unicode_t text = single_char (buf, XLookupString (&plain, buf, sizeof (buf) - 1, &sym, 0));
+
+      plain.state &= ~(ShiftMask | LockMask);
+      unicode_t code = single_char (buf, XLookupString (&plain, buf, sizeof (buf) - 1, &sym, 0));
+
+      if (!code)
+        return false;
+
+      // text is sent as text, without events, unless all keys are asked for
+      if (!all && !modified)
+        return release;
+
+      n = snprintf (seq, sizeof (seq), "\033[%u", code);
+
+      if (flags & KBD_ALTERNATES && mods & 1 && text && text != code)
+        n += snprintf (seq + n, sizeof (seq) - n, ":%u", text);
+
+      bool with_text = flags & KBD_TEXT && all && text && !modified && type != 3;
+
+      if (mods || type != 1 || with_text)
+        seq[n++] = ';';
+      if (mods || type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, "%d", mods + 1);
+      if (type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, ":%d", type);
+      if (with_text)
+        n += snprintf (seq + n, sizeof (seq) - n, ";%u", text);
+
+      seq[n++] = 'u';
+    }
+
+  tt_write_user_input (seq, n);
+  return true;
 }
 
 void ecb_cold
@@ -950,12 +1271,31 @@ rxvt_term::key_release (XKeyEvent &ev)
   else if (keysym == XK_Control_L || keysym == XK_Control_R)
     mouse_slip_wheel_speed = 0;
 #endif
+
+  kbd_down[ev.keycode >> 3] &= ~(1 << (ev.keycode & 7));
+
+  if (kbd_flags[current_screen] & KBD_EVENT_TYPES)
+    {
+      char buf[16];
+      KeySym sym = NoSymbol;
+      XLookupString (&ev, buf, sizeof (buf), &sym, 0);
+
+      if (sym != NoSymbol)
+        kitty_key (ev, sym, true);
+    }
 }
 
 void
 rxvt_term::flush ()
 {
   flush_ev.stop ();
+
+  if (priv_modes & PrivMode_SyncOutput)
+    {
+      // a synchronized update is in progress: draw it when it's complete
+      display->flush ();
+      return;
+    }
 
 #ifdef HAVE_IMG
   if (bg_flags & BG_NEEDS_REFRESH)
@@ -1019,10 +1359,75 @@ rxvt_term::flush ()
 void
 rxvt_term::refresh_check ()
 {
-  if (want_refresh && !flush_ev.is_active ())
+  if (want_refresh && !flush_ev.is_active () && !(priv_modes & PrivMode_SyncOutput))
     flush_ev.start ();
 
   display->flush ();
+}
+
+/*
+ * The colour scheme, as programs ask for it with CSI ? 996 n: 1 for
+ * dark, 2 for light, from the background colour.
+ */
+int
+rxvt_term::color_scheme ()
+{
+  rgba bg = pix_colors_focused[Color_bg];
+
+  // relative luminance (ITU-R BT.709) of the gamma-encoded values: the
+  // perceived lightness, which is what tells dark from light
+  unsigned long luminance = 2126UL * bg.r + 7152UL * bg.g + 722UL * bg.b;
+
+  return luminance > 10000UL * rgba::MAX_CC / 2 ? 2 : 1;
+}
+
+// with mode 2031 set, tell the program when the scheme changes
+void
+rxvt_term::color_scheme_check ()
+{
+  if (!(priv_modes & PrivMode_ColorScheme))
+    return;
+
+  int scheme = color_scheme ();
+
+  if (scheme != reported_color_scheme)
+    {
+      reported_color_scheme = scheme;
+      tt_printf ("\033[?997;%dn", scheme);
+    }
+}
+
+/*
+ * Synchronized output (mode 2026): while it's set, changes to the screen
+ * are not drawn, so a program can redraw everything and have it appear
+ * at once, without flicker or half-drawn frames. A program that never
+ * resets it doesn't freeze the terminal: it ends by itself after
+ * SYNC_OUTPUT_TIMEOUT seconds.
+ */
+void
+rxvt_term::sync_output (bool on)
+{
+  if (on)
+    {
+      // a second "begin" doesn't extend the time limit
+      if (!sync_ev.is_active ())
+        sync_ev.start (SYNC_OUTPUT_TIMEOUT);
+      priv_modes |= PrivMode_SyncOutput;
+    }
+  else
+    {
+      priv_modes &= ~PrivMode_SyncOutput;
+      sync_ev.stop ();
+      refresh_check ();
+    }
+}
+
+void
+rxvt_term::sync_cb (ev::timer &w, int revents)
+{
+  make_current ();
+
+  sync_output (false);
 }
 
 void
@@ -1205,6 +1610,11 @@ rxvt_term::pty_fill ()
 
   if (r > 0)
     {
+#if ENABLE_RECORD
+      if (recording)
+        record_output (cmdbuf_endp, r);
+#endif
+
       cmdbuf_endp += r;
       return true;
     }
@@ -1232,9 +1642,15 @@ rxvt_term::pty_cb (ev::io &w, int revents)
   make_current ();
 
   if (revents & ev::READ)
-    // loop, but don't allow a single term to monopolize us
-    for (int i = CBUFCNT; i-- && pty_fill (); )
-      cmd_parse ();
+    {
+      // loop, but don't allow a single term to monopolize us
+      for (int i = CBUFCNT; i-- && pty_fill (); )
+        cmd_parse ();
+
+#if ENABLE_SHARE
+      share_changed ();
+#endif
+    }
 
   if (revents & ev::WRITE)
     pty_write ();
@@ -1285,8 +1701,20 @@ rxvt_term::mouse_report (XButtonEvent &ev)
   int x, y;
   bool release = ev.type == ButtonRelease;
 
-  x = 1 + clamp (Pixel2Col (ev.x), 0, ncol - 1);
-  y = 1 + clamp (Pixel2Row (ev.y), 0, nrow - 1);
+#if ENABLE_FRILLS
+  if (priv_modes & PrivMode_ExtMousePixels)
+    {
+      // SGR-Pixels: the position in pixels from the top left of the text
+      // area, starting at 1 like cells
+      x = 1 + clamp (ev.x, 0, Width2Pixel (ncol) - 1);
+      y = 1 + clamp (ev.y, 0, Height2Pixel (nrow) - 1);
+    }
+  else
+#endif
+    {
+      x = 1 + clamp (Pixel2Col (ev.x), 0, ncol - 1);
+      y = 1 + clamp (Pixel2Row (ev.y), 0, nrow - 1);
+    }
 
   if (ev.type == MotionNotify)
     {
@@ -1356,7 +1784,7 @@ rxvt_term::mouse_report (XButtonEvent &ev)
 #endif
 
 #if ENABLE_FRILLS
-  if (priv_modes & PrivMode_ExtMouseSGR)
+  if (priv_modes & (PrivMode_ExtMouseSGR | PrivMode_ExtMousePixels))
     tt_printf ("\033[<%d;%d;%d%c",
               button_number + state,
               x,
@@ -1423,6 +1851,15 @@ rxvt_term::x_cb (XEvent &ev)
         button_release (ev.xbutton);
         break;
 
+#if ENABLE_DND
+      case SelectionNotify:
+        // the data of a drop
+        if (ev.xselection.requestor == parent
+            && ev.xselection.selection == display->atom ("XdndSelection"))
+          dnd_selection_notify (ev.xselection);
+        break;
+#endif
+
       case ClientMessage:
         if (ev.xclient.format == 32
             && !HOOK_INVOKE ((this, HOOK_CLIENT_MESSAGE, DT_XEVENT, &ev, DT_END)))
@@ -1444,6 +1881,10 @@ rxvt_term::x_cb (XEvent &ev)
 #endif
                   }
               }
+#if ENABLE_DND
+            else if (dnd_client_message (ev.xclient))
+              ;
+#endif
 #if ENABLE_XEMBED
             else if (ev.xclient.format == 32 && ev.xclient.message_type == xa[XA_XEMBED])
               {
@@ -2190,6 +2631,11 @@ rxvt_term::button_release (XButtonEvent &ev)
           && ev.button == Button1 && MEvent.clicks <= 1)
         selection_extend (ev.x, ev.y, 0);
 
+      // control-click on a hyperlink opens it
+      if (ev.button == Button1 && ev.state & ControlMask && MEvent.clicks <= 1
+          && open_link (ev.x, ev.y))
+        return;
+
       switch (ev.button)
         {
           case Button1:
@@ -2248,6 +2694,16 @@ rxvt_term::cmd_parse ()
   wchar_t ch = NOCHAR;
   char *seq_begin; // remember start of esc-sequence here
 
+  if (ecb_unlikely (pstr.kind))
+    try
+      {
+        read_string (); // continue the string the last input ended in
+      }
+    catch (const class out_of_input &o)
+      {
+        return;
+      }
+
   for (;;)
     {
       if (ecb_unlikely (ch == NOCHAR))
@@ -2286,6 +2742,14 @@ rxvt_term::cmd_parse ()
             {
               if (ecb_unlikely (ch == NOCHAR || (IS_CONTROL (ch) && ch != C0_LF && ch != C0_CR && ch != C0_HT)))
                 break;
+
+              // DEL is ignored (ECMA-48, xterm), not a character to show
+              if (ecb_unlikely (ch == 0x7f))
+                {
+                  seq_begin = cmdbuf_ptr;
+                  ch = next_char ();
+                  continue;
+                }
 
               *str++ = ch;
 
@@ -2360,8 +2824,10 @@ rxvt_term::cmd_parse ()
             }
           catch (const class out_of_input &o)
             {
-              // we ran out of input, retry later
-              cmdbuf_ptr = seq_begin;
+              // we ran out of input, retry later - except in a string,
+              // which keeps what it read and continues (see read_string)
+              if (!pstr.kind)
+                cmdbuf_ptr = seq_begin;
               break;
             }
 
@@ -2577,6 +3043,13 @@ rxvt_term::process_nonprinting (unicode_t ch)
       case 0x9d:		/* OSC */
         process_osc_seq ();
         break;
+      case 0x98:		/* SOS */
+      case 0x9e:		/* PM */
+        begin_string (C1_PM);
+        break;
+      case 0x9f:		/* APC */
+        begin_string (C1_APC);
+        break;
 #endif
     }
 }
@@ -2757,9 +3230,21 @@ rxvt_term::process_escape_seq ()
         process_osc_seq ();
         break;
 
+        /* 8.3.2: APPLICATION PROGRAM COMMAND, 8.3.94: PRIVACY MESSAGE,
+         * 8.3.128: START OF STRING - read and ignored */
+      case C1_APC:		/* ESC _ */
+        begin_string (C1_APC);
+        break;
+      case C1_PM:		/* ESC ^ */
+      case C1_SOS:		/* ESC X */
+        begin_string (C1_PM); // read and ignored
+        break;
+
         /* 8.3.106: RESET TO INITIAL STATE (RIS) */
       case 'c':
         mbstate.reset ();
+        memset (kbd_flags, 0, sizeof (kbd_flags));
+        memset (kbd_depth, 0, sizeof (kbd_depth));
         scr_poweron ();
         scrollBar.show (1);
         break;
@@ -2815,6 +3300,10 @@ rxvt_term::process_csi_seq ()
   unsigned int nargs, p;
   int n, ndef;
   int arg[ESC_ARGS] = { };
+  // bit p set: arg[p] is a subparameter of the argument before it, i.e. it
+  // followed a ':' (ISO 8613-6), as in "4:3" or "38:2::255:0:0"
+  uint32_t sub = 0;
+  bool colon = false;
 
   nargs = 0;
 
@@ -2838,11 +3327,16 @@ rxvt_term::process_csi_seq ()
           else
             n = n * 10 + ch - '0';
         }
-      else if (ch == ';')
+      else if (ch == ';' || ch == ':')
         {
           if (nargs < ESC_ARGS)
-            arg[nargs++] = n;
+            {
+              if (colon)
+                sub |= 1U << nargs;
+              arg[nargs++] = n;
+            }
           n = -1;
+          colon = ch == ':';
         }
       else if (IS_CONTROL (ch))
         process_nonprinting (ch);
@@ -2855,7 +3349,11 @@ rxvt_term::process_csi_seq ()
     return;
 
   if (nargs < ESC_ARGS)
-    arg[nargs++] = n;
+    {
+      if (colon)
+        sub |= 1U << nargs;
+      arg[nargs++] = n;
+    }
 
   i = ch - CSI_ICH;
   ndef = get_byte_array_bit (csi_defaults, i);
@@ -2882,13 +3380,39 @@ rxvt_term::process_csi_seq ()
                 //
                 tt_printf ("\033[>%d;95;0c", 'U');
               }
+            else if (ch == 'q' && arg[0] == 0) /* XTVERSION: name and version */
+              tt_printf ("\033P>|wrxvt(" VERSION ")\033\\");
+            else if (ch == 'u')
+              process_kbd_seq (priv, nargs, arg);
+            break;
+
+          case '<':
+          case '=':
+            if (ch == 'u')
+              process_kbd_seq (priv, nargs, arg);
             break;
 
           case '?':
+            if (ch == 'u')
+              process_kbd_seq (priv, nargs, arg);
             if (ch == 'h' || ch == 'l' || ch == 'r' || ch == 's' || ch == 't')
               process_terminal_mode (ch, priv, nargs, arg);
             if (prev_ch == '$' && ch == 'p')
               process_terminal_mode (ch, priv, nargs, arg);
+            if (ch == CSI_DSR && arg[0] == 996) /* the colour scheme: dark or light */
+              tt_printf ("\033[?997;%dn", color_scheme ());
+#if ENABLE_SIXEL
+            if (ch == 'S' && nargs >= 2) /* XTSMGRAPHICS: graphics limits */
+              {
+                if (arg[0] == 1)        // colour registers
+                  tt_printf ("\033[?1;0;%dS", SIXEL_COLORS);
+                else if (arg[0] == 2)   // the largest picture: the text area, up to SIXEL_MAX_SIZE
+                  tt_printf ("\033[?2;0;%d;%dS", min (Width2Pixel (ncol), SIXEL_MAX_SIZE),
+                             min (Height2Pixel (nrow), SIXEL_MAX_SIZE));
+                else                    // no ReGIS
+                  tt_printf ("\033[?%d;1;0S", arg[0]);
+              }
+#endif
             break;
 
           case '!':
@@ -2898,7 +3422,7 @@ rxvt_term::process_csi_seq ()
                 scr_soft_reset ();
 
                 static const int pm_h[] = { 7, 25 };
-                static const int pm_l[] = { 1, 3, 4, 5, 6, 9, 66, 1000, 1001, 1005, 1006, 1015, 1049 };
+                static const int pm_l[] = { 1, 3, 4, 5, 6, 9, 66, 1000, 1001, 1005, 1006, 1015, 1016, 1049 };
 
                 process_terminal_mode ('h', 0, ecb_array_length (pm_h), pm_h);
                 process_terminal_mode ('l', 0, ecb_array_length (pm_l), pm_l);
@@ -3022,7 +3546,7 @@ rxvt_term::process_csi_seq ()
         break;
 
       case CSI_SGR:		/* 8.3.118: (0) SELECT GRAPHIC RENDITION */
-        process_sgr_mode (nargs, arg);
+        process_sgr_mode (nargs, arg, sub);
         break;
 
       case CSI_DSR:		/* 8.3.36: (0) DEVICE STATUS REPORT */
@@ -3139,6 +3663,34 @@ rxvt_term::process_csi_seq ()
 }
 /*}}} */
 
+// the window title (or icon name) in the locale's encoding; free () it
+char *
+rxvt_term::get_title (bool icon)
+{
+  XTextProperty prop;
+  char *title = 0;
+
+  // without the [shared] mark
+  if (!icon && app_title)
+    return strdup (app_title);
+
+  if (XGetTextProperty (dpy, parent, &prop, icon ? XA_WM_ICON_NAME : XA_WM_NAME))
+    {
+      char **list;
+      int count;
+
+      if (XmbTextPropertyToTextList (dpy, &prop, &list, &count) >= Success && count > 0)
+        {
+          title = strdup (list[0]);
+          XFreeStringList (list);
+        }
+
+      XFree (prop.value);
+    }
+
+  return title ? title : strdup ("");
+}
+
 #if !ENABLE_MINIMAL
 void
 rxvt_term::process_window_ops (const int *args, unsigned int nargs)
@@ -3204,9 +3756,21 @@ rxvt_term::process_window_ops (const int *args, unsigned int nargs)
                                &x, &y, &wdummy);
         tt_printf ("\033[3;%d;%dt", x, y);
         break;
-      case 14:			/* report window size (pixels) */
+      case 14:			/* report text area size (pixels), with 2: the window's */
+        if (nargs > 1 && args[1] == 2)
+          {
+            XGetWindowAttributes (dpy, parent, &wattr);
+            tt_printf ("\033[4;%d;%dt", wattr.height, wattr.width);
+          }
+        else
+          tt_printf ("\033[4;%d;%dt", Height2Pixel (nrow), Width2Pixel (ncol));
+        break;
+      case 15:			/* report screen size (pixels) */
         XGetWindowAttributes (dpy, parent, &wattr);
-        tt_printf ("\033[4;%d;%dt", wattr.height, wattr.width);
+        tt_printf ("\033[5;%d;%dt", HeightOfScreen (wattr.screen), WidthOfScreen (wattr.screen));
+        break;
+      case 16:			/* report character cell size (pixels) */
+        tt_printf ("\033[6;%d;%dt", fheight, fwidth);
         break;
       case 18:			/* report text area size (chars) */
         tt_printf ("\033[8;%d;%dt", nrow, ncol);
@@ -3215,20 +3779,56 @@ rxvt_term::process_window_ops (const int *args, unsigned int nargs)
         tt_printf ("\033[9;%d;%dt", nrow, ncol);
         break;
       case 20:			/* report icon label */
-        {
-          char *s;
-          XGetIconName (dpy, parent, &s);
-          tt_printf ("\033]L%-.250s\234", option (Opt_insecure) && s ? s : "");	/* 8bit ST */
-          XFree (s);
-        }
-        break;
       case 21:			/* report window title */
         {
-          char *s;
-          XFetchName (dpy, parent, &s);
-          tt_printf ("\033]l%-.250s\234", option (Opt_insecure) && s ? s : "");	/* 8bit ST */
-          XFree (s);
+          char *s = get_title (args[0] == 20);
+          tt_printf ("\033]%c%-.250s\033\\", args[0] == 20 ? 'L' : 'l', option (Opt_insecure) ? s : "");
+          free (s);
         }
+        break;
+
+      /*
+       * the title stack: programs (vim, for one) save the title, set their
+       * own, and restore it when they exit. 0 is both, 1 the icon name,
+       * 2 the title.
+       */
+      case 22:			/* push the title and/or icon name */
+        {
+          int which = nargs > 1 ? args[1] : 0;
+          title_stack_entry e = { 0, 0 };
+
+          if (which == 0 || which == 2)
+            e.title = get_title (false);
+
+          if (which == 0 || which == 1)
+            e.icon = get_title (true);
+
+          if (title_depth == TITLE_STACK_MAX)
+            {
+              // full: forget the oldest
+              free (title_stack[0].title);
+              free (title_stack[0].icon);
+              memmove (title_stack, title_stack + 1, (TITLE_STACK_MAX - 1) * sizeof (title_stack[0]));
+              title_depth--;
+            }
+
+          title_stack[title_depth++] = e;
+        }
+        break;
+      case 23:			/* pop the title and/or icon name */
+        if (title_depth)
+          {
+            int which = nargs > 1 ? args[1] : 0;
+            title_stack_entry &e = title_stack[--title_depth];
+
+            if (e.title && (which == 0 || which == 2))
+              set_title (e.title);
+            if (e.icon && (which == 0 || which == 1))
+              set_icon_name (e.icon);
+
+            free (e.title);
+            free (e.icon);
+          }
         break;
     }
 }
@@ -3236,75 +3836,1259 @@ rxvt_term::process_window_ops (const int *args, unsigned int nargs)
 
 /*----------------------------------------------------------------------*/
 /*
- * get input up until STRING TERMINATOR (or BEL)
- * ends_how is terminator used. returned input must be free()'d
+ * Control strings: OSC, DCS, APC, PM and SOS, up to STRING TERMINATOR
+ * (ESC \ or 0x9c, or BEL).
+ *
+ * A string can be much longer than the input buffer (an image, a copied
+ * file), so it isn't parsed again from the start each time more input
+ * arrives, like other sequences: it is collected in pstr across reads,
+ * and cmd_parse continues it before anything else.
  */
-char *
-rxvt_term::get_to_st (string_term &st)
+void
+rxvt_term::begin_string (unicode_t kind)
 {
-  unicode_t ch;
-  bool seen_esc = false;
-  unsigned int n = 0;
-  wchar_t string[CBUFSIZ];
+  pstr.kind = kind;
+  pstr.len = 0;
+  pstr.seen_esc = false;
+  pstr.seen_syn = false;
+  pstr.overflow = false;
 
-  while ((ch = cmd_getc ()) != NOCHAR)
+  read_string ();
+}
+
+// read the rest of the string, or as much as there is. Throws out_of_input
+// when the input runs out: what was read so far stays in pstr.
+void
+rxvt_term::read_string ()
+{
+  for (;;)
     {
-      if (seen_esc)
+      unicode_t ch;
+
+      if (pstr.seen_syn)
         {
-          if (ch == 0x5c)	/* 7bit ST */
-            break;
+          ch = cmd_get8 ();
+          pstr.seen_syn = false;
+        }
+      else
+        {
+          ch = cmd_getc ();
+
+          if (pstr.seen_esc)
+            {
+              if (ch == 0x5c)	/* 7bit ST */
+                end_string (ch);
+              else
+                pstr.kind = 0; /* ESC and something else: abort */
+              return;
+            }
+          else if (ch == C0_ESC)
+            {
+              pstr.seen_esc = true;
+              continue;
+            }
+          else if (ch == C0_BEL || ch == CHAR_ST)
+            {
+              end_string (ch);
+              return;
+            }
+          else if (ch == C0_SYN)
+            {
+              pstr.seen_syn = true;
+              continue;
+            }
+          else if (ch < 0x20)
+            {
+              // format effectors (BS, HT, LF, VT, FF, CR) are allowed in
+              // device control strings, and ignored
+              if (pstr.kind != C1_OSC && IN_RANGE_INC (ch, C0_BS, C0_CR))
+                continue;
+
+              pstr.kind = 0; /* other control character - abort */
+              return;
+            }
+        }
+
+      if (pstr.len + 1 >= pstr.size)
+        {
+          if (pstr.size >= STRING_MAX)
+            pstr.overflow = true; // keep reading up to the end, then drop it
           else
-            return NULL;
+            {
+              pstr.size = pstr.size ? pstr.size * 2 : 256;
+              pstr.buf = (wchar_t *)rxvt_realloc (pstr.buf, pstr.size * sizeof (wchar_t));
+            }
         }
-      else if (ch == C0_ESC)
-        {
-          seen_esc = true;
-          continue;
-        }
-      else if (ch == C0_BEL || ch == CHAR_ST)
-        break;
-      else if (ch == C0_SYN)
-        ch = cmd_get8 ();
-      else if (ch < 0x20)
-        return NULL;	/* other control character - exit */
 
-      seen_esc = false;
-
-      if (n >= sizeof (string) - 1)
-        // stop at some sane length
-        return NULL;
-
-      string[n++] = ch;
+      if (!pstr.overflow)
+        pstr.buf[pstr.len++] = ch;
     }
+}
 
-  string[n++] = '\0';
+void
+rxvt_term::end_string (unicode_t terminator)
+{
+  unicode_t kind = pstr.kind;
+  pstr.kind = 0;
 
-  n = 0;
-  if (ch == 0x5c)
+  string_term st;
+  unsigned int n = 0;
+  if (terminator == 0x5c)
     st.v[n++] = C0_ESC;
-  st.v[n++] = ch;
+  st.v[n++] = terminator;
   st.v[n] = '\0';
 
-  return rxvt_wcstombs (string);
+  char *s = 0;
+  if (!pstr.overflow && (kind == C1_OSC || kind == C1_DCS
+#if ENABLE_SIXEL
+                         || (kind == C1_APC && pstr.len && pstr.buf[0] == 'G')
+#endif
+                         ))
+    {
+      pstr.buf[pstr.len] = 0;
+      s = rxvt_wcstombs (pstr.buf, pstr.len);
+    }
+
+  // don't keep a big buffer around after a big string
+  if (pstr.size > 65536)
+    {
+      free (pstr.buf);
+      pstr.buf = 0;
+      pstr.size = 0;
+    }
+  pstr.len = 0;
+
+  // APC, PM and SOS strings, and strings too long, are ignored
+  if (!s)
+    return;
+
+  if (kind == C1_OSC)
+    process_xterm_seq (pstr.osc, s, st);
+#if ENABLE_SIXEL
+  else if (kind == C1_APC)
+    process_apc_string (s);
+#endif
+  else
+    process_dcs_string (s);
+
+  free (s);
 }
 
 /*----------------------------------------------------------------------*/
 /*
  * process DEVICE CONTROL STRING `ESC P ... (ST|BEL)' or `0x90 ... (ST|BEL)'
+ *
+ * DCS Pp... Pi... F data ST: parameters (digits ; : < = > ?), then
+ * intermediates (0x20-0x2f), then the final byte (0x40-0x7e) and the data.
  */
 void
 rxvt_term::process_dcs_seq ()
 {
-  /*
-   * Not handled yet
-   */
+  unsigned int np = 0, ni = 0;
+  unicode_t ch;
 
-  string_term st;
-  char *s = get_to_st (st);
-  if (s)
-    free (s);
+  for (;;)
+    {
+      ch = cmd_getc ();
 
-  return;
+      if (IN_RANGE_INC (ch, '0', '?'))
+        {
+          if (np < sizeof (pstr.params) - 1)
+            pstr.params[np++] = ch;
+        }
+      else if (IN_RANGE_INC (ch, 0x20, 0x2f))
+        {
+          if (ni < sizeof (pstr.inter) - 1)
+            pstr.inter[ni++] = ch;
+        }
+      else
+        break;
+    }
+
+  pstr.params[np] = 0;
+  pstr.inter[ni] = 0;
+  pstr.final = ch;
+
+  if (!IN_RANGE_INC (ch, 0x40, 0x7e))
+    {
+      // an empty string (ESC P ESC \) or garbage: skip to the terminator
+      if (ch == C0_ESC)
+        cmd_getc ();
+      else if (ch != C0_BEL && ch != CHAR_ST)
+        begin_string (C1_PM); // read and ignored
+      return;
+    }
+
+  begin_string (C1_DCS);
+}
+
+// a complete device control string: pstr has its parameters, s the data
+void
+rxvt_term::process_dcs_string (const char *s)
+{
+  bool noparams = !pstr.params[0];
+
+  if (pstr.final == 'q' && !strcmp (pstr.inter, "$") && noparams)
+    decrqss (s);
+#if ENABLE_SIXEL
+  else if (pstr.final == 'q' && !pstr.inter[0])
+    process_sixel (pstr.params, s);
+#endif
+  else if (pstr.final == 'q' && !strcmp (pstr.inter, "+") && noparams)
+    xtgettcap (s);
+}
+
+/*
+ * The SGR sequence that recreates rendition r: "0;1;38:5:208".
+ */
+void
+rxvt_term::sgr_string (rend_t r, char *buf, size_t len) const
+{
+  int n = snprintf (buf, len, "0");
+
+#define SGR_ADD(...) n += snprintf (buf + n, n < (int)len ? len - n : 0, __VA_ARGS__)
+
+  if (r & RS_Bold)      SGR_ADD (";1");
+  if (r & RS_Faint)     SGR_ADD (";2");
+  if (r & RS_Italic)    SGR_ADD (";3");
+  if (r & RS_Uline)
+    {
+      if (GET_ULSTYLE (r) == UL_single)
+        SGR_ADD (";4");
+      else
+        SGR_ADD (";4:%d", GET_ULSTYLE (r) + 1);
+    }
+  if (r & RS_Blink)     SGR_ADD (";5");
+  if (r & RS_RVid)      SGR_ADD (";7");
+  if (r & RS_Conceal)   SGR_ADD (";8");
+  if (r & RS_Strike)    SGR_ADD (";9");
+  if (r & RS_Overline)  SGR_ADD (";53");
+
+  struct { int color, base; } colors[] = {
+    { (int)GET_BASEFG (r), 30 },
+    { (int)GET_BASEBG (r), 40 },
+    { r & RS_ulColor ? GET_ULCOLOR (r) : -1, 50 },
+  };
+
+  for (auto &c : colors)
+    {
+      int idx = c.color;
+
+      if (idx < minCOLOR || idx > maxTermCOLOR24)
+        continue; // the default colour (or none)
+
+      if (c.base != 50 && idx <= maxCOLOR)
+        SGR_ADD (";%d", c.base + idx - minCOLOR);
+#if !ENABLE_MINIMAL
+      else if (c.base != 50 && IN_RANGE_INC (idx, minBrightCOLOR, maxBrightCOLOR))
+        SGR_ADD (";%d", c.base + 60 + idx - minBrightCOLOR);
+#endif
+      else if (idx <= maxTermCOLOR)
+        SGR_ADD (";%d:5:%d", c.base + 8, idx - minCOLOR);
+      else
+        {
+          uint32_t rgb = rgb24_color[idx - minTermCOLOR24];
+          SGR_ADD (";%d:2::%d:%d:%d", c.base + 8, (rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
+        }
+    }
+
+#undef SGR_ADD
+}
+
+/*
+ * DECRQSS, request selection or setting: DCS $ q Pt ST
+ * answered with DCS 1 $ r <the sequence that sets it> ST,
+ * or DCS 0 $ r ST for settings we don't report.
+ */
+void
+rxvt_term::decrqss (const char *setting)
+{
+  char reply[256];
+
+  if (!strcmp (setting, "m"))           // SGR
+    {
+      sgr_string (rstyle, reply, sizeof (reply) - 1);
+      strcat (reply, "m");
+    }
+  else if (!strcmp (setting, "r"))      // DECSTBM, the scroll region
+    snprintf (reply, sizeof (reply), "%d;%dr", screen.tscroll + 1, screen.bscroll + 1);
+  else if (!strcmp (setting, " q"))     // DECSCUSR, the cursor style
+    {
+      int blink = 0;
+#ifdef CURSOR_BLINK
+      blink = option (Opt_cursorBlink);
+#endif
+      snprintf (reply, sizeof (reply), "%d q", cursor_type * 2 + (blink ? 1 : 2));
+    }
+  else if (!strcmp (setting, "t"))      // DECSLPP, lines per page
+    snprintf (reply, sizeof (reply), "%dt", nrow);
+  else if (!strcmp (setting, "\"q"))    // DECSCA: no protected characters
+    strcpy (reply, "0\"q");
+  else if (!strcmp (setting, "\"p"))    // DECSCL: a VT220-class terminal, 7-bit replies
+    strcpy (reply, "62;1\"p");
+  else
+    {
+      tt_printf ("\033P0$r\033\\");
+      return;
+    }
+
+  tt_printf ("\033P1$r%s\033\\", reply);
+}
+
+/*
+ * XTGETTCAP: DCS + q <hex name>;<hex name>... ST
+ * answered for each name with DCS 1 + r <hex name>=<hex value> ST
+ * (just the name for a boolean), or DCS 0 + r <hex name> ST.
+ */
+static int
+hex_digit (char c)
+{
+  return IN_RANGE_INC (c, '0', '9') ? c - '0'
+       : IN_RANGE_INC (c, 'a', 'f') ? c - 'a' + 10
+       : IN_RANGE_INC (c, 'A', 'F') ? c - 'A' + 10
+       : -1;
+}
+
+const char *
+rxvt_term::tcap_value (const char *name, bool &boolean)
+{
+  static char number[16];
+
+  boolean = false;
+
+  if (!strcmp (name, "TN") || !strcmp (name, "name"))
+    return rs[Rs_term_name] ? rs[Rs_term_name] : TERMENV;
+
+  if (!strcmp (name, "Co") || !strcmp (name, "colors"))
+    {
+      snprintf (number, sizeof (number), "%d", maxTermCOLOR - minCOLOR + 1);
+      return number;
+    }
+
+  static const struct { const char *name, *value; } caps[] = {
+    // 24-bit colours (SGR 38:2, 48:2)
+    { "RGB",    "8/8/8" },
+    { "Tc",     0 },
+    // styled and coloured underlines (SGR 4:N, 58)
+    { "Smulx",  "\033[4:%p1%dm" },
+    { "Setulc", "\033[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm" },
+    { "ol",     "\033[59m" },
+    // crossed-out text (SGR 9)
+    { "smxx",   "\033[9m" },
+    { "rmxx",   "\033[29m" },
+    // dim, overline
+    { "dim",    "\033[2m" },
+    { "Smol",   "\033[53m" },
+    { "Rmol",   "\033[55m" },
+    // cursor styles (DECSCUSR)
+    { "Ss",     "\033[%p1%d q" },
+    { "Se",     "\033[0 q" },
+    // bracketed paste
+    { "BE",     "\033[?2004h" },
+    { "BD",     "\033[?2004l" },
+    { "PS",     "\033[200~" },
+    { "PE",     "\033[201~" },
+    // focus events
+    { "fe",     "\033[?1004h" },
+    { "fd",     "\033[?1004l" },
+    // synchronized output (mode 2026), as tmux writes it
+    { "Sync",   "\033[?2026%?%p1%{1}%-%tl%eh%;" },
+    // setting the selection (OSC 52), as tmux writes it
+    { "Ms",     "\033]52;%p1%s;%p2%s\007" },
+    // XTVERSION, the request for the terminal's name and version
+    { "XR",     "\033[>0q" },
+  };
+
+  for (auto &cap : caps)
+    if (!strcmp (name, cap.name))
+      {
+        boolean = !cap.value;
+        return cap.value ? cap.value : "";
+      }
+
+  return 0;
+}
+
+void
+rxvt_term::xtgettcap (const char *request)
+{
+  const char *p = request;
+
+  while (*p)
+    {
+      const char *end = strchr (p, ';');
+      if (!end)
+        end = p + strlen (p);
+
+      char name[64];
+      unsigned int n = 0;
+      bool valid = (end - p) % 2 == 0 && end > p && (end - p) / 2 < (int)sizeof (name);
+
+      for (const char *q = p; valid && q < end; q += 2)
+        {
+          int hi = hex_digit (q[0]), lo = hex_digit (q[1]);
+          if (hi < 0 || lo < 0)
+            valid = false;
+          else
+            name[n++] = hi * 16 + lo;
+        }
+      name[n] = 0;
+
+      bool boolean;
+      const char *value = valid ? tcap_value (name, boolean) : 0;
+
+      int len = end - p;
+      if (!value)
+        tt_printf ("\033P0+r%.*s\033\\", len, p);
+      else if (boolean)
+        tt_printf ("\033P1+r%.*s\033\\", len, p);
+      else
+        {
+          // DCS 1 + r name = value in hex (every byte becomes two
+          // characters, so this can be longer than tt_printf allows)
+          size_t vlen = strlen (value);
+          size_t size = len + 2 * vlen + 16;
+          char *reply = (char *)rxvt_malloc (size);
+          int r = snprintf (reply, size, "\033P1+r%.*s=", len, p);
+          for (size_t i = 0; i < vlen; i++)
+            r += sprintf (reply + r, "%02X", (unsigned char)value[i]);
+          r += sprintf (reply + r, "\033\\");
+          tt_write (reply, r);
+          free (reply);
+        }
+
+      p = *end ? end + 1 : end;
+    }
+}
+
+/*----------------------------------------------------------------------*/
+/*
+ * OSC 52: ESC ] 52 ; Pc ; Pd ST, set the selections named in Pc to the
+ * base64 text Pd, or report them if Pd is "?".
+ */
+static const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+char *
+rxvt_base64_encode (const char *data, unsigned int len)
+{
+  char *out = (char *)rxvt_malloc ((len + 2) / 3 * 4 + 1);
+  char *p = out;
+
+  for (unsigned int i = 0; i < len; i += 3)
+    {
+      uint32_t v = (unsigned char)data[i] << 16;
+      if (i + 1 < len) v |= (unsigned char)data[i + 1] << 8;
+      if (i + 2 < len) v |= (unsigned char)data[i + 2];
+
+      *p++ = base64_chars[v >> 18 & 63];
+      *p++ = base64_chars[v >> 12 & 63];
+      *p++ = i + 1 < len ? base64_chars[v >> 6 & 63] : '=';
+      *p++ = i + 2 < len ? base64_chars[v & 63] : '=';
+    }
+
+  *p = 0;
+  return out;
+}
+
+// decodes in place, returns the length, or -1 if it isn't base64
+int
+rxvt_base64_decode (char *str)
+{
+  uint32_t v = 0;
+  int bits = 0, len = 0;
+  bool padding = false;
+
+  for (char *p = str; *p; p++)
+    {
+      if (*p == '=')
+        {
+          padding = true;
+          continue;
+        }
+
+      const char *c = strchr (base64_chars, *p);
+      if (!c || padding)
+        return -1;
+
+      v = v << 6 | (c - base64_chars);
+      bits += 6;
+
+      if (bits >= 8)
+        {
+          bits -= 8;
+          str[len++] = v >> bits & 0xff;
+        }
+    }
+
+  return len;
+}
+
+void
+rxvt_term::selection_report (char target, const char *data, unsigned int len)
+{
+  char *encoded = rxvt_base64_encode (data ? data : "", data ? len : 0);
+
+  tt_printf ("\033]52;%c;", target);
+  tt_write (encoded, strlen (encoded));
+  tt_write ("\033\\", 2);
+
+  free (encoded);
+}
+
+void
+rxvt_term::process_selection_seq (char *str, string_term &st)
+{
+  char *data = strchr (str, ';');
+  if (!data)
+    return;
+
+  *data++ = 0;
+
+  // the selections: c the clipboard; p, s and cut buffers 0-7 primary
+  // (they are what the user selects); none means "s 0", the selection
+  bool clipboard = false, primary = false;
+  char target = 0;
+
+  for (char *p = *str ? str : (char *)"s"; *p; p++)
+    if (*p == 'c')
+      {
+        clipboard = true;
+        target = target ? target : 'c';
+      }
+    else if (*p == 'p' || *p == 's' || IN_RANGE_INC (*p, '0', '7'))
+      {
+        primary = true;
+        target = target ? target : *p;
+      }
+
+  if (!target)
+    return;
+
+  if (!strcmp (data, "?"))
+    {
+      // the selection could hold anything (a password just copied), so
+      // programs can read it only with the insecure option
+      if (!option (Opt_insecure))
+        return;
+
+      // a terminal of this process (wrxvtd runs many) has it?
+      rxvt_term *owner = clipboard ? display->clipboard_owner : display->selection_owner;
+
+      if (owner)
+        {
+          wchar_t *own = clipboard ? owner->selection.clip_text : owner->selection.text;
+          unsigned int own_len = clipboard ? owner->selection.clip_len : owner->selection.len;
+          char *text = own ? rxvt_wcstombs (own, own_len) : strdup ("");
+          selection_report (target, text, strlen (text));
+          free (text);
+        }
+      else if (!selection_req)
+        {
+          // another program has it: ask it, and answer when it replies
+          selection_req = new rxvt_selection (display, clipboard ? Sel_Clipboard : Sel_Primary,
+                                              CurrentTime, vt, xa[XA_VT_SELECTION], this);
+          selection_req->report = target;
+          selection_req->run ();
+        }
+
+      return;
+    }
+
+  int len = rxvt_base64_decode (data);
+  if (len < 0)
+    return;
+
+  data[len] = 0;
+  wchar_t *text = rxvt_mbstowcs (data, len);
+  set_selection (text, primary, clipboard);
+  free (text);
+}
+
+// own the primary selection and/or the clipboard, with this text
+void
+rxvt_term::set_selection (const wchar_t *text, bool primary, bool clipboard)
+{
+  if (primary)
+    {
+      selection_clear (false);
+      selection.text = wcsdup (text);
+      selection.len = wcslen (text);
+      selection_grab (CurrentTime, false);
+    }
+
+  if (clipboard)
+    {
+      selection_clear (true);
+      selection.clip_text = wcsdup (text);
+      selection.clip_len = wcslen (text);
+      selection_grab (CurrentTime, true);
+    }
+}
+
+/*----------------------------------------------------------------------*/
+/*
+ * OSC 7: the shell tells its current directory as file://host/path. It is
+ * published as the _WRXVT_CWD property of the window, so a window manager
+ * binding can open a new terminal in the same place:
+ *
+ *   wrxvt -cd "$(xprop -id "$(xdotool getactivewindow)" _WRXVT_CWD | cut -d'"' -f2)"
+ */
+void
+rxvt_term::set_cwd (const char *uri)
+{
+  if (strncmp (uri, "file://", 7))
+    return;
+
+  const char *path = strchr (uri + 7, '/'); // skip the host name
+  if (!path)
+    return;
+
+  // undo the percent-encoding
+  char *dir = (char *)rxvt_malloc (strlen (path) + 1);
+  char *d = dir;
+
+  for (const char *p = path; *p; p++)
+    {
+      int hi, lo;
+
+      if (*p == '%'
+          && (hi = hex_digit (p[1])) >= 0
+          && (lo = hex_digit (p[2])) >= 0)
+        {
+          *d++ = hi * 16 + lo;
+          p += 2;
+        }
+      else
+        *d++ = *p;
+    }
+
+  *d = 0;
+
+  set_utf8_property (display->atom ("_WRXVT_CWD"), dir);
+  free (shell_cwd);
+  shell_cwd = dir;
+}
+
+/*
+ * OSC 8: ESC ] 8 ; params ; URI ST makes the text that follows a link to
+ * URI, up to ESC ] 8 ; ; ST. params can have id=ID: separate pieces of
+ * text with the same ID and URI are one link.
+ */
+void
+rxvt_term::process_hyperlink (char *str)
+{
+  char *uri = strchr (str, ';');
+  if (!uri)
+    return;
+
+  *uri++ = 0;
+
+  rstyle &= ~RS_linkMask;
+
+  if (!*uri)
+    return; // the end of the link
+
+  // URIs are printable ASCII (anything else is percent-encoded)
+  size_t len = 0;
+  for (const char *p = uri; *p; p++, len++)
+    if (!IN_RANGE_INC (*p, 0x21, 0x7e) || len > 8192)
+      return;
+
+  const char *id = "";
+  for (char *param = strtok (str, ":"); param; param = strtok (0, ":"))
+    if (!strncmp (param, "id=", 3))
+      id = param + 3;
+
+  if (!links)
+    links = (hyperlink *)rxvt_calloc (LINK_MAX + 1, sizeof (hyperlink));
+
+  // the same link as a recent one: use its index
+  unsigned int idx = 0;
+
+  for (unsigned int i = 0, n = link_next; i < 256 && links[n].uri; i++, n = n > 1 ? n - 1 : LINK_MAX)
+    if (!strcmp (links[n].uri, uri) && !strcmp (links[n].id, id))
+      {
+        idx = n;
+        break;
+      }
+
+  if (!idx)
+    {
+      // a new one, replacing the oldest when the table is full
+      link_next = link_next % LINK_MAX + 1;
+      idx = link_next;
+
+      free (links[idx].id);
+      free (links[idx].uri);
+      links[idx].id = strdup (id);
+      links[idx].uri = strdup (uri);
+    }
+
+  rstyle |= (rend_t)idx << RS_linkShift;
+}
+
+// the URI of the hyperlink at pixel x, y of the window, or 0
+const char *
+rxvt_term::link_at (int x, int y)
+{
+  if (!links)
+    return 0;
+
+  int row = Pixel2Row (y);
+  int col = Pixel2Col (x);
+
+  if (!IN_RANGE_EXC (row, 0, nrow) || !IN_RANGE_EXC (col, 0, ncol))
+    return 0;
+
+  line_t &l = ROW (view_start + row);
+
+  if (!l.valid ())
+    return 0;
+
+  int idx = GET_LINK (l.r[col]);
+
+  return idx ? links[idx].uri : 0;
+}
+
+/*
+ * Run command with sh -c, the arguments as $1 and $2 (never interpreted
+ * by the shell), detached from the terminal.
+ */
+void
+rxvt_term::spawn (const char *command, const char *arg1, const char *arg2)
+{
+  // fork twice, so the command is not our child and needs no reaping
+  pid_t pid = fork ();
+
+  if (pid == 0)
+    {
+      if (fork () == 0)
+        {
+          setsid ();
+
+          // nothing of the terminal: not the pty, nor the X connection
+          int null = open ("/dev/null", O_RDWR);
+          dup2 (null, STDIN_FILENO);
+          for (int fd = 3; fd < 1024; fd++)
+            close (fd);
+
+          if (env)
+            environ = env;
+
+          execl ("/bin/sh", "sh", "-c", command, "sh", arg1, arg2, (char *)0);
+        }
+
+      _exit (0);
+    }
+
+  if (pid > 0)
+    waitpid (pid, 0, 0);
+}
+
+/*
+ * Open the hyperlink at x, y with the url-launcher resource (the same
+ * as the matcher extension's), xdg-open by default.
+ */
+bool
+rxvt_term::open_link (int x, int y)
+{
+  const char *uri = link_at (x, y);
+  if (!uri)
+    return false;
+
+  const char *launcher = x_resource ("url-launcher");
+  if (!launcher || !*launcher)
+    launcher = "xdg-open";
+
+  char *command = (char *)rxvt_malloc (strlen (launcher) + 8);
+  sprintf (command, "%s \"$1\"", launcher);
+  spawn (command, uri);
+  free (command);
+
+  return true;
+}
+
+/*
+ * OSC 9 ; text: a desktop notification (as in iTerm2), shown with the
+ * notifyCommand resource, notify-send by default, given the window
+ * title and the text.
+ */
+// a desktop notification with notifyCommand (title and text as $1 and $2)
+void
+rxvt_term::notify_as (const char *title, const char *text)
+{
+  const char *notifier = rs[Rs_notifyCommand];
+  if (!notifier)
+    notifier = "notify-send --";
+
+  if (!*notifier)
+    return; // disabled
+
+  char *command = (char *)rxvt_malloc (strlen (notifier) + 16);
+  sprintf (command, "%s \"$1\" \"$2\"", notifier);
+  spawn (command, title, text);
+  free (command);
+}
+
+void
+rxvt_term::notify (const char *text)
+{
+  // ConEmu's progress reports (9;4;...) and other numbered subcommands
+  if (isdigit (text[0]) && text[1] == ';')
+    return;
+
+  char *title = get_title (false);
+  notify_as (*title ? title : RESNAME, text);
+  free (title);
+
+#if ENABLE_FRILLS
+  if (!focus && option (Opt_urgentOnBell))
+    set_urgency (1);
+#endif
+}
+
+/*
+ * ESC ] 99 ; metadata ; payload ST: kitty's desktop notifications. The
+ * metadata is key=value pairs separated by colons:
+ *   i  an id: parts with the same id make one notification
+ *   d  0: more parts follow; 1 (the default): show it
+ *   p  what the payload is: title (the default) or body; "?" asks what
+ *      the terminal supports
+ *   e  1: the payload is base64
+ *   o  when to show it: always (the default), unfocused, invisible
+ * Other keys (actions, icons, sounds, urgency...) are ignored.
+ */
+void
+rxvt_term::process_kitty_notify (char *str)
+{
+  char *payload = strchr (str, ';');
+
+  if (payload)
+    *payload++ = 0;
+  else
+    payload = (char *)"";
+
+  char id[64] = "", type[16] = "title", occasion[16] = "always";
+  bool done = true, base64 = false;
+
+  for (char *kv = strtok (str, ":"); kv; kv = strtok (0, ":"))
+    {
+      char *v = strchr (kv, '=');
+      if (!v)
+        continue;
+      *v++ = 0;
+
+      if (!strcmp (kv, "i"))
+        snprintf (id, sizeof (id), "%s", v);
+      else if (!strcmp (kv, "d"))
+        done = strcmp (v, "0");
+      else if (!strcmp (kv, "p"))
+        snprintf (type, sizeof (type), "%s", v);
+      else if (!strcmp (kv, "e"))
+        base64 = !strcmp (v, "1");
+      else if (!strcmp (kv, "o"))
+        snprintf (occasion, sizeof (occasion), "%s", v);
+    }
+
+  if (!strcmp (type, "?"))
+    {
+      tt_printf ("\033]99;i=%s:p=?;a=:c=0:o=always,unfocused,invisible:p=title,body:u=0,1,2\033\\", id);
+      return;
+    }
+
+  if (strcmp (type, "title") && strcmp (type, "body"))
+    return; // close, icon, buttons, alive...
+
+  // parts of another notification: that one is dropped
+  if (kitty_note.id && strcmp (kitty_note.id, id))
+    {
+      free (kitty_note.id);
+      free (kitty_note.title);
+      free (kitty_note.body);
+      kitty_note.id = kitty_note.title = kitty_note.body = 0;
+    }
+
+  if (!kitty_note.id)
+    kitty_note.id = strdup (id);
+
+  if (base64)
+    {
+      int len = rxvt_base64_decode (payload);
+      if (len < 0)
+        return;
+      payload[len] = 0;
+    }
+
+  char *&part = strcmp (type, "body") ? kitty_note.title : kitty_note.body;
+  size_t old = part ? strlen (part) : 0;
+  if (old + strlen (payload) < 65536)
+    {
+      part = (char *)rxvt_realloc (part, old + strlen (payload) + 1);
+      strcpy (part + old, payload);
+    }
+
+  if (!done)
+    return;
+
+  // (the payload is UTF-8; notify_as takes the locale's encoding)
+  bool show = !strcmp (occasion, "always") || !focus;
+
+  if (show && ((kitty_note.title && *kitty_note.title) || (kitty_note.body && *kitty_note.body)))
+    {
+      wchar_t *wt = rxvt_utf8towcs (kitty_note.title ? kitty_note.title : "");
+      wchar_t *wb = rxvt_utf8towcs (kitty_note.body ? kitty_note.body : "");
+      char *t = rxvt_wcstombs (wt);
+      char *b = rxvt_wcstombs (wb);
+
+      notify_as (*t ? t : RESNAME, b);
+
+      free (t);
+      free (b);
+      free (wt);
+      free (wb);
+    }
+
+  free (kitty_note.id);
+  free (kitty_note.title);
+  free (kitty_note.body);
+  kitty_note.id = kitty_note.title = kitty_note.body = 0;
+}
+
+/*
+ * OSC 133 ; X, the marks shells put around their prompts and commands:
+ *   A  a prompt starts here (prompt:previous, prompt:next jump to them)
+ *   B  the prompt ends: the command is typed from here
+ *   C  the command runs: its output starts here (prompt:copy-output)
+ *   D [; exit status]  it ended
+ */
+void
+rxvt_term::shell_mark (const char *str)
+{
+  char mark = str[0];
+
+  if (!mark || (str[1] && str[1] != ';') || current_screen != PRIMARY)
+    return;
+
+  line_t &line = ROW (screen.cur.row);
+
+  switch (mark)
+    {
+      case 'A':
+        if (command_start)
+          command_finished (-1); // no D from this shell
+        line.f |= LINE_PROMPT;
+        prompt_command_col = -1;
+        break;
+
+      case 'B':
+        prompt_command_col = screen.cur.col;
+        break;
+
+      case 'C':
+        {
+          line.f |= LINE_OUTPUT;
+          command_start = ev::now ();
+          free (command_text);
+          command_text = 0;
+
+#if ENABLE_RECORD
+          // the command: from B on the prompt's line to here
+          for (int row = screen.cur.row - 1; row >= max (top_row, screen.cur.row - 20); row--)
+            if (ROW (row).f & LINE_PROMPT)
+              {
+                rxvt_buf text;
+                rows_text (text, row, screen.cur.row, false, " ", true, prompt_command_col);
+                // (ugly, but this is the one place: trim and shorten)
+                char *t = text.data ? text.data : (char *)"";
+                while (*t == ' ')
+                  t++;
+                size_t n = strlen (t);
+                while (n && t[n - 1] == ' ')
+                  n--;
+                if (n > 200)
+                  n = 200;
+                wchar_t *w = rxvt_utf8towcs (t, n);
+                command_text = rxvt_wcstombs (w);
+                free (w);
+                break;
+              }
+#endif
+        }
+        break;
+
+      case 'D':
+        if (command_start)
+          command_finished (str[1] == ';' && isdigit (str[2]) ? atoi (str + 2) : -1);
+        break;
+    }
+}
+
+// a command ended: a notification if it took long and the window is not
+// in front (notifyLongCommand)
+void
+rxvt_term::command_finished (int status)
+{
+  ev_tstamp took = ev::now () - command_start;
+  command_start = 0;
+
+  int seconds = rs[Rs_notifyLongCommand] ? atoi (rs[Rs_notifyLongCommand]) : 0;
+
+  if (seconds > 0 && took >= seconds && !focus)
+    {
+      char title[64], text[512];
+      long t = (long)(took + .5);
+
+      if (status > 0)
+        snprintf (title, sizeof (title), "Command failed (exit status %d)", status);
+      else
+        snprintf (title, sizeof (title), "Command finished");
+
+      if (t >= 3600)
+        snprintf (text, sizeof (text), "%s\nafter %ld h %ld min", command_text ? command_text : "",
+                  t / 3600, t / 60 % 60);
+      else if (t >= 60)
+        snprintf (text, sizeof (text), "%s\nafter %ld min %ld s", command_text ? command_text : "",
+                  t / 60, t % 60);
+      else
+        snprintf (text, sizeof (text), "%s\nafter %ld s", command_text ? command_text : "", t);
+
+      notify_as (title, *text == '\n' ? text + 1 : text);
+
+#if ENABLE_FRILLS
+      if (option (Opt_urgentOnBell))
+        set_urgency (1);
+#endif
+    }
+
+  free (command_text);
+  command_text = 0;
+}
+
+/*
+ * Scroll so that the previous (dir < 0) or next (dir > 0) prompt marked
+ * with OSC 133 ; A is the top line; the next one after the last prompt
+ * is the bottom of the screen.
+ */
+bool
+rxvt_term::jump_to_prompt (int dir)
+{
+  if (current_screen != PRIMARY)
+    return false;
+
+  if (dir < 0)
+    {
+      for (int row = view_start - 1; row >= top_row; row--)
+        if (ROW (row).f & LINE_PROMPT)
+          return scr_changeview (row);
+
+      return false;
+    }
+
+  for (int row = view_start + 1; row < 0; row++)
+    if (ROW (row).f & LINE_PROMPT)
+      return scr_changeview (row);
+
+  return scr_changeview (0);
+}
+
+/*
+ * A font list with every size changed by delta: pixelsize=N and size=N
+ * of xft: fonts, and the pixel size field of X core font names.
+ */
+static char *
+scale_font_list (const char *list, int delta)
+{
+  // every number grows by at most a few digits
+  char *out = (char *)rxvt_malloc (strlen (list) * 2 + 64);
+  char *o = out;
+  const char *p = list;
+
+  while (*p)
+    {
+      const char *end = strchr (p, ',');
+      if (!end)
+        end = p + strlen (p);
+
+      const char *num = 0;
+
+      if (!strncmp (p, "xft:", 4))
+        {
+          // the last pixelsize= or size= of this font
+          for (const char *q = p; q < end; q++)
+            if (*q == ':' && !strncmp (q + 1, "pixelsize=", 10))
+              num = q + 11;
+            else if (*q == ':' && !strncmp (q + 1, "size=", 5))
+              num = q + 6;
+        }
+      else if (*p == '-')
+        {
+          // -foundry-family-weight-slant-setwidth-adstyle-PIXELSIZE-...
+          int dashes = 0;
+          for (const char *q = p; q < end; q++)
+            if (*q == '-' && ++dashes == 7)
+              {
+                num = q + 1;
+                break;
+              }
+        }
+
+      if (num && isdigit (*num))
+        {
+          char *e;
+          long size = strtol (num, &e, 10);
+
+          memcpy (o, p, num - p);
+          o += num - p;
+          o += sprintf (o, "%ld", max (1L, size + delta));
+          p = e;
+        }
+
+      memcpy (o, p, end - p);
+      o += end - p;
+      p = end;
+
+      if (*p == ',')
+        *o++ = *p++;
+    }
+
+  *o = 0;
+  return out;
+}
+
+/*
+ * The font-size actions: make all fonts one step (one pixel or point)
+ * bigger or smaller, or as configured again (delta 0).
+ */
+void
+rxvt_term::change_font_size (int delta)
+{
+#if ENABLE_STYLES
+  const int fonts = 4; // normal, bold, italic, bold italic
+#else
+  const int fonts = 1;
+#endif
+
+  if (!font_size_set)
+    {
+      // remember the fonts as configured
+      for (int i = 0; i < fonts; i++)
+        font_orig[i] = rs[Rs_font + i] ? strdup (rs[Rs_font + i]) : 0;
+
+      font_size_set = true;
+    }
+
+  // the step of the font-size perl extension's resource, so its settings carry over
+  const char *step = x_resource ("font-size.step");
+  int n = step ? atoi (step) : 1;
+
+  font_delta = delta ? font_delta + delta * (n > 0 ? n : 1) : 0;
+
+  for (int i = 0; i < fonts; i++)
+    if (font_orig[i])
+      {
+        char *f = scale_font_list (font_orig[i], font_delta);
+        allocated.push_back ((void *)f);
+        rs[Rs_font + i] = f;
+      }
+
+  set_fonts ();
+}
+
+/*
+ * Actions for keysym bindings (URxvt.keysym.C-S-Up: prompt:previous)
+ * that wrxvt does without perl.
+ */
+bool
+rxvt_term::builtin_action (const char *name, const char *arg)
+{
+  if (!strcmp (name, "font-size"))
+    {
+      if (!strcmp (arg, "increase"))
+        change_font_size (1);
+      else if (!strcmp (arg, "decrease"))
+        change_font_size (-1);
+      else if (!strcmp (arg, "reset"))
+        change_font_size (0);
+      else
+        return false;
+
+      return true;
+    }
+
+#if ENABLE_SHARE
+  if (!strcmp (name, "share"))
+    {
+      if (!strcmp (arg, "start"))
+        share_start ();
+      else if (!strcmp (arg, "stop"))
+        share_stop ();
+      else if (!strcmp (arg, "toggle"))
+        share ? share_stop () : share_start ();
+      else if (!strcmp (arg, "control"))
+        share ? share_copy_link (true) : (void)0;
+      else
+        return false;
+
+      return true;
+    }
+#endif
+
+#if ENABLE_RECORD
+  if (!strcmp (name, "record"))
+    {
+      if (!strcmp (arg, "start"))
+        record_start (0);
+      else if (!strcmp (arg, "stop"))
+        record_stop ();
+      else if (!strcmp (arg, "toggle"))
+        recording ? record_stop () : record_start (0);
+      else
+        return false;
+
+      return true;
+    }
+
+  if (!strcmp (name, "scrollback") && !strcmp (arg, "pager"))
+    {
+      scrollback_pager ();
+      return true;
+    }
+#endif
+
+#if ENABLE_HINTS
+  if (!strcmp (name, "hints"))
+    {
+      if (!strcmp (arg, "open"))
+        hints_start (HINTS_OPEN);
+      else if (!strcmp (arg, "copy"))
+        hints_start (HINTS_COPY);
+      else if (!strcmp (arg, "insert"))
+        hints_start (HINTS_INSERT);
+      else
+        return false;
+
+      return true;
+    }
+#endif
+
+  if (!strcmp (name, "prompt"))
+    {
+      if (!strcmp (arg, "previous"))
+        jump_to_prompt (-1);
+      else if (!strcmp (arg, "next"))
+        jump_to_prompt (1);
+#if ENABLE_RECORD
+      else if (!strcmp (arg, "copy-output"))
+        copy_output ();
+#endif
+      else
+        return false;
+
+      refresh_check ();
+      return true;
+    }
+
+  return false;
 }
 
 /*----------------------------------------------------------------------*/
@@ -3322,34 +5106,37 @@ rxvt_term::process_osc_seq ()
 
   if (ch == ';')
     {
+      pstr.osc = arg;
+      begin_string (C1_OSC);
+    }
+  else if (ch == C0_BEL || ch == CHAR_ST || (ch == C0_ESC && cmd_getc () == '\\'))
+    {
+      // no text at all: ESC ] 104 ST resets all colours, for example
       string_term st;
-      char *s = get_to_st (st);
+      st.v[0] = ch == C0_ESC ? C0_ESC : ch;
+      st.v[1] = ch == C0_ESC ? '\\' : 0;
+      st.v[2] = 0;
 
-      if (s)
-        {
-          process_xterm_seq (arg, s, st);
-          free (s);
-        }
+      char empty[1] = "";
+      process_xterm_seq (arg, empty, st);
     }
 }
 
-static unsigned int
-colorcube_index (unsigned int idx_r,
-                 unsigned int idx_g,
-                 unsigned int idx_b)
-{
-  assert (idx_r < Red_levels);
-  assert (idx_g < Green_levels);
-  assert (idx_b < Blue_levels);
-
-  return idx_r * Blue_levels * Green_levels +
-         idx_g * Blue_levels +
-         idx_b;
-}
-
 /*
- * Find the nearest color slot in the hidden color cube,
- * adapt its value to the 32bit RGBA color.
+ * A colour slot for a 24-bit colour (SGR 38:2, 48:2...). Cells name their
+ * colours by slot, so a slot's colour must not change while cells use it:
+ * rxvt-unicode recycled the oldest slot near the colour, and text already
+ * on the screen (or in the scrollback) took the new colour.
+ *
+ * Here, in this order:
+ *  - a slot that has the colour already;
+ *  - a slot never used;
+ *  - a slot no cell uses any more: a scan of the screen, the scrollback
+ *    and the other screen finds those when the free ones run out (if it
+ *    finds none, again only after the screen or the scrollback was
+ *    erased, or half a second later);
+ *  - otherwise, with every slot in use, the slot of the nearest colour:
+ *    the new text gets a close colour, and nothing already there changes.
  */
 unsigned int
 rxvt_term::map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsigned int a)
@@ -3360,80 +5147,157 @@ rxvt_term::map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsi
   a &= 0xff;
 
   uint32_t color = (a << 24) | (r << 16) | (g << 8) | b;
+  int idx = -1;
 
-  /* we allow one of the 6 closest neighbouring colours */
-  /* to replace the current color, if they not used recently */
-  #if 0
-  static const unsigned char dxyz[][3] = {
-    0, 0, 0,
-    0, 0, 4,
-    0, 4, 4,
-    4, 4, 0,
-    4, 0, 4,
-    0, 4, 0,
-    4, 0, 0,
-  };
-  #else
-  // silly compressed verlapping triplets version of above
-  static const unsigned char dxyz[] = {
-    0, 0, 0, 4, 4, 0, 4, 0, 0,
-  };
-  #endif
+  // the slots by colour: a hash table, chained through rgb24_next (both
+  // hold slot + 1, 0 ends a chain)
+  uint8_t &bucket = rgb24_bucket[(color * 2654435761u) >> 24];
 
-  static const unsigned char color_level[8][32] = {
-    // neighbour index
-    {0, 0, 1, 0, 0, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-    {0, 1, 0, 1, 1, 2, 1, 1, 2, 2, 3, 3, 2, 2, 2, 3, 3, 3, 4, 4, 4, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4},
-    {0, 0, 1, 2, 1, 1, 2, 3, 3, 2, 2, 3, 3, 4, 4, 3, 3, 3, 4, 4, 5, 5, 5, 4, 4, 4, 5, 5, 5, 5, 5, 5},
-    {0, 0, 2, 1, 2, 3, 2, 2, 3, 4, 4, 3, 3, 4, 4, 5, 5, 4, 4, 5, 5, 5, 6, 6, 5, 5, 5, 6, 6, 6, 6, 6},
-    // Red_levels/Green_levels/Blue_levels index
-    {0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-    {0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
-    {0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5},
-    {0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6},
-  };
+  for (int i = bucket; i; i = rgb24_next[i - 1])
+    if (rgb24_color[i - 1] == color)
+      {
+        if (rgb24_seqno[i - 1] == 2)
+          rgb24_unused--;
+        rgb24_seqno[i - 1] = 1; // (in use again, if a scan had found it unused)
+        return i - 1 + minTermCOLOR24;
+      }
 
-  unsigned int idx;
+  // slots are first taken in order
+  if (rgb24_fresh < RGB24_CUBE_SIZE)
+    idx = rgb24_fresh++;
 
-  for (int n = 0; n < ecb_array_length (dxyz) - 2; ++n)
+  if (idx < 0)
+    idx = rgb24_unused_slot ();
+
+  if (idx < 0)
     {
-      unsigned int idx_r = color_level[  Red_levels - dxyz[n + 0]][r / 8];
-      unsigned int idx_g = color_level[Green_levels - dxyz[n + 1]][g / 8];
-      unsigned int idx_b = color_level[ Blue_levels - dxyz[n + 2]][b / 8];
-      unsigned int index = colorcube_index (idx_r, idx_g, idx_b);
-
-      if (n == 0)
-        idx = index;
-
-      if (rgb24_color[index] == color)
+      // all in use: the slot nearest to the colour, from a table made
+      // when the scan found them all in use (8 levels a channel)
+      if (!rgb24_near_valid)
         {
-          rgb24_seqno[index] = ++rgb24_sequence;
-          return index + minTermCOLOR24;
+          for (int n = 0; n < 512; n++)
+            {
+              long nr = (n >> 6) * 32 + 16, ng = (n >> 3 & 7) * 32 + 16, nb = (n & 7) * 32 + 16;
+              unsigned long best = ~0UL;
+
+              for (int i = 0; i < RGB24_CUBE_SIZE; i++)
+                {
+                  uint32_t c = rgb24_color[i];
+                  long dr = (long)(c >> 16 & 0xff) - nr, dg = (long)(c >> 8 & 0xff) - ng,
+                       db = (long)(c & 0xff) - nb;
+                  unsigned long d = 3 * dr * dr + 4 * dg * dg + 2 * db * db;
+
+                  if (d < best)
+                    best = d, rgb24_near[n] = i;
+                }
+            }
+
+          rgb24_near_valid = true;
         }
 
-      // minor issue: could update index 0 few more times
-      if ((rgb24_seqno[index] | rgb24_color[index]) == 0)
-        {
-          idx = index;
-          goto update;
-        }
-
-      // like (rgb24_seqno[idx] > rgb24_seqno[index])
-      // but also handles wrap around values well enough
-      if ((uint16_t)(rgb24_seqno[idx] - rgb24_seqno[index]) < 0x8000)
-        idx = index;
+      return rgb24_near[(r >> 5) << 6 | (g >> 5) << 3 | b >> 5] + minTermCOLOR24;
     }
 
-update:
+  // out of the chain of its old colour, into the new one's
+  if (rgb24_seqno[idx])
+    for (uint8_t *p = &rgb24_bucket[(rgb24_color[idx] * 2654435761u) >> 24]; *p; p = &rgb24_next[*p - 1])
+      if (*p == idx + 1)
+        {
+          *p = rgb24_next[idx];
+          break;
+        }
+
+  rgb24_next[idx] = bucket;
+  bucket = idx + 1;
+
   rgb24_color[idx] = color;
-  rgb24_seqno[idx] = ++rgb24_sequence;
+  rgb24_seqno[idx] = 1; // in use
+  rgb24_near_valid = false;
 
-  idx += minTermCOLOR24;
-  pix_colors_focused [idx].free (this);
-  pix_colors_focused [idx].set (this, rgba (r * 0x0101, g * 0x0101, b * 0x0101, a * 0x0101));
-  update_fade_color (idx, false);
+  int slot = idx + minTermCOLOR24;
+  pix_colors_focused [slot].free (this);
+  pix_colors_focused [slot].set (this, rgba (r * 0x0101, g * 0x0101, b * 0x0101, a * 0x0101));
+  update_fade_color (slot, false);
 
-  return idx;
+  return slot;
+}
+
+// a slot no cell uses, or -1
+int
+rxvt_term::rgb24_unused_slot ()
+{
+  // slots found unused by the last scan, not taken since
+  if (rgb24_unused)
+    for (int i = 0; i < RGB24_CUBE_SIZE; i++)
+      if (rgb24_seqno[i] == 2)
+        {
+          rgb24_unused--;
+          return i;
+        }
+
+  // all were in use: look again only when the screen or the scrollback
+  // was erased since, or after half a second
+  if (erased == rgb24_full_erased && ev::now () - rgb24_full_scan < .5)
+    return -1;
+
+  bool used[RGB24_CUBE_SIZE] = { };
+
+  auto mark = [&] (rend_t r)
+  {
+    unsigned int c;
+
+    c = GET_BASEFG (r) - minTermCOLOR24;
+    if (c < RGB24_CUBE_SIZE) used[c] = true;
+    c = GET_BASEBG (r) - minTermCOLOR24;
+    if (c < RGB24_CUBE_SIZE) used[c] = true;
+    if (r & RS_ulColor)
+      {
+        c = GET_ULCOLOR (r) - minTermCOLOR24;
+        if (c < RGB24_CUBE_SIZE) used[c] = true;
+      }
+  };
+
+  auto mark_line = [&] (line_t &l)
+  {
+    if (!l.valid () || !l.r)
+      return;
+
+    rend_t last = ~(rend_t)0;
+    for (int col = 0; col < ncol; col++)
+      if (l.r[col] != last)
+        mark (last = l.r[col]);
+  };
+
+  for (int row = top_row; row < nrow; row++)
+    mark_line (ROW (row));
+
+  if (swap_buf)
+    for (int row = 0; row < nrow; row++)
+      mark_line (swap_buf[row]);
+
+  mark (rstyle);
+  mark (screen.s_rstyle);
+  mark (swap.s_rstyle);
+
+  int found = -1;
+  rgb24_unused = 0;
+  for (int i = RGB24_CUBE_SIZE; i--; )
+    if (!used[i] && rgb24_seqno[i])
+      {
+        rgb24_seqno[i] = 2; // free to take
+        rgb24_unused++;
+        found = i;
+      }
+
+  if (found < 0)
+    {
+      rgb24_full_scan = ev::now ();
+      rgb24_full_erased = erased;
+    }
+  else
+    rgb24_unused--; // (this one)
+
+  return found;
 }
 
 void
@@ -3460,6 +5324,16 @@ rxvt_term::process_color_seq (int report, int color, const char *str, string_ter
   else
     set_window_color (color, str);
 }
+
+#ifdef XTERM_COLOR_CHANGE
+// a colour back to its configured value
+void
+rxvt_term::reset_color (int idx)
+{
+  if (initial_colors[idx] && (!rs[Rs_color + idx] || strcmp (rs[Rs_color + idx], initial_colors[idx])))
+    set_window_color (idx, initial_colors[idx]);
+}
+#endif
 
 /*
  * XTerm escape sequences: ESC ] Ps;Pt (ST|BEL)
@@ -3593,6 +5467,80 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
         // TODO, when secure mode?
         break;
 
+      case XTerm_selection:
+        process_selection_seq (str, st);
+        break;
+
+      case XTerm_cwd:
+        set_cwd (str);
+        break;
+
+      case XTerm_hyperlink:
+        process_hyperlink (str);
+        break;
+
+      case XTerm_notify:
+        notify (str);
+        break;
+
+      case Kitty_notify:
+        process_kitty_notify (str);
+        break;
+
+#if ENABLE_SIXEL
+      case ITerm_command:
+        process_iterm_file (str);
+        break;
+#endif
+
+#ifdef XTERM_COLOR_CHANGE
+      case XTerm_resetColor:
+        if (!*str)
+          for (color = minCOLOR; color <= maxTermCOLOR; color++)
+            reset_color (color);
+        else
+          for (buf = str; *buf; )
+            {
+              color = atoi (buf) + minCOLOR;
+
+              if (IN_RANGE_INC (color, minCOLOR, maxTermCOLOR))
+                reset_color (color);
+
+              buf = strchr (buf, ';');
+              if (!buf)
+                break;
+              buf++;
+            }
+        break;
+
+      case XTerm_resetColor00 ... XTerm_resetColor_HTC:
+        {
+          // the colours of OSC 10 to 19, one less of them each
+          static const int colors[] = {
+            Color_fg, Color_bg,
+# ifndef NO_CURSORCOLOR
+            Color_cursor,
+# else
+            -1,
+# endif
+            Color_pointer_fg, Color_pointer_bg, -1, -1,
+# ifdef OPTION_HC
+            Color_HC, -1, Color_HTC,
+# else
+            -1, -1, -1,
+# endif
+          };
+
+          if (colors[op - XTerm_resetColor00] >= 0)
+            reset_color (colors[op - XTerm_resetColor00]);
+        }
+        break;
+#endif
+
+      case Shell_mark:
+        shell_mark (str);
+        break;
+
 #if 0
       case Rxvt_dumpscreen:	/* no error notices */
         {
@@ -3669,11 +5617,24 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
         break;
 #endif
 
-#if ENABLE_PERL
       case URxvt_perl:
-        HOOK_INVOKE ((this, HOOK_OSC_SEQ_PERL, DT_STR, str, DT_STR, st.v, DT_END));
-        break;
+#if ENABLE_PERL
+        if (HOOK_INVOKE ((this, HOOK_OSC_SEQ_PERL, DT_STR, str, DT_STR, st.v, DT_END)))
+          break;
 #endif
+        // ESC ] 777 ; notify ; title ; body: notifications as foot, Ghostty
+        // and the urxvt notify extensions take them
+        if (!strncmp (str, "notify;", 7))
+          {
+            char *title = str + 7;
+            char *body = strchr (title, ';');
+
+            if (body)
+              *body++ = 0;
+
+            notify_as (*title ? title : RESNAME, body ? body : "");
+          }
+        break;
     }
 }
 /*----------------------------------------------------------------------*/
@@ -3763,6 +5724,7 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                   { 1004, PrivMode_FocusEvent },
                   { 1005, PrivMode_ExtMouseUTF8 },
                   { 1006, PrivMode_ExtMouseSGR },
+                  { 1016, PrivMode_ExtMousePixels },
 #endif
                   { 1010, PrivMode_TtyOutputInh }, // rxvt extension
                   { 1011, PrivMode_Keypress }, // rxvt extension
@@ -3779,6 +5741,8 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
 #if ENABLE_FRILLS
                   { 2004, PrivMode_BracketPaste },
 #endif
+                  { 2026, PrivMode_SyncOutput },
+                  { 2031, PrivMode_ColorScheme },
                 };
 
   if (nargs == 0)
@@ -3938,6 +5902,12 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                 else
                   scr_cursor (RESTORE);
               break;
+            case 2026:		/* synchronized output */
+              sync_output (state);
+              break;
+            case 2031:		/* colour scheme updates */
+              reported_color_scheme = color_scheme ();
+              break;
             default:
               break;
           }
@@ -3947,11 +5917,11 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
 
 /*{{{ process sgr sequences */
 void ecb_hot
-rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
+rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
 {
   unsigned int i;
   short rendset;
-  int rendstyle;
+  rend_t rendstyle;
 
   if (nargs == 0)
     {
@@ -3959,8 +5929,16 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
       return;
     }
 
+  // is arg[i] a subparameter (it followed a ':')?
+  #define SGR_SUB(i) ((i) < nargs && (sub >> (i) & 1))
+
   for (i = 0; i < nargs; i++)
     {
+      // subparameters the code below doesn't use belong to an argument we
+      // already handled: never read them as arguments of their own
+      if (SGR_SUB (i))
+        continue;
+
       rendset = -1;
       switch (arg[i])
         {
@@ -3970,12 +5948,19 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
           case 1:
             rendset = 1, rendstyle = RS_Bold;
             break;
-          //case 2: // low intensity
+          case 2: // faint
+            rendset = 1, rendstyle = RS_Faint;
+            break;
           case 3:
             rendset = 1, rendstyle = RS_Italic;
             break;
           case 4:
-            rendset = 1, rendstyle = RS_Uline;
+            // 4:0 is "no underline", 4:1 to 4:5 single, double, curly,
+            // dotted and dashed
+            if (SGR_SUB (i + 1))
+              scr_underline (arg[i + 1] <= 0 ? -1 : arg[i + 1] - 1);
+            else
+              scr_underline (UL_single);
             break;
           case 5: // slowly blinking
           case 6: // rapidly blinking
@@ -3985,21 +5970,23 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
           case 7:
             rendset = 1, rendstyle = RS_RVid;
             break;
-          case 8:
-            // invisible. NYI
+          case 8: // invisible
+            rendset = 1, rendstyle = RS_Conceal;
             break;
-          //case 9: // crossed out
+          case 9: // crossed out
+            rendset = 1, rendstyle = RS_Strike;
+            break;
           //case 10: // scoansi acs off, primary font
           //case 11: // scoansi acs on, first alt font
           //case 12: // scoansi acs on, |0x80, second alt font
           //...
           //case 19: // ninth alt font
           //case 20: // gothic
-          case 21: // disable bold, faint, sometimes doubly underlined (iso 8613)
-            rendset = 0, rendstyle = RS_Bold;
+          case 21: // doubly underlined (ECMA-48, as in xterm, VTE, kitty)
+            scr_underline (UL_double);
             break;
-          case 22: // bold off (vt220)
-            rendset = 0, rendstyle = RS_Bold;
+          case 22: // normal intensity: neither bold nor faint
+            rendset = 0, rendstyle = RS_Bold | RS_Faint;
             break;
           case 23: // disable italic
             rendset = 0, rendstyle = RS_Italic;
@@ -4016,8 +6003,18 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
           case 27: // reverse off (vt220)
             rendset = 0, rendstyle = RS_RVid;
             break;
-          //case 28: // visible. NYI
-          //case 29: // not crossed-out
+          case 28: // visible
+            rendset = 0, rendstyle = RS_Conceal;
+            break;
+          case 29: // not crossed out
+            rendset = 0, rendstyle = RS_Strike;
+            break;
+          case 53: // overlined
+            rendset = 1, rendstyle = RS_Overline;
+            break;
+          case 55: // not overlined
+            rendset = 0, rendstyle = RS_Overline;
+            break;
         }
 
       if (rendset != -1)
@@ -4058,31 +6055,57 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
 
           case 38: // set fg color, ISO 8613-6
           case 48: // set bg color, ISO 8613-6
+          case 58: // set underline color (kitty, VTE, xterm...)
             {
-              unsigned int fgbg = arg[i] == 38 ? Color_fg : Color_bg;
-              unsigned int idx;
+              unsigned int which = arg[i];
+              int idx = -1;
 
-              if (nargs > i + 2 && arg[i + 1] == 5)
+              if (SGR_SUB (i + 1))
                 {
-                  idx = minCOLOR + arg[i + 2];
-                  i += 2;
+                  // the ISO 8613-6 form with colons: 38:5:N, 38:2:R:G:B and
+                  // 38:2:CS:R:G:B (CS, the colour space id, is usually empty)
+                  unsigned int count = 0;
+                  while (SGR_SUB (i + 1 + count))
+                    count++;
 
-                  scr_color (idx, fgbg);
+                  if (arg[i + 1] == 5 && count >= 2)
+                    {
+                      if (IN_RANGE_INC (arg[i + 2], 0, 255))
+                        idx = minCOLOR + arg[i + 2];
+                    }
+                  else if (arg[i + 1] == 2 && count >= 4)
+                    {
+                      unsigned int first = count >= 5 ? i + 3 : i + 2;
+                      idx = map_rgb24_color (arg[first], arg[first + 1], arg[first + 2], 0xff);
+                    }
+
+                  i += count;
+                }
+              else if (nargs > i + 2 && arg[i + 1] == 5)
+                {
+                  // only the 256 palette colours: higher numbers would pick
+                  // the slots used internally for 24-bit colours
+                  if (IN_RANGE_INC (arg[i + 2], 0, 255))
+                    idx = minCOLOR + arg[i + 2];
+                  i += 2;
                 }
               else if (nargs > i + 4 && arg[i + 1] == 2)
                 {
-                  unsigned int r = arg[i + 2];
-                  unsigned int g = arg[i + 3];
-                  unsigned int b = arg[i + 4];
-                  unsigned int a = 0xff;
-
-                  idx = map_rgb24_color (r, g, b, a);
-
+                  idx = map_rgb24_color (arg[i + 2], arg[i + 3], arg[i + 4], 0xff);
                   i += 4;
-
-                  scr_color (idx, fgbg);
                 }
+
+              if (idx < 0)
+                break;
+
+              if (which == 58)
+                scr_underline_color (idx);
+              else
+                scr_color (idx, which == 38 ? Color_fg : Color_bg);
             }
+            break;
+          case 59: // default underline color
+            scr_underline_color (-1);
             break;
 
           //case 50: // not variable spacing
@@ -4119,8 +6142,10 @@ rxvt_term::set_cursor_style (int style)
   if (!IN_RANGE_INC (style, 0, 6))
     return;
 
+  // 0 is the style the user configured (cursorUnderline, cursorBlink),
+  // so programs that reset the cursor when they exit leave it as it was
   if (style == 0)
-    style = 1;
+    style = default_cursor_style;
 
   cursor_type = (style - 1) / 2;
   set_option (Opt_cursorUnderline, cursor_type == 1);

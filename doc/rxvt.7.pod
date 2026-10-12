@@ -1545,8 +1545,9 @@ See B<< C<ESC [ Ps C> >>
 
 Send Device Attributes (DA)
 B<< C<Ps = 0> >> (or omitted): request attributes from terminal
-returns: B<< C<ESC [ ? 1 ; 2 c> >> (``I am a VT100 with Advanced Video
-Option'')
+returns: B<< C<ESC [ ? 62 ; 4 ; 22 c> >> (``I am a VT220 with sixel
+graphics and ANSI colour''), or B<< C<ESC [ ? 1 ; 2 c> >> (``I am a VT100
+with Advanced Video Option'') in builds without sixel graphics
 
 =item B<< C<ESC [ Ps d> >>
 
@@ -1620,13 +1621,20 @@ Character Attributes (SGR)
 =begin table
 
 	B<< C<Pm = 0> >>	Normal (default)
-	B<< C<Pm = 1 / 21> >>	On / Off Bold (bright fg)
+	B<< C<Pm = 1 / 22> >>	On / Off Bold (bright fg)
+	B<< C<Pm = 2 / 22> >>	On / Off Faint (halfway to the background)
 	B<< C<Pm = 3 / 23> >>	On / Off Italic
 	B<< C<Pm = 4 / 24> >>	On / Off Underline
+	B<< C<Pm = 4:0 / 4:1> >>	Off / On Underline (colon form)
+	B<< C<Pm = 4:2 / 21> >>	Double underline
+	B<< C<Pm = 4:3> >>	Curly underline
+	B<< C<Pm = 4:4 / 4:5> >>	Dotted / dashed underline
 	B<< C<Pm = 5 / 25> >>	On / Off Slow Blink (bright bg)
 	B<< C<Pm = 6 / 26> >>	On / Off Rapid Blink (bright bg)
 	B<< C<Pm = 7 / 27> >>	On / Off Inverse
-	B<< C<Pm = 8 / 27> >>	On / Off Invisible (NYI)
+	B<< C<Pm = 8 / 28> >>	On / Off Invisible
+	B<< C<Pm = 9 / 29> >>	On / Off Crossed out
+	B<< C<Pm = 53 / 55> >>	On / Off Overline
 	B<< C<Pm = 30 / 40> >>	fg/bg Black
 	B<< C<Pm = 31 / 41> >>	fg/bg Red
 	B<< C<Pm = 32 / 42> >>	fg/bg Green
@@ -1638,6 +1646,10 @@ Character Attributes (SGR)
 	B<< C<Pm = 38;5 / 48;5> >>	set fg/bg to colour #m (ISO 8613-6)
 	B<< C<Pm = 38;2;R;G;B> >>	set fg to 24-bit colour #RGB (ISO 8613-3)
 	B<< C<Pm = 48;2;R;G;B> >>	set bg to 24-bit colour #RGB (ISO 8613-3)
+	B<< C<Pm = 38:5:N / 48:5:N> >>	the same with colons (ISO 8613-6)
+	B<< C<Pm = 38:2::R:G:B> >>	(also 38:2:R:G:B, and 48 for the background)
+	B<< C<Pm = 58:5:N / 58:2::R:G:B> >>	Underline colour (also with semicolons)
+	B<< C<Pm = 59> >>	Default underline colour (the text colour)
 	B<< C<Pm = 39 / 49> >>	fg/bg Default
 	B<< C<Pm = 90 / 100> >>	fg/bg Bright Black
 	B<< C<Pm = 91 / 101> >>	fg/bg Bright Red
@@ -1664,13 +1676,18 @@ Device Status Report (DSR)
 
 =end table
 
+=item B<< C<ESC [ ? 996 n> >>
+
+Report the colour scheme: B<< C<ESC [ ? 997 ; 1 n> >> if the background
+is dark, B<< C<ESC [ ? 997 ; 2 n> >> if it is light. See also mode 2031.
+
 =item B<< C<ESC [ Ps SP q> >>
 
 Set Cursor Style (DECSCUSR)
 
 =begin table
 
-	B<< C<Ps = 0> >>	Blink Block
+	B<< C<Ps = 0> >>	The configured style (B<cursorUnderline>, B<cursorBlink>)
 	B<< C<Ps = 1> >>	Blink Block
 	B<< C<Ps = 2> >>	Steady Block
 	B<< C<Ps = 3> >>	Blink Underline
@@ -1705,11 +1722,15 @@ Window Operations
 	B<< C<Ps = 8> >>	B<< C<ESC [ 8 ; R ; C t> >> Resize to R rows and C columns
 	B<< C<Ps = 11> >>	Report window state (responds with C<Ps = 1> or C<Ps = 2>)
 	B<< C<Ps = 13> >>	Report window position (responds with C<Ps = 3>)
-	B<< C<Ps = 14> >>	Report window pixel size (responds with C<Ps = 4>)
-	B<< C<Ps = 18> >>	Report window text size (responds with C<Ps = 7>)
+	B<< C<Ps = 14> >>	Report the text area size in pixels (responds with C<ESC [ 4 ; height ; width t>); C<ESC [ 14 ; 2 t> the whole window's
+	B<< C<Ps = 15> >>	Report the screen size in pixels (responds with C<Ps = 5>)
+	B<< C<Ps = 16> >>	Report the character cell size in pixels (responds with C<ESC [ 6 ; height ; width t>)
+	B<< C<Ps = 18> >>	Report window text size (responds with C<ESC [ 8 ; rows ; columns t>)
 	B<< C<Ps = 19> >>	Currently the same as C<Ps = 18>, but responds with C<Ps = 9>
-	B<< C<Ps = 20> >>	Reports icon label (B<< C<ESC ] L NAME \234> >>) (insecure mode)
-	B<< C<Ps = 21> >>	Reports window title (B<< C<ESC ] l NAME \234> >>) (insecure mode)
+	B<< C<Ps = 20> >>	Reports icon label (B<< C<ESC ] L NAME ESC \> >>) (insecure mode)
+	B<< C<Ps = 21> >>	Reports window title (B<< C<ESC ] l NAME ESC \> >>) (insecure mode)
+	B<< C<Ps = 22> >>	Save the title and icon name on a stack (C<ESC [ 22 ; 1 t> only the icon name, C<ESC [ 22 ; 2 t> only the title), up to 10 deep
+	B<< C<Ps = 23> >>	Restore the title and icon name saved last (C<; 1> and C<; 2> as for C<Ps = 22>)
 	B<< C<Ps = 24..> >>	Set window height to C<Ps> rows
 
 =end table
@@ -2034,6 +2055,15 @@ Unlike XTerm, coordinates larger than 2015 will work fine.
 
 =end table
 
+=item B<< C<Pm = 1016> >> (X11 XTerm SGR-Pixels mouse mode) (Compile frills)
+
+=begin table
+
+	B<< C<h> >>	Enable SGR mouse reporting in pixels.
+	B<< C<l> >>	Disable SGR mouse reporting in pixels.
+
+=end table
+
 =item B<< C<Pm = 1021> >> (B<rxvt>)
 
 =begin table
@@ -2079,6 +2109,107 @@ Unlike XTerm, coordinates larger than 2015 will work fine.
 
 =end table
 
+=item B<< C<Pm = 2026> >> (Synchronized output)
+
+=begin table
+
+	B<< C<h> >>	Begin an update: changes to the screen are not drawn yet
+	B<< C<l> >>	End the update: draw everything at once
+
+=end table
+
+So that a program that never ends an update can't freeze the window, the
+update also ends by itself half a second after it began. C<CSI ? 2026 $ p>
+(DECRQM) tells whether the mode is supported and set.
+
+=item B<< C<Pm = 2031> >> (Colour scheme updates)
+
+=begin table
+
+	B<< C<h> >>	Report the colour scheme (as C<ESC [ ? 997 ; Ps n>, see C<ESC [ ? 996 n>) whenever it changes between dark and light
+	B<< C<l> >>	Don't
+
+=end table
+
+=back
+
+X<DCS>
+
+=head2 Application Program Commands
+
+C<ESC _ G> I<keys> C<;> I<payload> C<ST> is the kitty graphics protocol
+(L<https://sw.kovidgoyal.net/kitty/graphics-protocol/>). Supported:
+actions C<t>, C<T>, C<p>, C<d> (C<a>, C<A>, C<i>, C<I>) and C<q>; formats
+C<24> and C<32> (raw RGB and RGBA, with C<s> and C<v>) and C<100> (PNG, or
+any image file gdk-pixbuf reads); data sent directly (C<t=d>), in chunks
+(C<m=1>); C<c> and C<r> (the cells to fill), C<C=1> (don't move the
+cursor), image ids (C<i>) and C<q>. Compression, files, shared memory,
+animation, relative placements and z-order are answered with an error.
+Pictures are shown like sixel pictures, and the cursor moves after them.
+The last 16 transmitted images are kept for C<a=p>. Other APC strings,
+privacy messages (C<ESC ^>) and SOS strings (C<ESC X>) are ignored.
+
+=head2 Device Control Strings
+
+C<ESC P> (or the 8-bit C<0x90>) starts a device control string: parameters,
+intermediate characters and a final character, then data up to C<ST> (or
+C<BEL>). Strings not listed here are ignored. Replies always end with the
+7-bit C<ESC \>.
+
+Control strings (these, operating system commands, and the application
+program commands C<ESC _>, privacy messages C<ESC ^> and C<ESC X> strings,
+which are all ignored) can be up to 4194304 characters long; longer ones
+are read to their end and dropped.
+
+=over
+
+=item B<< C<ESC P $ q Pt ST> >>
+
+Request Selection or Setting (DECRQSS). The reply is C<< ESC P 1 $ r I<seq> ST >>,
+where I<seq> is the sequence that sets the current value, or C<ESC P 0 $ r ST>
+for settings not reported. B<< C<Pt> >> is one of:
+
+=begin table
+
+	B<< C<m> >>	the current rendition, e.g. C<0;1;4:3;38:5:208m> (24-bit colours as C<38:2::R:G:B>)
+	B<< C<r> >>	the scroll region (DECSTBM)
+	B<< C<SP q> >>	the cursor style (DECSCUSR)
+	B<< C<t> >>	the number of lines (DECSLPP)
+	B<< C<" q> >>	character protection (DECSCA): always C<0>
+	B<< C<" p> >>	the conformance level (DECSCL): C<62;1>
+
+=end table
+
+=item B<< C<ESC P P1 ; P2 ; P3 q data ST> >>
+
+Sixel graphics (Compile frills): draw the picture in I<data> at the
+cursor, and put the cursor on the line below it, in the column it starts
+in. The picture takes the cells it covers like text: it scrolls, goes
+into the scrollback, and text written over it replaces it. Colours are
+defined with C<#> (RGB and HLS, 1024 registers, starting with the VT340's
+16), and raster attributes (C<">) give the pixel aspect ratio and size;
+pixels left unset show the background. Pictures can be up to 4096 pixels
+either way; up to 255 are kept, those no longer on the screen or in the
+scrollback are freed. Cells with pictures copy as blanks.
+
+=item B<< C<ESC [ ? Pi ; Pa ; Pv S> >>
+
+XTSMGRAPHICS: B<< C<Pi = 1> >> reports the number of colour registers
+(B<< C<ESC [ ? 1 ; 0 ; 1024 S> >>), B<< C<Pi = 2> >> the largest sixel
+picture (the text area, B<< C<ESC [ ? 2 ; 0 ; width ; height S> >>).
+
+=item B<< C<ESC P + q Pt ST> >>
+
+Request termcap/terminfo capabilities (XTGETTCAP). B<< C<Pt> >> is a list of
+capability names in hexadecimal, separated by C<;>. Each one is answered
+separately: C<< ESC P 1 + r I<name>=I<value> ST >> with the value in
+hexadecimal (only the name for a boolean), or C<< ESC P 0 + r I<name> ST >>
+for an unknown name. The names known are C<TN> (and C<name>), C<Co> (and
+C<colors>), C<RGB>, C<Tc>, C<Smulx>, C<Setulc>, C<ol>, C<smxx>, C<rmxx>,
+C<dim>, C<Smol>, C<Rmol>, C<Ss>, C<Se>, C<BE>, C<BD>, C<PS>, C<PE>, C<fe>,
+C<fd>, C<Sync>, C<Ms> and C<XR>: the features of this terminal that its terminfo entry
+doesn't describe.
+
 =back
 
 X<XTerm>
@@ -2103,6 +2234,9 @@ this requires insecure mode to be enabled for most of these.
 	B<< C<Ps = 2> >>	Change Window Title to B<< C<Pt> >>
 	B<< C<Ps = 3> >>	If B<< C<Pt> >> starts with a B<< C<?> >>, query the (STRING) property of the window and return it (insecure mode). If B<< C<Pt> >> contains a B<< C<=> >>, set the named property to the given value, else delete the specified property.
 	B<< C<Ps = 4> >>	B<< C<Pt> >> is a semi-colon separated sequence of one or more semi-colon separated B<number>/B<name> pairs, where B<number> is an index to a colour and B<name> is the name of a colour. Each pair causes the B<number>ed colour to be changed to B<name>. Numbers 0-7 corresponds to low-intensity (normal) colours and 8-15 corresponds to high-intensity colours. 0=black, 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white
+	B<< C<Ps = 7> >>	The shell's current directory, as a C<file://I<host>/I<path>> URL (percent-encoded). It is published as the C<_WRXVT_CWD> property of the window, for window manager bindings that open a new terminal in the same directory.
+	B<< C<Ps = 8> >>	Hyperlink: B<< C<Pt> >> is I<params>C<;>I<URI>. The text that follows links to I<URI> (shown with a dashed underline; Control-click opens it with the C<url-launcher> resource, C<xdg-open> by default), up to C<ESC ] 8 ; ; ST>. I<params> may contain C<id=>I<ID>: pieces of text with the same I<ID> and I<URI> are the same link. The last 32767 links are remembered.
+	B<< C<Ps = 9> >>	Show B<< C<Pt> >> as a desktop notification, with the B<notifyCommand> resource (C<notify-send> by default) and the window title. Also sets the urgency hint when the window isn't focused and B<urgentOnBell> is set. C<Pt> starting with a digit and C<;> (ConEmu's progress reports) is ignored.
 	B<< C<Ps = 10> >>	Change colour of text foreground to B<< C<Pt> >>
 	B<< C<Ps = 11> >>	Change colour of text background to B<< C<Pt> >>
 	B<< C<Ps = 12> >>	Change colour of text cursor foreground to B<< C<Pt> >>
@@ -2114,7 +2248,13 @@ this requires insecure mode to be enabled for most of these.
 	B<< C<Ps = 46> >>	Change Log File to B<< C<Pt> >> I<unimplemented>
 	B<< C<Ps = 49> >>	Change default background colour to B<< C<Pt> >>. [deprecated, use 11]
 	B<< C<Ps = 50> >>	Set fontset to B<< C<Pt> >>, with the following special values of B<< C<Pt> >> (B<rxvt>) B<< C<#+n> >> change up B<< C<n> >> B<< C<#-n> >> change down B<< C<n> >> if B<< C<n> >> is missing of 0, a value of 1 is used I<empty> change to font0 B<< C<n> >> change to font B<< C<n> >>
+	B<< C<Ps = 52> >>	Set the selections named in the first part of B<< C<Pt> >> (C<c> the clipboard; C<p>, C<s> or C<0>-C<7> the primary selection; empty means C<s>) to the base64-encoded text in the second part, e.g. C<ESC ] 52 ; c ; aGVsbG8= ST>. If the second part is B<< C<?> >>, report the selection the same way (insecure mode only).
 	B<< C<Ps = 55> >>	Log all scrollback buffer and all of screen to B<< C<Pt> >> [disabled]
+	B<< C<Ps = 104> >>	Reset the palette colours listed in B<< C<Pt> >> (C<;>-separated numbers) to their configured values, or all of them if there is no B<< C<Pt> >>.
+	B<< C<Ps = 110> >> .. B<< C<Ps = 119> >>	Reset the colour B<< C<Ps - 100> >> sets (C<110> the foreground, C<111> the background, C<112> the cursor...) to its configured value.
+	B<< C<Ps = 99> >>	kitty's desktop notifications: B<< C<Pt> >> is I<metadata>C<;>I<payload>, the metadata colon-separated I<key>C<=>I<value>s: C<i> (an id joining parts), C<d=0> (more parts follow), C<p=title> or C<p=body> (what the payload is; C<p=?> asks what is supported), C<e=1> (base64 payload), C<o=unfocused> (only when the window isn't focused). Shown with B<notifyCommand>, the title and the body as its two arguments.
+	B<< C<Ps = 133> >>	Shell integration marks: B<< C<Pt> >> C<A> marks the line where a prompt starts, for the C<prompt:previous> and C<prompt:next> key actions; C<B> where the command starts on the prompt's line; C<C> the line where its output starts (C<prompt:copy-output>); C<D>[C<;>I<exit status>] that it ended (B<notifyLongCommand>).
+	B<< C<Ps = 1337> >>	iTerm2's inline images: B<< C<Pt> >> is C<File=>I<key>C<=>I<value>C<;>...C<:>I<base64 file>. With C<inline=1> the picture (PNG, JPEG, GIF... with gdk-pixbuf) is shown at the cursor like a sixel picture; C<width> and C<height> are cells, C<N>C<px> or C<N>C<%>, and C<preserveAspectRatio=0> stretches it. Other OSC 1337 commands are ignored.
 	B<< C<Ps = 701> >>	Change current locale to B<< C<Pt> >>, or, if B<< C<Pt> >> is B<< C<?> >>, return the current locale (insecure mode, Compile frills).
 	B<< C<Ps = 702> >>	Request version if B<< C<Pt> >> is B<< C<?> >>, returning C<rxvt-unicode>, the resource name, the major and minor version numbers, e.g. C<ESC ] 702 ; rxvt-unicode ; urxvt ; 7 ; 4 ST>.
 	B<< C<Ps = 704> >>	Change colour of italic characters to B<< C<Pt> >>
@@ -2129,13 +2269,51 @@ this requires insecure mode to be enabled for most of these.
 	B<< C<Ps = 720> >>	Move viewing window up by B<< C<Pt> >> lines, or clear scrollback buffer if C<Pt = 0> (Compile frills).
 	B<< C<Ps = 721> >>	Move viewing window down by B<< C<Pt> >> lines, or clear scrollback buffer if C<Pt = 0> (Compile frills).
 	B<< C<Ps = 776> >>	(urxvt 9.29) Returns info about the character cell size, replies with C<ESC ] 776 ; cell-width ; cell-height ; font-ascent ST>
-	B<< C<Ps = 777> >>	Call the perl extension with the given string, which should be of the form C<extension;parameters> (Compile perl).
+	B<< C<Ps = 777> >>	Call the perl extension with the given string, which should be of the form C<extension;parameters> (Compile perl). When no extension takes it, C<notify;>I<title>C<;>I<body> is a desktop notification (the format of foot, Ghostty and the urxvt notify extensions), with B<notifyCommand>.
 
 =end table
 
 =back
 
 X<Mouse>
+
+=head1 Keyboard: the kitty keyboard protocol
+
+Programs can ask for unambiguous key reports with the progressive
+enhancements of kitty's keyboard protocol
+(L<https://sw.kovidgoyal.net/kitty/keyboard-protocol/>). The flags are:
+1 disambiguate escape codes, 2 report event types (press, repeat,
+release), 4 report alternate keys (the shifted key), 8 report all keys
+as escape codes, 16 report associated text. Each screen (normal and
+alternate) has its own flags and a stack of saved ones.
+
+=over
+
+=item B<< C<ESC [ ? u> >>
+
+Report the current flags: B<< C<ESC [ ? flags u> >>.
+
+=item B<< C<< ESC [ > flags u >> >>
+
+Save the current flags on the stack and set new ones.
+
+=item B<< C<< ESC [ < n u >> >>
+
+Restore the flags saved last, n times (once if n is missing).
+
+=item B<< C<ESC [ = flags ; mode u> >>
+
+Set (mode 1, the default), add (2) or remove (3) flags.
+
+=back
+
+Keys are reported as B<< C<ESC [ key ; modifiers u> >> (or the C<~>,
+C<A>-C<D>, C<H>, C<F>, C<P>, C<Q>, C<S> forms for function and cursor
+keys), with the key's Unicode code point without shift, and 1 + the
+modifier bits (shift 1, alt 2, control 4, super 8, caps lock 64, num lock
+128). Text without control or alt is still sent as text, and Enter, Tab
+and Backspace unmodified as the usual bytes, unless all keys are asked
+for. While any flag is set, Control-Shift doesn't start ISO 14755 input.
 
 =head1 Mouse Reporting
 
@@ -2259,6 +2437,13 @@ the event type (press/motion or release).
 Example: Shift-Button-1 press at top row, column 80.
 
    ESC [ < 4 ; 80 ; 1 M
+
+=head2 Mode 1016
+
+Like mode 1006, but C<x> and C<y> are the position in pixels from the
+top left corner of the text area, starting at 1. Programs can draw
+finer than the cell grid (sliders, images, plots) and use it together
+with the cell size from C<ESC ] 776 ; ? ST>.
 
 =head2 Mode 1015
 

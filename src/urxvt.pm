@@ -488,7 +488,9 @@ our $NOCHAR = chr 0xffff;
 =item $urxvt::LIBDIR
 
 The rxvt-unicode library directory, where, among other things, the perl
-modules and scripts are stored.
+modules and scripts are stored. The C<WRXVT_LIBDIR> environment variable
+overrides it, which runs an uninstalled build: point it at the source's
+F<src> directory.
 
 =item $urxvt::RESCLASS, $urxvt::RESCLASS
 
@@ -614,11 +616,14 @@ being reset. Useful as a base to start when creating renditions.
 Return the rendition mask used for overlays by default.
 
 =item $rendbit = urxvt::RS_Bold, urxvt::RS_Italic, urxvt::RS_Blink,
-urxvt::RS_RVid, urxvt::RS_Uline
+urxvt::RS_RVid, urxvt::RS_Uline, urxvt::RS_Faint, urxvt::RS_Strike,
+urxvt::RS_Overline, urxvt::RS_Conceal
 
-Return the bit that enabled bold, italic, blink, reverse-video and
-underline, respectively. To enable such a style, just logically OR it into
-the bitset.
+Return the bit that enabled bold, italic, blink, reverse-video,
+underline, faint, crossed-out, overline and invisible, respectively. To
+enable such a style, just logically OR it into the bitset. Renditions are
+64 bits wide in wrxvt; the last four bits are above bit 31, so they need
+a perl with 64-bit integers (any 64-bit system).
 
 =item $foreground = urxvt::GET_BASEFG $rend
 
@@ -801,6 +806,11 @@ sub invoke {
                next unless /^([A-Za-z0-9_\-]+):/;
 
                my $ext = $1;
+
+               # actions wrxvt does itself (prompt:next, share:start...)
+               # need no extension, unless there is one of that name
+               next if $ext =~ /^(?:prompt|share|record|scrollback|hints)$/
+                       && !defined $TERM->extension_path ($ext);
 
                $ext_arg{$ext} = [];
             }

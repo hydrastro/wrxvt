@@ -1,0 +1,48 @@
+background - manage terminal background
+
+bell-command - execute a command when the bell rings
+
+block-graphics-to-ascii - map block graphics to ascii characters
+
+clickthrough - make window "transparent" with respect to input events
+
+clipboard-osc - implement the clipboard operating system command sequence
+
+confirm-paste - ask for confirmation before pasting control characters
+
+digital-clock - display a digital clock overlay
+
+eval - evaluate arbitrary perl code using actions
+
+example-refresh-hooks - example of how to use refresh hooks
+
+keysym-list - implement the "list" keysym expansion.
+
+kuake - kuake-like hotkey terminal
+
+matcher - match strings in terminal output and change their rendition
+
+option-popup - option menu
+
+overlay-osc - implement OSC to manage overlays
+
+readline - improve readline editing
+
+remote-clipboard - manage a shared and possibly remote clipboard
+
+searchable-scrollback - incremental scrollback search
+
+selection - more intelligent selection
+
+selection-autotransform - automatically transform select text
+
+selection-pastebin - automatic pastebin upload
+
+selection-popup - selection management pop-up
+
+selection-to-clipboard - copy the selection to the clipboard each time a selection is made
+
+tabbed - tabbed interface to urxvt
+
+xim-onthespot - implement XIM "on-the-spot" behaviour
+

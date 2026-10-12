@@ -108,7 +108,7 @@ rxvt_term::scr_blank_line (line_t &l, unsigned int col, unsigned int width, rend
 
   l.touch ();
 
-  efs &= ~RS_baseattrMask; // remove italic etc. fontstyles
+  efs &= ~(RS_baseattrMask | RS_linkMask); // remove italic etc. fontstyles, and links
   efs = SET_FONT (efs, FONTSET (efs)->find_space_font ());
 
   text_t *et = l.t + col;
@@ -140,7 +140,7 @@ rxvt_term::scr_kill_char (line_t &l, int col) const noexcept
   while (col > 0 && l.t[col] == NOCHAR)
     col--;
 
-  rend_t rend = l.r[col] & ~RS_baseattrMask;
+  rend_t rend = l.r[col] & ~(RS_baseattrMask | RS_linkMask);
   rend = SET_FONT (rend, FONTSET (rend)->find_space_font ());
 
   l.touch ();
@@ -216,6 +216,15 @@ rxvt_term::scr_reset ()
 {
 #if ENABLE_OVERLAY
   scr_overlay_off ();
+#endif
+
+#if ENABLE_SHARE
+  share_changed (); // a new size for the viewers
+#endif
+
+#if ENABLE_HINTS
+  if (hints)
+    hints_end (); // they were for the old size
 #endif
 
   view_start = 0;
@@ -307,6 +316,29 @@ rxvt_term::scr_reset ()
       int pend = MOD (term_start + top_row  , prev_total_rows);
       int q    = total_rows; // rewrapped row
 
+      // When the terminal gets shorter, first drop the empty lines below
+      // the cursor, and only then push lines off the top into the
+      // scrollback: otherwise the lines just above the prompt would
+      // disappear although there was room for them.
+      int drop = 0;
+
+      while (drop < prev_nrow - nrow
+             && prev_nrow - 1 - drop > screen.cur.row
+             && prev_row_buf [MOD (term_start + prev_nrow - 1 - drop, prev_total_rows)].l <= 0)
+        {
+          line_t &candidate = prev_row_buf [MOD (term_start + prev_nrow - 1 - drop, prev_total_rows)];
+          int col = 0;
+          // A logically empty line can still contain a coloured background
+          // or underline. Drop only visually default, blank rows.
+          while (col < prev_ncol && candidate.t[col] == ' '
+                 && !((candidate.r[col] ^ DEFAULT_RSTYLE) & ~RS_fontMask))
+            ++col;
+          if (col != prev_ncol) break;
+          ++drop;
+        }
+
+      p = MOD (p - drop, prev_total_rows);
+
 #if ENABLE_FRILLS
       if ((rewrap_always || top_row) && !rewrap_never)
         {
@@ -349,6 +381,7 @@ rxvt_term::scr_reset ()
                   qline = row_buf + qrow;
                   qline->alloc (); // redundant with next line
                   qline->l = ncol;
+                  qline->f = qrow == q ? prev_row_buf [p].f & (LINE_PROMPT | LINE_OUTPUT) : 0;
                   qline->is_longer (1);
 
                   int qcol = 0;
@@ -394,7 +427,7 @@ rxvt_term::scr_reset ()
 #endif
         {
           // wing, instead of wrap
-          screen.cur.row += nrow - prev_nrow;
+          screen.cur.row += nrow - prev_nrow + drop;
 
           do
             {
@@ -409,9 +442,20 @@ rxvt_term::scr_reset ()
       term_start = total_rows - nrow;
       top_row = q - term_start;
 
-      // make sure all terminal lines exist
-      while (top_row > 0)
-        scr_blank_screen_mem (ROW (--top_row), DEFAULT_RSTYLE);
+      // When the terminal gets taller but there are not enough lines
+      // (scrollback) to fill it from the top, keep the text at the top and
+      // add the new lines at the bottom, as xterm does: the content, and
+      // the cursor with it, would otherwise move down, leaving empty lines
+      // above it (e.g. the first prompt of a terminal that a tiling window
+      // manager enlarges right after it starts).
+      if (top_row > 0)
+        {
+          for (int row = q; row < total_rows; row++)
+            ::swap (row_buf [row - top_row], row_buf [row]);
+
+          screen.cur.row -= top_row;
+          top_row = 0;
+        }
 
       clamp_it (screen.cur.row, 0, nrow - 1);
       clamp_it (screen.cur.col, 0, ncol - 1);
@@ -629,15 +673,137 @@ rxvt_term::scr_color (unsigned int color, int fgbg) noexcept
 
 /* ------------------------------------------------------------------------- */
 /*
+ * The colour faint (SGR 2) text is drawn in: halfway between the
+ * foreground and the background, in one of the 24-bit colour slots.
+ */
+int
+rxvt_term::faint_color (int fore, int back)
+{
+  rgba f, b;
+
+  pix_colors[fore].get (f);
+  pix_colors[back].get (b);
+
+  return map_rgb24_color ((f.r + b.r) >> 9, (f.g + b.g) >> 9, (f.b + b.b) >> 9, f.a >> 8);
+}
+
+/* ------------------------------------------------------------------------- */
+/*
+ * Draw the underline of a run of cells starting at pixel x, in the GC's
+ * colour. y is the top of the row. Patterns are aligned to absolute
+ * pixel positions, so runs drawn separately join up seamlessly.
+ */
+void
+rxvt_term::draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend)
+{
+  int base = y + font->ascent + 1;          // where rxvt-unicode draws it
+  int bottom = y + fheight - 1;             // the last pixel row of the cell
+  int thick = max (1, (font->ascent + font->descent) / 16);
+  int room = max (0, bottom - base);        // pixels below the line
+
+  switch (GET_ULSTYLE (rend))
+    {
+      case UL_double:
+        {
+          int gap = room >= 3 * thick ? thick : 1;
+          int first = min (base, bottom - 2 * thick - gap + 1);
+          XFillRectangle (dpy, vt, gc, x, first, width, thick);
+          XFillRectangle (dpy, vt, gc, x, first + thick + gap, width, thick);
+        }
+        break;
+
+      case UL_curly:
+        {
+          // one wave per cell, as tall as the room below the baseline allows
+          int amp = clamp ((room - thick + 1) / 2, 1, max (1, fwidth / 4));
+          int mid = min (base + amp, bottom - amp);
+          int period = max (4, fwidth);
+
+          // each half wave is a parabola, close enough to a sine (and no libm)
+          XPoint *pts = rxvt_temp_buf<XPoint> (width + 1);
+          for (int i = 0; i <= width; i++)
+            {
+              int a = ((x + i) % period + period) % period * 2; // 0 .. 2 * period
+              int sign = a < period ? 1 : -1;
+              if (a >= period)
+                a -= period;
+
+              int h = (4 * amp * a * (period - a) + period * period / 2) / (period * period);
+
+              pts[i].x = x + i;
+              pts[i].y = mid - sign * h;
+            }
+
+          XSetLineAttributes (dpy, gc, thick, LineSolid, CapButt, JoinRound);
+          XDrawLines (dpy, vt, gc, pts, width + 1, CoordModeOrigin);
+          XSetLineAttributes (dpy, gc, 0, LineSolid, CapButt, JoinMiter);
+        }
+        break;
+
+      case UL_dotted:
+        {
+          int step = 2 * thick;
+          for (int px = x + (step - x % step) % step; px < x + width; px += step)
+            XFillRectangle (dpy, vt, gc, px, base, min (thick, x + width - px), thick);
+        }
+        break;
+
+      case UL_dashed:
+        {
+          int dash = max (2, fwidth / 2), step = dash + max (1, fwidth / 4);
+          int start = x - (x % step);
+          for (int px = start; px < x + width; px += step)
+            {
+              int from = max (px, x), to = min (px + dash, x + width);
+              if (to > from)
+                XFillRectangle (dpy, vt, gc, from, base, to - from, thick);
+            }
+        }
+        break;
+
+      default: // UL_single
+        XFillRectangle (dpy, vt, gc, x, base, width, thick);
+        break;
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+/*
+ * Underline with a style (SGR 4:N), -1 for none
+ */
+void
+rxvt_term::scr_underline (int style) noexcept
+{
+  if (style < 0)
+    rstyle &= ~RS_Uline;
+  else
+    rstyle = (rstyle & ~RS_ulStyleMask) | RS_Uline
+             | ((rend_t)min (style, (int)UL_dashed) << RS_ulStyleShift);
+}
+
+/*
+ * Underline colour (SGR 58), -1 for the default (the text colour)
+ */
+void
+rxvt_term::scr_underline_color (int color) noexcept
+{
+  rstyle &= ~(RS_ulColor | RS_ulColorMask);
+
+  if (IN_RANGE_INC (color, minCOLOR, maxTermCOLOR24))
+    rstyle |= RS_ulColor | ((rend_t)color << RS_ulColorShift);
+}
+
+/* ------------------------------------------------------------------------- */
+/*
  * Change the rendition style for following text
  */
 void
-rxvt_term::scr_rendition (int set, int style) noexcept
+rxvt_term::scr_rendition (int set, rend_t style) noexcept
 {
   if (set)
     rstyle |= style;
   else if (style == ~RS_None)
-    rstyle = DEFAULT_RSTYLE;
+    rstyle = DEFAULT_RSTYLE | (rstyle & RS_linkMask); // SGR 0 doesn't end a hyperlink
   else
     rstyle &= ~style;
 }
@@ -792,6 +958,7 @@ rxvt_term::scr_scroll_text (int row1, int row2, int count) noexcept
 /*
  * Add text given in <str> of length <len> to screen struct
  */
+
 void ecb_hot
 rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
 {
@@ -925,6 +1092,64 @@ rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
       if (ecb_unlikely (screen.flags & Screen_Insert))
         scr_insdel_chars (width, INSERT);
 
+#if ENABLE_EMOJI_SEQUENCES
+      // Emoji sequences (see emoji_join in rxvt.h): the second regional
+      // indicator of a flag, a skin tone after an emoji, or an emoji after
+      // a zero width joiner continue the previous character, which gets
+      // wider by the width of this one.
+      if (ecb_unlikely (width > 0
+                        && screen.cur.col > 0
+                        && !(screen.flags & Screen_WrapNext)
+                        && screen.cur.col + width <= ncol
+                        && (emoji_properties (c) & (EMOJI_REGIONAL | EMOJI_MODIFIER | EMOJI_PICTOGRAPHIC))))
+        {
+          text_t *tp = line->t + screen.cur.col - 1;
+          rend_t *rp = line->r + screen.cur.col - 1;
+
+          while (*tp == NOCHAR && tp > line->t)
+            tp--, rp--;
+
+          bool join = emoji_join (*tp, c)
+                      && !((*rp ^ rstyle) & ~RS_fontMask);
+
+          if (join)
+            {
+              line->touch ();
+
+              *tp = rxvt_composite.compose (*tp, c, false);
+              *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
+
+              do
+                {
+                  line->t[screen.cur.col] = NOCHAR;
+                  line->r[screen.cur.col] = *rp;
+
+                  if (screen.cur.col < ncol - 1)
+                    screen.cur.col++;
+                  else
+                    {
+                      line->l = ncol;
+                      if (screen.flags & Screen_Autowrap)
+                        screen.flags |= Screen_WrapNext;
+
+                      goto joined;
+                    }
+                }
+              while (--width);
+
+              // pad with spaces when overwriting a wide character
+              for (int col = screen.cur.col; col < ncol && line->t[col] == NOCHAR; col++)
+                {
+                  line->t[col] = ' ';
+                  line->r[col] = *rp;
+                }
+
+            joined:
+              continue;
+            }
+        }
+#endif
+
       if (width != 0)
         {
 #if !UNICODE_3
@@ -1029,7 +1254,14 @@ end_of_line:
               // first try to find a precomposed character
               unicode_t n = rxvt_compose (*tp, c);
               if (n == NOCHAR)
-                n = rxvt_composite.compose (*tp, c);
+                {
+#if ENABLE_EMOJI_SEQUENCES
+                  // emoji sequences repeat characters on purpose
+                  n = rxvt_composite.compose (*tp, c, !emoji_join (*tp, c));
+#else
+                  n = rxvt_composite.compose (*tp, c);
+#endif
+                }
 
               *tp = n;
               *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
@@ -1042,6 +1274,112 @@ end_of_line:
 
   assert (screen.cur.row >= 0);
 }
+
+#if ENABLE_SIXEL
+/*
+ * Put a picture's tiles at the cursor, cols x rows cells (cut at the right
+ * edge), scrolling as text would, and leave the cursor on the line below,
+ * in the column the picture starts in.
+ */
+void
+rxvt_term::scr_add_image (int slot, int cols, int rows, int cursor) noexcept
+{
+  row_col_t start = screen.cur;
+
+  want_refresh = 1;
+  ZERO_SCROLLBACK ();
+
+  int col0 = screen.cur.col;
+  int width = min (cols, ncol - col0);
+
+  screen.flags &= ~Screen_WrapNext;
+
+  for (int r = 0; r < rows; r++)
+    {
+      line_t &l = ROW (screen.cur.row);
+
+      // wide characters the picture covers partly
+      if (col0 < ncol && l.t[col0] == NOCHAR)
+        scr_kill_char (l, col0);
+      if (col0 + width < ncol && l.t[col0 + width] == NOCHAR)
+        scr_kill_char (l, col0 + width);
+
+      for (int c = 0; c < width; c++)
+        {
+          text_t code = IMAGE_TILE (slot, r, c);
+          l.t[col0 + c] = code;
+          l.r[col0 + c] = SET_FONT (rstyle & ~(RS_baseattrMask | RS_linkMask), FONTSET (rstyle)->find_font (code));
+        }
+
+      l.touch (col0 + width);
+
+      // the next line (after the last one too, unless the cursor stays on it)
+      if (r == rows - 1 && cursor != IMAGE_CURSOR_BELOW)
+        break;
+
+      if (screen.cur.row == screen.bscroll)
+        scr_scroll_text (screen.tscroll, screen.bscroll, 1);
+      else if (screen.cur.row < nrow - 1)
+        screen.cur.row++;
+    }
+
+  if (cursor == IMAGE_CURSOR_BELOW)
+    screen.cur.col = col0;
+  else if (cursor == IMAGE_CURSOR_AFTER)
+    {
+      // after the picture, on its last line (kitty)
+      screen.cur.col = col0 + width;
+      if (screen.cur.col >= ncol)
+        {
+          screen.cur.col = ncol - 1;
+          screen.flags |= Screen_WrapNext;
+        }
+    }
+  else
+    {
+      // where it was, unless the picture scrolled the screen
+      int scrolled = start.row + rows - 1 - screen.cur.row;
+      screen.cur.row = max (start.row - scrolled, 0);
+      screen.cur.col = start.col;
+    }
+}
+
+/*
+ * Replace the cells of pictures match () picks with blanks, on both
+ * screens and in the scrollback.
+ */
+void
+rxvt_term::scr_erase_images (bool (*match)(rxvt_term *, term_image *, void *), void *data)
+{
+  auto erase = [&](line_t &l)
+  {
+    if (!l.valid () || !l.t)
+      return;
+
+    for (int col = 0; col < ncol; col++)
+      if (IS_IMAGE_TILE (l.t[col]))
+        {
+          term_image *img = images[IMAGE_TILE_SLOT (l.t[col])];
+
+          if (!img || match (this, img, data))
+            {
+              l.t[col] = ' ';
+              l.r[col] = SET_FONT (l.r[col], FONTSET (l.r[col])->find_space_font ());
+              l.touch ();
+            }
+        }
+  };
+
+  for (int row = top_row; row < nrow; row++)
+    erase (ROW (row));
+
+  if (swap_buf)
+    for (int row = 0; row < nrow; row++)
+      erase (swap_buf[row]);
+
+  scr_touch (true);
+}
+#endif
 
 /* ------------------------------------------------------------------------- */
 /*
@@ -1334,6 +1672,7 @@ rxvt_term::scr_erase_line (int mode) noexcept
 void
 rxvt_term::scr_erase_screen (int mode) noexcept
 {
+  erased++; // (24-bit colour slots may be free again)
   int num;
   int32_t row;
   rend_t ren;
@@ -1414,6 +1753,7 @@ rxvt_term::scr_erase_screen (int mode) noexcept
 void
 rxvt_term::scr_erase_savelines () noexcept
 {
+  erased++;
   want_refresh = 1;
   ZERO_SCROLLBACK ();
 
@@ -2373,6 +2713,12 @@ rxvt_term::scr_refresh () noexcept
 #endif
                 }
 
+              if (rend & RS_Faint)
+                fore = faint_color (fore, back);
+
+              if (rend & RS_Conceal)
+                fore = back;
+
 #ifdef TEXT_BLINK
               if (rend & RS_Blink && (back == Color_bg || fore == Color_bg))
                 {
@@ -2432,6 +2778,8 @@ rxvt_term::scr_refresh () noexcept
               if (showcursor && focus && row == screen.cur.row
                   && IN_RANGE_EXC (col, cur_col, cur_col + cursorwidth))
                 XSetForeground (dpy, gc, pix_colors[ccol1]);
+              else if (rend & RS_ulColor) // the program's colour (SGR 58)
+                XSetForeground (dpy, gc, pix_colors[GET_ULCOLOR (rend)]);
               else
 #if ENABLE_FRILLS
               if (ISSET_PIXCOLOR (Color_underline))
@@ -2440,9 +2788,32 @@ rxvt_term::scr_refresh () noexcept
 #endif
                 XSetForeground (dpy, gc, pix_colors[fore]);
 
-              XDrawLine (dpy, vt, gc,
-                         xpixel, ypixel + font->ascent + 1,
-                         xpixel + Width2Pixel (count) - 1, ypixel + font->ascent + 1);
+              draw_underline (xpixel, ypixel, Width2Pixel (count), font, rend);
+            }
+
+          // hyperlinks without an underline of their own get a dashed one
+          if (ecb_unlikely (rend & RS_linkMask && !(rend & RS_Uline) && font->descent > 1 && fore != back))
+            {
+              XSetForeground (dpy, gc, pix_colors[fore]);
+              draw_underline (xpixel, ypixel, Width2Pixel (count), font,
+                              (rend & ~RS_ulStyleMask) | ((rend_t)UL_dashed << RS_ulStyleShift));
+            }
+
+          if (ecb_unlikely (rend & (RS_Strike | RS_Overline) && fore != back))
+            {
+              // as thick as the font's strokes, roughly
+              int thickness = max (1, (font->ascent + font->descent) / 16);
+
+              XSetForeground (dpy, gc, pix_colors[fore]);
+
+              // through the middle of the lower-case letters
+              if (rend & RS_Strike)
+                XFillRectangle (dpy, vt, gc, xpixel,
+                                ypixel + font->ascent - font->ascent * 3 / 10 - thickness / 2,
+                                Width2Pixel (count), thickness);
+
+              if (rend & RS_Overline)
+                XFillRectangle (dpy, vt, gc, xpixel, ypixel, Width2Pixel (count), thickness);
             }
         }                     /* for (col....) */
     }                         /* for (row....) */
@@ -2869,6 +3240,13 @@ rxvt_term::selection_make (Time tm)
                 }
 
               ofs += rxvt_composite.expand (*t++, new_selection_text + ofs);
+            }
+#endif
+#if ENABLE_SIXEL
+          else if (IS_IMAGE_TILE (*t))
+            {
+              new_selection_text[ofs++] = ' '; // pictures copy as blanks
+              t++;
             }
 #endif
           else

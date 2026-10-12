@@ -98,6 +98,14 @@ optList[] = {
               SWCH ("iconic", Opt_iconic, 0, "start iconic"),
               SWCH ("ic", Opt_iconic, 0, NULL),	/* short form */
               STRG (Rs_chdir, "chdir", "cd", "string", "start shell in this directory"),
+              RSTRG (Rs_notifyCommand, "notifyCommand", "string"),
+              RSTRG (Rs_shareAddress, "shareAddress", "address"),
+              RSTRG (Rs_sharePort, "sharePort", "number"),
+              STRG (Rs_record, NULL, "record", "file", "record the terminal to an asciinema file"),
+              RSTRG (Rs_recordDirectory, "recordDirectory", "directory"),
+              RSTRG (Rs_scrollbackCommand, "scrollbackCommand", "command"),
+              RSTRG (Rs_notifyLongCommand, "notifyLongCommand", "seconds"),
+              RSTRG (Rs_imageMemory, "imageMemory", "MiB"),
               SWCH ("dockapp", Opt_dockapp, 0, "start as dockapp"),
               BOOL (Rs_reverseVideo, "reverseVideo", "rv", Opt_reverseVideo, 0, "reverse video"),
               BOOL (Rs_loginShell, "loginShell", "ls", Opt_loginShell, 0, "login shell"),
@@ -139,6 +147,7 @@ optList[] = {
               BOOL (Rs_disablePasteBrackets, "disablePasteBrackets", "dpb", Opt_disablePasteBrackets, 0, "paste bracket suppression"),
               BOOL (Rs_tripleclickwords, "tripleclickwords", "tcw", Opt_tripleclickwords, 0, "triple click word selection"),
               BOOL (Rs_insecure, "insecure", "insecure", Opt_insecure, 0, "enable possibly insecure escape sequences"),
+              SWCH ("share", Opt_share, 0, "share the terminal on a web page"),
               BOOL (Rs_cursorUnderline, "cursorUnderline", "uc", Opt_cursorUnderline, 0, "underline cursor"),
 #endif
 #if CURSOR_BLINK
@@ -165,6 +174,9 @@ optList[] = {
               RSTRG (Rs_color + minBrightCOLOR + 5, "color13", "color"),
               RSTRG (Rs_color + minBrightCOLOR + 6, "color14", "color"),
               RSTRG (Rs_color + minBrightCOLOR + 7, "color15", "color"),
+#if !ENABLE_MINIMAL
+# include "colorres.h"
+#endif
 #ifndef NO_BOLD_UNDERLINE_REVERSE
               RSTRG (Rs_color + Color_BD, "colorBD", "color"),
               RSTRG (Rs_color + Color_IT, "colorIT", "color"),
@@ -288,7 +300,7 @@ optList[] = {
 #undef SWCH
 #undef BOOL
 
-static const char releasestring[] = "rxvt-unicode (" RXVTNAME ") v" VERSION " - released: " DATE "\n";
+static const char releasestring[] = "wrxvt (" RXVTNAME ") v" VERSION ", based on rxvt-unicode " UPSTREAM_VERSION " - released: " DATE "\n";
 static const char optionsstring[] = "options: "
 #if ENABLE_PERL
                                     "perl,"
@@ -399,7 +411,7 @@ rxvt_term::rxvt_usage (int type)
 {
   unsigned int i, col;
 
-  rxvt_log ("%s%s%s", releasestring, optionsstring, RESNAME);
+  rxvt_log ("%s%s%s", releasestring, optionsstring, RXVTNAME);
 
   switch (type)
     {
@@ -464,10 +476,24 @@ rxvt_term::rxvt_usage (int type)
 
         for (i = 0; i < ecb_array_length (optList); i++)
           if (optList[i].kw != NULL)
+            {
+              // color16 to color255: one line
+              if (!strncmp (optList[i].kw, "color", 5) && atoi (optList[i].kw + 5) >= 16)
+                {
+                  if (atoi (optList[i].kw + 5) == 16)
+                    {
+                      char kw[32];
+                      snprintf (kw, sizeof (kw), "color16 .. color%d", maxTermCOLOR - minCOLOR);
+                      rxvt_log ("  %s: %*scolor\n", kw, (int)(INDENT + 2 - strlen (kw)), "");
+                    }
+                  continue;
+                }
+
             rxvt_log ("  %s: %*s%s\n",
                     optList[i].kw,
                     (INDENT + 2 - strlen (optList[i].kw)), "", /* XXX */
                     (optList_isBool (i) ? "boolean" : optList[i].arg));
+            }
 
 #if ENABLE_PERL
         rxvt_perl.init (this);
@@ -784,6 +810,9 @@ void
 rxvt_term::extract_resources ()
 {
 #ifndef NO_RESOURCES
+  // (the display always has a database, an empty one without any
+  // resources: the options go into it, where the keysym resources and
+  // perl look later)
   XrmDatabase database = XrmGetDatabase (dpy);
   XrmMergeDatabases (option_db, &database);
   option_db = NULL;
@@ -822,6 +851,65 @@ rxvt_term::extract_resources ()
     }
 #endif /* NO_RESOURCES */
 }
+
+#if ENABLE_RESOURCE_RELOAD
+/*
+ * The colours follow the X resources: when they change (xrdb -merge, a
+ * theme switch), the window takes the new colours, as if it had just
+ * started. Colours given on the command line (-fg, -bg...) stay. Programs
+ * that asked for colour scheme reports (mode 2031) get one if the
+ * background went from dark to light or back.
+ */
+void
+rxvt_term::resources_cb (XEvent &ev)
+{
+  if (ev.type == PropertyNotify && ev.xproperty.atom == XA_RESOURCE_MANAGER)
+    {
+      // xrdb may change it more than once: wait until it's done
+      resources_reload_ev.set (0.1);
+      resources_reload_ev.start ();
+    }
+}
+
+void
+rxvt_term::resources_reload_cb (ev::timer &w, int revents)
+{
+  make_current ();
+
+  XrmDatabase database = display->get_resources (true);
+  if (!database)
+    return;
+
+  for (unsigned int entry = 0; entry < ecb_array_length (optList); entry++)
+    {
+      int idx = optList[entry].doff - Rs_color;
+      const char *kw = optList[entry].kw;
+
+      if (!kw || idx < 0 || idx >= NRS_COLORS || colors_from_options[idx])
+        continue;
+
+      const char *value = get_res (database, rs[Rs_name], kw);
+      if (!value)
+        value = get_res (database, RESCLASS, kw);
+#ifdef RESFALLBACK
+      if (!value)
+        value = get_res (database, RESFALLBACK, kw);
+#endif
+
+      // a colour no longer set keeps its value
+      if (!value || !*value || (initial_colors[idx] && !strcmp (initial_colors[idx], value)))
+        continue;
+
+      char *copy = strdup (value);
+      allocated.push_back ((void *)copy);
+      initial_colors[idx] = copy;
+      set_window_color (idx, copy);
+    }
+
+  XrmDestroyDatabase (database);
+  refresh_check ();
+}
+#endif
 
 struct rxvt_enumerate_closure
 {

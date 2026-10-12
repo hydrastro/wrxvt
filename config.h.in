@@ -60,6 +60,9 @@
 /* Define to 1 if you have the <fontconfig/fontconfig.h> header file. */
 #undef HAVE_FONTCONFIG_FONTCONFIG_H
 
+/* Define to draw emoji sequences with harfbuzz */
+#undef HAVE_HARFBUZZ
+
 /* Define to 1 if you have the `inotify_init' function. */
 #undef HAVE_INOTIFY_INIT
 

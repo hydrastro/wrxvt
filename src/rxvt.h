@@ -41,7 +41,10 @@ typedef uint32_t text_t;
 #else
 typedef uint16_t text_t; // saves lots of memory
 #endif
-typedef uint32_t rend_t;
+// The rendition (colours and attributes) of one cell. 64 bits since
+// wrxvt 9.32: the lower 32 are rxvt-unicode's layout, unchanged; the upper
+// 32 hold the attributes rxvt-unicode had no room for (RS_Faint...).
+typedef uint64_t rend_t;
 typedef  int32_t tlen_t;  // was int16_t, but this results in smaller code and memory use
 typedef  int32_t tlen_t_; // specifically for use in the line_t structure
 
@@ -153,6 +156,8 @@ void rxvt_init ();
 
 // misc.C
 char *           rxvt_wcstombs                    (const wchar_t *str, int len = -1);
+int              rxvt_base64_decode               (char *str);
+char *           rxvt_base64_encode               (const char *data, unsigned int len);
 wchar_t *        rxvt_mbstowcs                    (const char *str, int len = -1);
 char *           rxvt_wcstoutf8                   (const wchar_t *str, int len = -1);
 wchar_t *        rxvt_utf8towcs                   (const char *str, int len = -1);
@@ -294,7 +299,7 @@ struct mouse_event
 # define Blue_levels     4
 #endif
 
-#define RGB24_CUBE_SIZE (Red_levels * Green_levels * Blue_levels)
+#define RGB24_CUBE_SIZE (Red_levels * Green_levels * Blue_levels) // < 255
 
 #if defined (NO_MOUSE_REPORT) && !defined (NO_MOUSE_REPORT_SCROLLBAR)
 # define NO_MOUSE_REPORT_SCROLLBAR 1
@@ -386,7 +391,32 @@ enum {
 #define RS_RVid                 (1UL << 30)    // reverse video
 #define RS_Uline                (1UL << 31)    // underline
 
-#define RS_baseattrMask         (RS_Italic | RS_Bold | RS_Blink | RS_RVid | RS_Uline)
+// attributes that didn't fit in rxvt-unicode's 32 bits (see rend_t)
+#define RS_Faint                ((rend_t)1 << 32)   // SGR 2: dim
+#define RS_Strike               ((rend_t)1 << 33)   // SGR 9: crossed out
+#define RS_Overline             ((rend_t)1 << 34)   // SGR 53
+#define RS_Conceal              ((rend_t)1 << 35)   // SGR 8: invisible
+
+// underline style (SGR 4:N), meaningful with RS_Uline
+#define RS_ulStyleShift         36
+#define RS_ulStyleMask          ((rend_t)7 << RS_ulStyleShift)
+enum { UL_single, UL_double, UL_curly, UL_dotted, UL_dashed };
+#define GET_ULSTYLE(x)          ((int)(((x) & RS_ulStyleMask) >> RS_ulStyleShift))
+
+// underline colour (SGR 58): a colour index like fg and bg, valid if RS_ulColor
+#define RS_ulColor              ((rend_t)1 << 39)
+#define RS_ulColorShift         40
+#define RS_ulColorMask          ((rend_t)RS_colorMask << RS_ulColorShift)
+#define GET_ULCOLOR(x)          ((int)(((x) & RS_ulColorMask) >> RS_ulColorShift))
+
+// hyperlink (OSC 8): an index into the link table (links), 0 for none
+#define RS_linkShift            49
+#define RS_linkMask             ((rend_t)LINK_MAX << RS_linkShift)
+#define GET_LINK(x)             ((int)(((x) & RS_linkMask) >> RS_linkShift))
+
+#define RS_baseattrMask         (RS_Italic | RS_Bold | RS_Blink | RS_RVid | RS_Uline \
+                                 | RS_Faint | RS_Strike | RS_Overline | RS_Conceal \
+                                 | RS_ulStyleMask | RS_ulColor | RS_ulColorMask)
 #define RS_attrMask             (RS_baseattrMask | RS_fontMask)
 
 #define DEFAULT_RSTYLE  (RS_None | (Color_fg    << RS_fgShift) | (Color_bg     << RS_bgShift))
@@ -416,6 +446,10 @@ enum {
   XTerm_iconName         =  1,
   XTerm_title            =  2,
   XTerm_property         =  3,      // change X property
+  XTerm_cwd              =  7,      // the shell's current directory, as file://host/path
+  XTerm_hyperlink        =  8,      // ESC ] 8 ; params ; URI ST: following text links to URI
+  XTerm_notify           =  9,      // a desktop notification (iTerm2)
+  Kitty_notify           = 99,      // a desktop notification (kitty), with a title
   XTerm_Color            =  4,      // change colors
   XTerm_Color00          = 10,      // change fg color
   XTerm_Color01          = 11,      // change bg color
@@ -428,6 +462,7 @@ enum {
   XTerm_Color_HTC        = 19,      // change actual 'Highlight' fg color
   XTerm_logfile          = 46,      // not implemented
   XTerm_font             = 50,
+  XTerm_selection        = 52,      // set or query the clipboard or primary selection
 
   XTerm_konsole30        = 30,      // reserved for konsole
   XTerm_konsole31        = 31,      // reserved for konsole
@@ -441,6 +476,10 @@ enum {
   Rxvt_restoreBG         = 49,
 
   Rxvt_dumpscreen        = 55,      // dump scrollback and all of screen
+
+  XTerm_resetColor       = 104,     // reset palette colours (all, or the ones listed)
+  XTerm_resetColor00     = 110,     // reset the foreground; 111 background, 112 cursor...
+  XTerm_resetColor_HTC   = 119,
 
   URxvt_locale           = 701,     // change locale
   URxvt_version          = 702,     // request version
@@ -459,6 +498,9 @@ enum {
   URxvt_view_down        = 721,
 
   URxvt_cellinfo         = 776,     // returns font cell width, height etc.
+
+  Shell_mark             = 133,     // FinalTerm/iTerm2 shell integration: prompt and command marks
+  ITerm_command          = 1337,    // iTerm2: File= (inline images)
   URxvt_perl             = 777,     // for use by perl extensions, starts with "extension-name;"
 };
 
@@ -595,6 +637,9 @@ enum {
 #define PrivMode_BlinkingCursor (1UL<<25)
 #define PrivMode_FocusEvent     (1UL<<26)
 #define PrivMode_ExtMouseSGR    (1UL<<27)
+#define PrivMode_SyncOutput     (1UL<<28) // mode 2026: hold the screen until the update is complete
+#define PrivMode_ColorScheme    (1UL<<29) // mode 2031: report dark/light changes
+#define PrivMode_ExtMousePixels (1UL<<30) // mode 1016: SGR mouse reports in pixels
 
 #define PrivMode_mouse_report   (PrivMode_MouseX10|PrivMode_MouseX11|PrivMode_MouseBtnEvent|PrivMode_MouseAnyEvent)
 
@@ -607,6 +652,10 @@ enum {
 // do not change these constants lightly, there are many interdependencies
 #define IMBUFSIZ               128     // input modifier buffer sizes
 #define KBUFSZ                 512     // size of keyboard mapping buffer
+#define SYNC_OUTPUT_TIMEOUT    0.5     // seconds a synchronized update (mode 2026) may hold the screen
+#define TITLE_STACK_MAX        10      // titles CSI 22 t can save
+#define LINK_MAX               0x7fff  // hyperlinks a terminal remembers (15 rendition bits)
+#define STRING_MAX             (1 << 22) // longest control string (OSC, DCS...) in characters
 #define CBUFSIZ                32768   // size of command buffer (longest command sequence possible)
 #define CBUFCNT                8       // never call pty_fill/cmd_parse more than this often in a row
 #define UBUFSIZ                2048    // character buffer
@@ -712,11 +761,61 @@ typedef callback<int (int)> getfd_callback;
 
 /****************************************************************************/
 
+#if ENABLE_FRILLS && defined(XTERM_COLOR_CHANGE) && !defined(NO_RESOURCES)
+# define ENABLE_RESOURCE_RELOAD 1  // colours follow X resource changes
+#endif
+
+#if ENABLE_FRILLS
+# define ENABLE_HINTS 1         // hints.C: pick things on the screen with the keyboard
+# define ENABLE_DND 1           // dnd.C: drag and drop
+# define ENABLE_SHARE 1         // share.C: the terminal on a web page
+# define ENABLE_RECORD 1        // record.C: asciinema recordings
+#endif
+
+struct share_server;
+struct term_recording;
+struct term_hints;
+struct hint;
+struct hint_line;
+struct rxvt_buf;
+
+/*
+ * Sixel pictures (sixel.C): cells covered by a picture hold IMAGE_TILE
+ * characters naming the picture's slot and the tile, above anything
+ * Unicode or the composite characters use (int32_t negative).
+ */
+#if ENABLE_FRILLS && UNICODE_3
+# define ENABLE_SIXEL 1
+#endif
+
+#define SIXEL_SLOTS             256
+#define SIXEL_COLORS            1024     // colour registers
+#define SIXEL_MAX_SIZE          4096     // pixels, either way
+#define IMAGE_MEMORY_MAX        (256UL << 20) // bytes of pictures a terminal keeps (imageMemory)
+#define IMAGE_TILE_MAX          1023     // tiles, either way
+#define IMAGE_TILE(slot,row,col) ((text_t)(0xC0000000UL | (slot) << 20 | (row) << 10 | (col)))
+#define IS_IMAGE_TILE(c)        (((c) & 0xF0000000UL) == 0xC0000000UL)
+#define IMAGE_TILE_SLOT(c)      ((int)((c) >> 20 & 0xff))
+#define IMAGE_TILE_ROW(c)       ((int)((c) >> 10 & 0x3ff))
+#define IMAGE_TILE_COL(c)       ((int)((c) & 0x3ff))
+
+struct term_image
+{
+  unsigned int kitty_id;  // the image id the kitty protocol gave it, or 0
+  unsigned long serial;   // the order they came in
+  int w, h;               // pixels
+  int cell_w, cell_h;     // the cell size the tiles were cut for
+  uint32_t *pixels;       // ARGB, until the pixmap is made
+  Pixmap pixmap;
+};
+
 #define LINE_LONGER     0x0001 // line is continued on the next row
 #define LINE_FILTERED   0x0002 // line has been filtered
 #define LINE_COMPRESSED 0x0004 // line has been compressed (NYI)
 #define LINE_FILTER     0x0008 // line needs to be filtered before display (NYI)
 #define LINE_BIDI       0x0010 // line needs bidi (NYI)
+#define LINE_PROMPT     0x0020 // a shell prompt begins on this line (OSC 133 ; A)
+#define LINE_OUTPUT     0x0040 // a command's output begins on this line (OSC 133 ; C)
 
 struct line_t
 {
@@ -821,7 +920,7 @@ struct rxvt_composite_vec
 {
   vector<compose_char> v;
 
-  text_t compose (unicode_t c1, unicode_t c2 = NOCHAR);
+  text_t compose (unicode_t c1, unicode_t c2 = NOCHAR, bool dedupe = true);
   template<typename T> int expand (unicode_t c, T *r);
   int expand (unicode_t c) { return expand (c, (text_t *)0); }
   compose_char *operator [](text_t c)
@@ -833,6 +932,46 @@ struct rxvt_composite_vec
 };
 
 extern class rxvt_composite_vec rxvt_composite;
+
+#if HAVE_HARFBUZZ && XFT && UNICODE_3
+# define ENABLE_EMOJI_SEQUENCES 1
+#endif
+
+#if ENABLE_EMOJI_SEQUENCES
+# include "emoji-sequences.h"
+
+// Expand the left-linked composition chain without recursion. Spaces here
+// are padding inserted by the wide-glyph patch, never part of an emoji.
+static inline unsigned int
+emoji_expand (text_t c, uint32_t *out)
+{
+  unsigned int n = 0, depth = 0;
+  while (compose_char *cc = rxvt_composite [c])
+    {
+      if (++depth > 2 * EMOJI_MAX_CODEPOINTS) return 0;
+      if (cc->c2 != NOCHAR && cc->c2 != ' ')
+        {
+          if (n == EMOJI_MAX_CODEPOINTS) return 0;
+          out[n++] = cc->c2;
+        }
+      c = cc->c1;
+    }
+  if (n == EMOJI_MAX_CODEPOINTS) return 0;
+  out[n++] = c;
+  for (unsigned int i = 0; i < n / 2; ++i)
+    ::swap (out[i], out[n - i - 1]);
+  return n;
+}
+
+static inline bool
+emoji_join (text_t previous, unicode_t next)
+{
+  uint32_t sequence[EMOJI_MAX_CODEPOINTS];
+  unsigned int n = emoji_expand (previous, sequence);
+  return emoji_can_join (sequence, n, next);
+}
+#endif
+
 #endif
 
 #if 0
@@ -1232,6 +1371,17 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   char           *cmdbuf_ptr, *cmdbuf_endp;
   char            cmdbuf_base[CBUFSIZ];
 
+  // the control string (OSC, DCS, APC...) being read, see read_string
+  struct {
+    unicode_t kind;             // C1_OSC, C1_DCS, C1_APC, C1_PM (ignored), 0 if none
+    int osc;                    // OSC: its number
+    char params[32], inter[4];  // DCS: parameters and intermediates
+    unicode_t final;            //      and the final character
+    wchar_t *buf;
+    size_t len, size;
+    bool seen_esc, seen_syn, overflow;
+  } pstr;
+
   ptytty         *pty;
 
   // chunk contains all line_t's as well as rend_t and text_t buffers
@@ -1240,8 +1390,17 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   size_t          chunk_size;
 
   uint32_t        rgb24_color[RGB24_CUBE_SIZE];   // the 24-bit color value
-  uint16_t        rgb24_seqno[RGB24_CUBE_SIZE];   // which one is older?
-  uint16_t        rgb24_sequence;
+  uint8_t         rgb24_seqno[RGB24_CUBE_SIZE];   // 0 never used, 1 in use, 2 found unused
+  int             rgb24_fresh;                    // slots ever used (they are taken in order)
+  int             rgb24_unused;                   // slots marked 2 (found unused)
+  uint8_t         rgb24_bucket[256];              // the slots by colour (a hash table)
+  uint8_t         rgb24_next[RGB24_CUBE_SIZE];
+  uint8_t         rgb24_near[512];                // the nearest slot, by 3-bit r, g, b
+  bool            rgb24_near_valid;
+  ev_tstamp       rgb24_full_scan;                // when a scan last found every slot in use
+  unsigned int    rgb24_full_erased;              // and the value of erased then
+  unsigned int    erased;                         // screen or scrollback erases, ever
+  int rgb24_unused_slot ();
 
   static vector<rxvt_term *> termlist; // a vector of all running rxvt_term's
 
@@ -1277,6 +1436,163 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void refresh_check ();
   void flush ();
   void flush_cb (ev::timer &w, int revents); ev::timer flush_ev;
+  void sync_cb (ev::timer &w, int revents); ev::timer sync_ev;
+  void sync_output (bool on);
+  int color_scheme ();
+  bool jump_to_prompt (int dir);
+  bool builtin_action (const char *name, const char *arg);
+  void change_font_size (int delta);
+  int default_cursor_style;
+
+  // the kitty keyboard protocol: the flags of each screen, and the
+  // flags pushed before them
+  enum {
+    KBD_DISAMBIGUATE = 1,
+    KBD_EVENT_TYPES  = 2,
+    KBD_ALTERNATES   = 4,
+    KBD_ALL_KEYS     = 8,
+    KBD_TEXT         = 16,
+    KBD_STACK        = 16,
+  };
+  unsigned char kbd_flags[2], kbd_stack[2][KBD_STACK], kbd_depth[2];
+  unsigned char kbd_down[32]; // keycodes held, to tell repeats
+  bool kbd_detectable_repeat;
+  void process_kbd_seq (unicode_t priv, unsigned int nargs, const int *arg);
+  bool kitty_key (XKeyEvent &ev, KeySym keysym, bool release);
+
+#if ENABLE_SIXEL
+  term_image *images[SIXEL_SLOTS];
+  int image_next;
+  unsigned long image_serial;
+  size_t image_memory_max ();
+  int image_slot ();
+  void free_image (int slot);
+  void process_sixel (const char *params, const char *data);
+  Pixmap image_pixmap (term_image *img);
+  void draw_image_tile (Drawable d, GC gc, int x, int y, text_t code);
+  enum { IMAGE_CURSOR_BELOW, IMAGE_CURSOR_AFTER, IMAGE_CURSOR_STAY };
+  void scr_add_image (int slot, int cols, int rows, int cursor) noexcept;
+  bool place_image (uint32_t *pixels, int w, int h, int cols, int rows, int cursor, unsigned int kitty_id = 0);
+  void scr_erase_images (bool (*match)(rxvt_term *, term_image *, void *), void *data);
+
+  // other image protocols (graphics.C)
+  void process_iterm_file (char *str);
+  void process_apc_string (char *str);
+  void process_kitty_graphics (char *str);
+  struct kitty_upload {
+    unsigned int id;
+    char keys[256];              // the control data of the first chunk
+    char *data; size_t len, size;
+  } kitty_pending;
+  struct kitty_stored {
+    unsigned int id;
+    uint32_t *pixels;
+    int w, h;
+  } kitty_store[16];
+  void kitty_forget (unsigned int id);
+
+#endif
+  const char *initial_colors[NRS_COLORS]; // the colours as configured
+#if ENABLE_RESOURCE_RELOAD
+  bool colors_from_options[NRS_COLORS];    // given on the command line: they stay
+  void resources_cb (XEvent &xev);
+  xevent_watcher resources_ev;
+  void resources_reload_cb (ev::timer &w, int revents); ev::timer resources_reload_ev;
+#endif
+  void reset_color (int idx);
+  char *font_orig[4];   // the fonts before font-size changes
+  int font_delta;
+  bool font_size_set;
+  void set_cwd (const char *uri);
+  void process_hyperlink (char *str);
+  const char *link_at (int x, int y);
+  bool open_link (int x, int y);
+  void spawn (const char *command, const char *arg1, const char *arg2 = 0);
+  void notify (const char *text);
+  void notify_as (const char *title, const char *text);
+  void process_kitty_notify (char *str);
+  // a kitty notification sent in parts (d=0)
+  struct { char *id, *title, *body; } kitty_note;
+
+  // the screen as text (record.C)
+  void sgr_color (rxvt_buf &b, int idx, int base);
+  void sgr_rend (rxvt_buf &b, rend_t r);
+  void rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const char *eol, bool join,
+                  int first_col = 0);
+
+#if ENABLE_RECORD
+  term_recording *recording;
+  void record_start (const char *path);
+  void record_stop (bool quiet = false);
+  void record_output (const char *data, size_t len);
+  void record_resize ();
+  void scrollback_pager ();
+  void copy_output ();
+#endif
+
+  // the shell's marks (OSC 133): the command running, for long-command
+  // notifications
+  int prompt_command_col;   // where the command starts on the prompt line (B), or -1
+  ev_tstamp command_start;  // when its output started (C), or 0
+  char *command_text;
+  void shell_mark (const char *str);
+  void command_finished (int status);
+  char *get_title (bool icon);
+  char *app_title;      // the title as programs set it, without marks like [shared]
+  void update_title ();
+  void set_selection (const wchar_t *text, bool primary, bool clipboard);
+
+#if ENABLE_HINTS
+  // hints (hints.C)
+  enum { HINTS_OPEN, HINTS_COPY, HINTS_INSERT };
+  term_hints *hints;
+  void hints_start (int action);
+  void hints_end ();
+  void hints_key (XKeyEvent &ev);
+  void hints_find ();
+  void hints_scan_line (const hint_line &l);
+  void hints_add (int row, int col, int cells, char *text);
+  void hints_add_match (const hint_line &l, int from, int to);
+  bool hints_overlap (int row, int col, int cells);
+  void hints_set_cell (int row, int col, text_t t, rend_t r);
+  void hints_draw ();
+  void hints_act (hint &m);
+  char *hints_path (const char *text);
+#endif
+  char *shell_cwd;          // the shell's directory (OSC 7)
+
+#if ENABLE_DND
+  // drag and drop (dnd.C)
+  Window dnd_source;
+  Atom dnd_type;
+  void dnd_init ();
+  Atom dnd_choose_type (const Atom *types, unsigned long count);
+  void dnd_send (Window to, const char *message, long l1, long l2 = 0, long l3 = 0, long l4 = 0);
+  void dnd_finish (bool accepted);
+  bool dnd_client_message (XClientMessageEvent &ev);
+  void dnd_selection_notify (XSelectionEvent &ev);
+#endif
+
+#if ENABLE_SHARE
+  // sharing the terminal on a web page (share.C)
+  share_server *share;
+  void share_start ();
+  void share_stop ();
+  void share_copy_link (bool control);
+  void share_changed ();
+  void share_notify (const char *text);
+  int share_watching ();
+#endif
+
+  // the title stack (CSI 22 t, CSI 23 t)
+  struct title_stack_entry { char *title, *icon; } title_stack[TITLE_STACK_MAX];
+  int title_depth;
+
+  // hyperlinks (OSC 8), indexed by the RS_link bits; 0 is unused
+  struct hyperlink { char *id, *uri; } *links;
+  unsigned int link_next;
+  void color_scheme_check ();
+  int reported_color_scheme;
   void cmdbuf_reify ();
   void cmdbuf_append (const char *str, size_t count);
   bool pty_fill ();
@@ -1372,15 +1688,25 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void process_escape_seq ();
   void process_csi_seq ();
   void process_window_ops (const int *args, unsigned int nargs);
-  char *get_to_st (string_term &st);
+  void begin_string (unicode_t kind);
+  void read_string ();
+  void end_string (unicode_t terminator);
   void process_dcs_seq ();
+  void process_dcs_string (const char *s);
+  void process_selection_seq (char *str, string_term &st);
+  void selection_report (char target, const char *data, unsigned int len);
+  void decrqss (const char *setting);
+  void xtgettcap (const char *request);
+  const char *tcap_value (const char *name, bool &boolean);
+  void sgr_string (rend_t r, char *buf, size_t len) const;
   void process_osc_seq ();
   void process_color_seq (int report, int color, const char *str, string_term &st);
   void process_xterm_seq (int op, char *str, string_term &st);
   unsigned int map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsigned int a);
+  int faint_color (int fore, int back);
   int privcases (int mode, unsigned long bit);
   void process_terminal_mode (int mode, int priv, unsigned int nargs, const int *arg);
-  void process_sgr_mode (unsigned int nargs, const int *arg);
+  void process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub = 0);
   void set_cursor_style (int style);
   // init.C
   void init (stringvec *argv, stringvec *envv);
@@ -1494,7 +1820,10 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void scr_swap_screen () noexcept;
   void scr_change_screen (int scrn);
   void scr_color (unsigned int color, int fgbg) noexcept;
-  void scr_rendition (int set, int style) noexcept;
+  void scr_rendition (int set, rend_t style) noexcept;
+  void scr_underline (int style) noexcept;
+  void scr_underline_color (int color) noexcept;
+  void draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend);
   void scr_add_lines (const wchar_t *str, int len, int minlines = 0) noexcept;
   void scr_backspace () noexcept;
   void scr_tab (int count, bool ht = false) noexcept;

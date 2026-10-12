@@ -1,0 +1,52 @@
+#! perl
+
+# Test helper, loaded only by the test suite (tests/harness.py):
+#
+#   ESC ] 777 ; wrxvt-test ; dump ; PATH BEL
+#
+# writes the visible screen to PATH as JSON: for each row its text, the
+# rendition of each cell (see the RS_* constants) and the line flags.
+
+use JSON::PP;
+
+sub on_osc_seq_perl {
+   my ($self, $osc, $resp) = @_;
+
+   return unless $osc =~ /^wrxvt-test;dump;(.+)$/s;
+   my $path = $1;
+
+   my @rows;
+   for my $row (0 .. $self->nrow - 1) {
+      my $rend = $self->ROW_r ($row);
+      push @rows, {
+         text => $self->ROW_t ($row),
+         rend => [ map { 0 + $_ } @$rend ],
+         # colour indices: 0 default fg, 1 default bg, palette colour N is N + 2
+         fg   => [ map { urxvt::GET_BASEFG $_ } @$rend ],
+         bg   => [ map { urxvt::GET_BASEBG $_ } @$rend ],
+      };
+   }
+
+   # the attribute bits of this build (missing ones are null)
+   my %attr = map { $_ => scalar eval "urxvt::RS_$_" }
+              qw(Bold Italic Blink RVid Uline Faint Strike Overline Conceal);
+
+   my %screen = (
+      rows   => \@rows,
+      ncol   => $self->ncol,
+      nrow   => $self->nrow,
+      cursor => [ $self->screen_cur ],
+      saved  => -$self->top_row,
+      view_start => $self->view_start,
+      # the text at the top of the view (row 0 when not scrolled back)
+      view_top   => $self->ROW_t ($self->view_start),
+      attr   => \%attr,
+   );
+
+   open my $fh, ">", "$path.tmp" or return 1;
+   print $fh JSON::PP->new->utf8->canonical->encode (\%screen);
+   close $fh;
+   rename "$path.tmp", $path;
+
+   1
+}

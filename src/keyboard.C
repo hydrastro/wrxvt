@@ -182,7 +182,14 @@ keyboard_manager::dispatch (rxvt_term *term, KeySym keysym, unsigned int state, 
               else if (strncmp (str, "perl:", 5) == 0)
                 HOOK_INVOKE ((term, HOOK_USER_COMMAND, DT_STR, colon + 1, DT_END));
               else
-                HOOK_INVOKE ((term, HOOK_ACTION, DT_STR_LEN, str, colon - str, DT_STR, colon + 1, DT_INT, 0, DT_STR_LEN, kbuf, len, DT_END));
+                {
+                  *colon = 0;
+                  bool done = term->builtin_action (str, colon + 1);
+                  *colon = ':';
+
+                  if (!done)
+                    HOOK_INVOKE ((term, HOOK_ACTION, DT_STR_LEN, str, colon - str, DT_STR, colon + 1, DT_INT, 0, DT_STR_LEN, kbuf, len, DT_END));
+                }
             }
           else
             term->tt_write_user_input (str, strlen (str));
