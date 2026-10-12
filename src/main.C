@@ -221,6 +221,9 @@ rxvt_term::~rxvt_term ()
 
   free (pstr.buf);
 
+  for (int i = 0; i < 4; i++)
+    free (font_orig[i]);
+
   for (int i = 0; i < title_depth; i++)
     {
       free (title_stack[i].title);

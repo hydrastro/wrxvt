@@ -4254,12 +4254,125 @@ rxvt_term::jump_to_prompt (int dir)
 }
 
 /*
+ * A font list with every size changed by delta: pixelsize=N and size=N
+ * of xft: fonts, and the pixel size field of X core font names.
+ */
+static char *
+scale_font_list (const char *list, int delta)
+{
+  // every number grows by at most a few digits
+  char *out = (char *)rxvt_malloc (strlen (list) * 2 + 64);
+  char *o = out;
+  const char *p = list;
+
+  while (*p)
+    {
+      const char *end = strchr (p, ',');
+      if (!end)
+        end = p + strlen (p);
+
+      const char *num = 0;
+
+      if (!strncmp (p, "xft:", 4))
+        {
+          // the last pixelsize= or size= of this font
+          for (const char *q = p; q < end; q++)
+            if (*q == ':' && !strncmp (q + 1, "pixelsize=", 10))
+              num = q + 11;
+            else if (*q == ':' && !strncmp (q + 1, "size=", 5))
+              num = q + 6;
+        }
+      else if (*p == '-')
+        {
+          // -foundry-family-weight-slant-setwidth-adstyle-PIXELSIZE-...
+          int dashes = 0;
+          for (const char *q = p; q < end; q++)
+            if (*q == '-' && ++dashes == 7)
+              {
+                num = q + 1;
+                break;
+              }
+        }
+
+      if (num && isdigit (*num))
+        {
+          char *e;
+          long size = strtol (num, &e, 10);
+
+          memcpy (o, p, num - p);
+          o += num - p;
+          o += sprintf (o, "%ld", max (1L, size + delta));
+          p = e;
+        }
+
+      memcpy (o, p, end - p);
+      o += end - p;
+      p = end;
+
+      if (*p == ',')
+        *o++ = *p++;
+    }
+
+  *o = 0;
+  return out;
+}
+
+/*
+ * The font-size actions: make all fonts one step (one pixel or point)
+ * bigger or smaller, or as configured again (delta 0).
+ */
+void
+rxvt_term::change_font_size (int delta)
+{
+#if ENABLE_STYLES
+  const int fonts = 4; // normal, bold, italic, bold italic
+#else
+  const int fonts = 1;
+#endif
+
+  if (!font_size_set)
+    {
+      // remember the fonts as configured
+      for (int i = 0; i < fonts; i++)
+        font_orig[i] = rs[Rs_font + i] ? strdup (rs[Rs_font + i]) : 0;
+
+      font_size_set = true;
+    }
+
+  font_delta = delta ? font_delta + delta : 0;
+
+  for (int i = 0; i < fonts; i++)
+    if (font_orig[i])
+      {
+        char *f = scale_font_list (font_orig[i], font_delta);
+        allocated.push_back ((void *)f);
+        rs[Rs_font + i] = f;
+      }
+
+  set_fonts ();
+}
+
+/*
  * Actions for keysym bindings (URxvt.keysym.C-S-Up: prompt:previous)
  * that wrxvt does without perl.
  */
 bool
 rxvt_term::builtin_action (const char *name, const char *arg)
 {
+  if (!strcmp (name, "font-size"))
+    {
+      if (!strcmp (arg, "increase"))
+        change_font_size (1);
+      else if (!strcmp (arg, "decrease"))
+        change_font_size (-1);
+      else if (!strcmp (arg, "reset"))
+        change_font_size (0);
+      else
+        return false;
+
+      return true;
+    }
+
   if (!strcmp (name, "prompt"))
     {
       if (!strcmp (arg, "previous"))

@@ -1375,6 +1375,10 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   int color_scheme ();
   bool jump_to_prompt (int dir);
   bool builtin_action (const char *name, const char *arg);
+  void change_font_size (int delta);
+  char *font_orig[4];   // the fonts before font-size changes
+  int font_delta;
+  bool font_size_set;
   void set_cwd (const char *uri);
   void process_hyperlink (char *str);
   const char *link_at (int x, int y);

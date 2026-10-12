@@ -1304,6 +1304,21 @@ this:
    URxvt.keysym.C-M-c: builtin-string:
    URxvt.keysym.C-M-v: builtin-string:
 
+=item font-size:increase, font-size:decrease, font-size:reset
+
+Make all fonts one step bigger or smaller (a pixel for C<pixelsize=>, a
+point for C<size=>, and the pixel size of X core font names), or as
+configured again. The window keeps its size if the window manager
+decides it (tiling), otherwise it keeps its rows and columns. For
+example:
+
+   URxvt.keysym.C-plus:  font-size:increase
+   URxvt.keysym.C-minus: font-size:decrease
+   URxvt.keysym.C-0:     font-size:reset
+
+These are the action names of the popular C<font-size> perl extension,
+which is no longer needed.
+
 =item prompt:previous, prompt:next
 
 Scroll back to the previous shell prompt, so that it is the top line, or
