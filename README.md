@@ -91,8 +91,10 @@ Configuration:
   switch) open windows take the new colours, and programs using mode
   2031 hear that dark became light.
 - `color16` to `color255` resources.
-- Built-in key actions: `font-size:increase|decrease|reset` (the names
-  of the popular perl extension) and `prompt:previous|next`.
+- Built-in key actions, no perl needed: `font-size:increase|decrease|reset`
+  (the names of the popular perl extension), `prompt:previous|next|copy-output`,
+  `hints:open|copy|insert`, `scrollback:pager`, `share:start|stop|toggle|control`
+  and `record:start|stop|toggle`.
 
 Fixes:
 
@@ -102,6 +104,31 @@ Fixes:
   database.
 - DECSCUSR 0 restores the configured cursor style.
 - Title reports end with 7-bit ST.
+- A font of one pixel (or `font-size:decrease` pressed long enough) no
+  longer hangs the terminal at 100% CPU on the next character that needs
+  a fallback font.
+- DEL (0x7f) is ignored, as in other terminals, not shown.
+- No crash on exit with `-xrm`, nor when perl can't start; the display's
+  resource database is freed once.
+
+## Not in wrxvt (yet)
+
+Planned at some point, and why not now:
+
+- **Grapheme clusters (mode 2027)**: emoji sequences are drawn as one
+  emoji already; full clustering (Indic scripts, Hangul) needs Unicode's
+  segmentation rules in the cell model.
+- **Detachable sessions in the daemon, tmux control mode**: tmux does
+  both today; wrxvt's pictures and keyboard protocol work through tmux 3.4.
+- **Native tabs and splits**: i3 (or any tiling window manager) does it.
+- **A native scrollback search**: the perl `searchable-scrollback`
+  extension and `scrollback:pager` cover it.
+- **Other renderers** (OpenGL, KMS/framebuffer without X, Wayland), BiDi,
+  ligatures: each a project of its own; XRender stays, and is fast.
+- **Unicode placeholders for kitty pictures, text sizing (OSC 66), file
+  transfer**: few programs send them.
+- **Encryption for sharing**: share on 127.0.0.1 through `ssh -L` or a
+  TLS proxy.
 
 The [terminfo entry](doc/etc/rxvt-unicode.terminfo) describes the new
 features as extended capabilities (`tic -x`).
