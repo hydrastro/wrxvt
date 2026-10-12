@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 
+#include "../config.h"
 #include "rxvtdaemon.h"
 
 char *rxvt_connection::unix_sockname ()
@@ -50,7 +51,9 @@ char *rxvt_connection::unix_sockname ()
       snprintf (name, PATH_MAX, "%s/.urxvt", path);
       mkdir (name, 0777);
 
-      snprintf (name, PATH_MAX, "%s/.urxvt/urxvtd-%s",
+      // named after the binary (wrxvtd-HOST), so urxvtd and wrxvtd can
+      // both run without taking each other's socket
+      snprintf (name, PATH_MAX, "%s/.urxvt/" RXVTNAME "d-%s",
                 path,
                 u.nodename);
 

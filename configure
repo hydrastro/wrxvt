@@ -1456,7 +1456,7 @@ Optional Packages:
   --with-res-name=NAME    set the default resource name (default: urxvt)
   --with-res-class=CLASS  set the resource class (default: URxvt)
   --with-name=NAME        set the basename for the installed binaries
-                          (default: urxvt)
+                          (default: wrxvt)
   --with-term=VALUE       set the value of the TERM environment variable
                           (default: rxvt)
   --with-terminfo=VALUE   set the value of the TERMINFO environment variable
@@ -5360,7 +5360,7 @@ fi
 printf "%s\n" "#define RESCLASS \"$RESCLASS\"" >>confdefs.h
 
 
-RXVTNAME=urxvt
+RXVTNAME=wrxvt
 
 # Check whether --with-name was given.
 if test ${with_name+y}

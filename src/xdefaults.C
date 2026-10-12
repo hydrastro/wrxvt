@@ -288,7 +288,7 @@ optList[] = {
 #undef SWCH
 #undef BOOL
 
-static const char releasestring[] = "rxvt-unicode (" RXVTNAME ") v" VERSION " - released: " DATE "\n";
+static const char releasestring[] = "wrxvt (" RXVTNAME ") v" VERSION ", based on rxvt-unicode " UPSTREAM_VERSION " - released: " DATE "\n";
 static const char optionsstring[] = "options: "
 #if ENABLE_PERL
                                     "perl,"
@@ -399,7 +399,7 @@ rxvt_term::rxvt_usage (int type)
 {
   unsigned int i, col;
 
-  rxvt_log ("%s%s%s", releasestring, optionsstring, RESNAME);
+  rxvt_log ("%s%s%s", releasestring, optionsstring, RXVTNAME);
 
   switch (type)
     {

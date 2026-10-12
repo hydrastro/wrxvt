@@ -361,10 +361,10 @@ AC_ARG_WITH(res-class,
   [RESCLASS="$withval"])
 AC_DEFINE_UNQUOTED(RESCLASS,"$RESCLASS", [Resource class])
 
-RXVTNAME=urxvt
+RXVTNAME=wrxvt
 AC_ARG_WITH(name,
   [AS_HELP_STRING([--with-name=NAME],
-     [set the basename for the installed binaries (default: urxvt)])],
+     [set the basename for the installed binaries (default: wrxvt)])],
   [RXVTNAME="$withval"])
 AC_DEFINE_UNQUOTED(RXVTNAME,"$RXVTNAME", [Binary base name])
 
