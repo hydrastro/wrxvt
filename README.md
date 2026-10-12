@@ -29,8 +29,9 @@ Drawing:
   opens them with `url-launcher`.
 - **Synchronized output** (mode 2026): no tearing when a program redraws
   everything.
-- **Sixel graphics**: pictures (img2sixel, chafa, yazi, lsix, gnuplot's
-  sixel terminal) that scroll and go into the scrollback like text.
+- **Pictures**: sixel graphics, the kitty graphics protocol and iTerm2
+  inline images (img2sixel, chafa, `kitty +kitten icat`, timg, yazi,
+  ranger, imgcat...). They scroll and go into the scrollback like text.
 
 Talking to programs:
 

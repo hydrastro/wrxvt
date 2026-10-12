@@ -224,6 +224,8 @@ rxvt_term::~rxvt_term ()
 #if ENABLE_SIXEL
   for (int i = 0; i < SIXEL_SLOTS; i++)
     free_image (i);
+  kitty_forget (0);
+  free (kitty_pending.data);
 #endif
 
   for (int i = 0; i < 4; i++)

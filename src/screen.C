@@ -1273,8 +1273,10 @@ end_of_line:
  * in the column the picture starts in.
  */
 void
-rxvt_term::scr_add_image (int slot, int cols, int rows) noexcept
+rxvt_term::scr_add_image (int slot, int cols, int rows, int cursor) noexcept
 {
+  row_col_t start = screen.cur;
+
   want_refresh = 1;
   ZERO_SCROLLBACK ();
 
@@ -1302,14 +1304,71 @@ rxvt_term::scr_add_image (int slot, int cols, int rows) noexcept
 
       l.touch (col0 + width);
 
-      // the next line (after the last one too)
+      // the next line (after the last one too, unless the cursor stays on it)
+      if (r == rows - 1 && cursor != IMAGE_CURSOR_BELOW)
+        break;
+
       if (screen.cur.row == screen.bscroll)
         scr_scroll_text (screen.tscroll, screen.bscroll, 1);
       else if (screen.cur.row < nrow - 1)
         screen.cur.row++;
     }
 
-  screen.cur.col = col0;
+  if (cursor == IMAGE_CURSOR_BELOW)
+    screen.cur.col = col0;
+  else if (cursor == IMAGE_CURSOR_AFTER)
+    {
+      // after the picture, on its last line (kitty)
+      screen.cur.col = col0 + width;
+      if (screen.cur.col >= ncol)
+        {
+          screen.cur.col = ncol - 1;
+          screen.flags |= Screen_WrapNext;
+        }
+    }
+  else
+    {
+      // where it was, unless the picture scrolled the screen
+      int scrolled = start.row + rows - 1 - screen.cur.row;
+      screen.cur.row = max (start.row - scrolled, 0);
+      screen.cur.col = start.col;
+    }
+}
+
+/*
+ * Replace the cells of pictures match () picks with blanks, on both
+ * screens and in the scrollback.
+ */
+void
+rxvt_term::scr_erase_images (bool (*match)(rxvt_term *, term_image *, void *), void *data)
+{
+  auto erase = [&](line_t &l)
+  {
+    if (!l.valid () || !l.t)
+      return;
+
+    for (int col = 0; col < ncol; col++)
+      if (IS_IMAGE_TILE (l.t[col]))
+        {
+          term_image *img = images[IMAGE_TILE_SLOT (l.t[col])];
+
+          if (!img || match (this, img, data))
+            {
+              l.t[col] = ' ';
+              l.r[col] = SET_FONT (l.r[col], FONTSET (l.r[col])->find_space_font ());
+              l.touch ();
+            }
+        }
+  };
+
+  for (int row = top_row; row < nrow; row++)
+    erase (ROW (row));
+
+  if (swap_buf)
+    for (int row = 0; row < nrow; row++)
+      erase (swap_buf[row]);
+
+  scr_touch (true);
 }
 #endif
 

@@ -75,7 +75,7 @@ hls_percent (int h, int l, int s)
  * Returns false if there is no picture.
  */
 static bool
-sixel_decode (const char *p, sixel_image &img)
+sixel_decode (const char *p, term_image &img)
 {
   uint32_t palette[SIXEL_COLORS];
 
@@ -319,7 +319,7 @@ rxvt_term::image_slot ()
 void
 rxvt_term::free_image (int slot)
 {
-  if (sixel_image *img = images[slot])
+  if (term_image *img = images[slot])
     {
       if (img->pixmap)
         XFreePixmap (dpy, img->pixmap);
@@ -335,32 +335,53 @@ rxvt_term::free_image (int slot)
 void
 rxvt_term::process_sixel (const char *params, const char *data)
 {
-  sixel_image *img = new sixel_image;
-  img->pixmap = 0;
-  img->pixels = 0;
+  term_image img;
+  img.pixels = 0;
 
-  if (!sixel_decode (data, *img))
+  if (!sixel_decode (data, img))
+    return;
+
+  // unset pixels (P2 = 1, or never drawn) show the background
+  place_image (img.pixels, img.w, img.h, 0, 0, IMAGE_CURSOR_BELOW);
+}
+
+/*
+ * Show w x h ARGB pixels (taking them over) at the cursor, over cols x rows
+ * cells (0: as many as the pixels need), and move the cursor as asked.
+ */
+bool
+rxvt_term::place_image (uint32_t *pixels, int w, int h, int cols, int rows, int cursor, unsigned int kitty_id)
+{
+  if (!pixels || w <= 0 || h <= 0)
     {
-      delete img;
-      return;
+      free (pixels);
+      return false;
     }
 
-  // P2 1: unset pixels stay transparent (we draw them in the background)
+  term_image *img = new term_image;
+  img->kitty_id = kitty_id;
+  img->pixmap = 0;
+  img->pixels = pixels;
+  img->w = w;
+  img->h = h;
   img->cell_w = fwidth;
   img->cell_h = fheight;
 
   int slot = image_slot ();
   images[slot] = img;
 
-  int cols = (img->w + fwidth - 1) / fwidth;
-  int rows = (img->h + fheight - 1) / fheight;
+  if (!cols)
+    cols = (w + fwidth - 1) / fwidth;
+  if (!rows)
+    rows = (h + fheight - 1) / fheight;
 
-  scr_add_image (slot, min (cols, IMAGE_TILE_MAX), min (rows, IMAGE_TILE_MAX));
+  scr_add_image (slot, min (cols, IMAGE_TILE_MAX), min (rows, IMAGE_TILE_MAX), cursor);
+  return true;
 }
 
 // an XImage of the picture for this visual, in a pixmap the tiles are copied from
 Pixmap
-rxvt_term::image_pixmap (sixel_image *img)
+rxvt_term::image_pixmap (term_image *img)
 {
   if (img->pixmap)
     return img->pixmap;
@@ -394,10 +415,11 @@ rxvt_term::image_pixmap (sixel_image *img)
         uint32_t c = img->pixels[(size_t)y * img->w + x];
         unsigned int r, g, b;
 
-        if (c >> 24)
-          r = c >> 16 & 0xff, g = c >> 8 & 0xff, b = c & 0xff;
-        else
-          r = bg.r >> 8, g = bg.g >> 8, b = bg.b >> 8; // transparent
+        // blend over the background (unset sixel pixels: alpha 0)
+        unsigned int a = c >> 24;
+        r = ((c >> 16 & 0xff) * a + (bg.r >> 8) * (255 - a) + 127) / 255;
+        g = ((c >>  8 & 0xff) * a + (bg.g >> 8) * (255 - a) + 127) / 255;
+        b = ((c       & 0xff) * a + (bg.b >> 8) * (255 - a) + 127) / 255;
 
         unsigned long pixel = (unsigned long)(r >> (8 - min (rb, 8))) << rs
                             | (unsigned long)(g >> (8 - min (gb, 8))) << gs
@@ -429,7 +451,7 @@ rxvt_term::image_pixmap (sixel_image *img)
 void
 rxvt_term::draw_image_tile (Drawable d, GC gc, int x, int y, text_t code)
 {
-  sixel_image *img = images[IMAGE_TILE_SLOT (code)];
+  term_image *img = images[IMAGE_TILE_SLOT (code)];
   if (!img)
     return;
 

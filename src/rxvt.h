@@ -156,6 +156,7 @@ void rxvt_init ();
 
 // misc.C
 char *           rxvt_wcstombs                    (const wchar_t *str, int len = -1);
+int              rxvt_base64_decode               (char *str);
 wchar_t *        rxvt_mbstowcs                    (const char *str, int len = -1);
 char *           rxvt_wcstoutf8                   (const wchar_t *str, int len = -1);
 wchar_t *        rxvt_utf8towcs                   (const char *str, int len = -1);
@@ -497,6 +498,7 @@ enum {
   URxvt_cellinfo         = 776,     // returns font cell width, height etc.
 
   Shell_mark             = 133,     // FinalTerm/iTerm2 shell integration: prompt and command marks
+  ITerm_command          = 1337,    // iTerm2: File= (inline images)
   URxvt_perl             = 777,     // for use by perl extensions, starts with "extension-name;"
 };
 
@@ -776,8 +778,9 @@ typedef callback<int (int)> getfd_callback;
 #define IMAGE_TILE_ROW(c)       ((int)((c) >> 10 & 0x3ff))
 #define IMAGE_TILE_COL(c)       ((int)((c) & 0x3ff))
 
-struct sixel_image
+struct term_image
 {
+  unsigned int kitty_id;  // the image id the kitty protocol gave it, or 0
   int w, h;               // pixels
   int cell_w, cell_h;     // the cell size the tiles were cut for
   uint32_t *pixels;       // ARGB, until the pixmap is made
@@ -1347,7 +1350,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
 
   // the control string (OSC, DCS, APC...) being read, see read_string
   struct {
-    unicode_t kind;             // C1_OSC, C1_DCS, C1_APC (ignored), 0 if none
+    unicode_t kind;             // C1_OSC, C1_DCS, C1_APC, C1_PM (ignored), 0 if none
     int osc;                    // OSC: its number
     char params[32], inter[4];  // DCS: parameters and intermediates
     unicode_t final;            //      and the final character
@@ -1426,14 +1429,34 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool kitty_key (XKeyEvent &ev, KeySym keysym, bool release);
 
 #if ENABLE_SIXEL
-  sixel_image *images[SIXEL_SLOTS];
+  term_image *images[SIXEL_SLOTS];
   int image_next;
   int image_slot ();
   void free_image (int slot);
   void process_sixel (const char *params, const char *data);
-  Pixmap image_pixmap (sixel_image *img);
+  Pixmap image_pixmap (term_image *img);
   void draw_image_tile (Drawable d, GC gc, int x, int y, text_t code);
-  void scr_add_image (int slot, int cols, int rows) noexcept;
+  enum { IMAGE_CURSOR_BELOW, IMAGE_CURSOR_AFTER, IMAGE_CURSOR_STAY };
+  void scr_add_image (int slot, int cols, int rows, int cursor) noexcept;
+  bool place_image (uint32_t *pixels, int w, int h, int cols, int rows, int cursor, unsigned int kitty_id = 0);
+  void scr_erase_images (bool (*match)(rxvt_term *, term_image *, void *), void *data);
+
+  // other image protocols (graphics.C)
+  void process_iterm_file (char *str);
+  void process_apc_string (char *str);
+  void process_kitty_graphics (char *str);
+  struct kitty_upload {
+    unsigned int id;
+    char keys[256];              // the control data of the first chunk
+    char *data; size_t len, size;
+  } kitty_pending;
+  struct kitty_stored {
+    unsigned int id;
+    uint32_t *pixels;
+    int w, h;
+  } kitty_store[16];
+  void kitty_forget (unsigned int id);
+
 #endif
   const char *initial_colors[NRS_COLORS]; // the colours as configured
   void reset_color (int idx);

@@ -3004,6 +3004,8 @@ rxvt_term::process_nonprinting (unicode_t ch)
         break;
       case 0x98:		/* SOS */
       case 0x9e:		/* PM */
+        begin_string (C1_PM);
+        break;
       case 0x9f:		/* APC */
         begin_string (C1_APC);
         break;
@@ -3190,9 +3192,11 @@ rxvt_term::process_escape_seq ()
         /* 8.3.2: APPLICATION PROGRAM COMMAND, 8.3.94: PRIVACY MESSAGE,
          * 8.3.128: START OF STRING - read and ignored */
       case C1_APC:		/* ESC _ */
+        begin_string (C1_APC);
+        break;
       case C1_PM:		/* ESC ^ */
       case C1_SOS:		/* ESC X */
-        begin_string (C1_APC);
+        begin_string (C1_PM); // read and ignored
         break;
 
         /* 8.3.106: RESET TO INITIAL STATE (RIS) */
@@ -3890,7 +3894,11 @@ rxvt_term::end_string (unicode_t terminator)
   st.v[n] = '\0';
 
   char *s = 0;
-  if (!pstr.overflow && (kind == C1_OSC || kind == C1_DCS))
+  if (!pstr.overflow && (kind == C1_OSC || kind == C1_DCS
+#if ENABLE_SIXEL
+                         || (kind == C1_APC && pstr.len && pstr.buf[0] == 'G')
+#endif
+                         ))
     {
       pstr.buf[pstr.len] = 0;
       s = rxvt_wcstombs (pstr.buf, pstr.len);
@@ -3911,6 +3919,10 @@ rxvt_term::end_string (unicode_t terminator)
 
   if (kind == C1_OSC)
     process_xterm_seq (pstr.osc, s, st);
+#if ENABLE_SIXEL
+  else if (kind == C1_APC)
+    process_apc_string (s);
+#endif
   else
     process_dcs_string (s);
 
@@ -3958,7 +3970,7 @@ rxvt_term::process_dcs_seq ()
       if (ch == C0_ESC)
         cmd_getc ();
       else if (ch != C0_BEL && ch != CHAR_ST)
-        begin_string (C1_APC); // read and ignored
+        begin_string (C1_PM); // read and ignored
       return;
     }
 
@@ -4234,8 +4246,8 @@ base64_encode (const char *data, unsigned int len)
 }
 
 // decodes in place, returns the length, or -1 if it isn't base64
-static int
-base64_decode (char *str)
+int
+rxvt_base64_decode (char *str)
 {
   uint32_t v = 0;
   int bits = 0, len = 0;
@@ -4337,7 +4349,7 @@ rxvt_term::process_selection_seq (char *str, string_term &st)
       return;
     }
 
-  int len = base64_decode (data);
+  int len = rxvt_base64_decode (data);
   if (len < 0)
     return;
 
@@ -5057,6 +5069,12 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
       case XTerm_notify:
         notify (str);
         break;
+
+#if ENABLE_SIXEL
+      case ITerm_command:
+        process_iterm_file (str);
+        break;
+#endif
 
 #ifdef XTERM_COLOR_CHANGE
       case XTerm_resetColor:
