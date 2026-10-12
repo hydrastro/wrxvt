@@ -65,36 +65,77 @@
       );
 
       checks = forAllSystems (
-        system: pkgs: {
-          build = self.packages.${system}.wrxvt;
-          minimal = self.packages.${system}.wrxvt-minimal;
-          # the test suite (tests/), against the installed package, under Xvfb
-          tests =
-            pkgs.runCommand "wrxvt-tests"
-              {
-                nativeBuildInputs = [
-                  self.packages.${system}.wrxvt
-                  (pkgs.python3.withPackages (p: [ p.python-xlib ])) # xlib: a drag source
-                  pkgs.perl
-                  pkgs.xvfb
-                  pkgs.imagemagick
-                  pkgs.xdotool
-                  pkgs.xclip # OSC 52
-                  pkgs.xprop # OSC 7
-                  pkgs.xrdb # colours that follow the resources
-                  pkgs.ncurses # tic and infocmp, for the terminfo entry
-                ];
-                FONTCONFIG_FILE = testFonts pkgs;
-                WRXVT = pkgs.lib.getExe self.packages.${system}.wrxvt;
-              }
+        system: pkgs:
+        let
+          wrxvt = self.packages.${system}.wrxvt;
+
+          # the same, compiled with AddressSanitizer and UBSan
+          wrxvt-asan = wrxvt.overrideAttrs (old: {
+            pname = "wrxvt-asan";
+            configureFlags = map (
+              f:
+              if pkgs.lib.hasPrefix "CXXFLAGS=" f then
+                f + " -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined"
+              else
+                f
+            ) old.configureFlags;
+            env = old.env // {
+              LDFLAGS = old.env.LDFLAGS + " -fsanitize=address,undefined";
+            };
+            dontStrip = true;
+          });
+
+          # the test suite (tests/), against a package, under Xvfb
+          testsWith =
+            name: package: environment:
+            pkgs.runCommand name
+              (
+                {
+                  nativeBuildInputs = [
+                    package
+                    (pkgs.python3.withPackages (p: [ p.python-xlib ])) # xlib: a drag source
+                    pkgs.perl
+                    pkgs.xvfb
+                    pkgs.imagemagick
+                    pkgs.xdotool
+                    pkgs.xclip # OSC 52
+                    pkgs.xprop # OSC 7
+                    pkgs.xrdb # colours that follow the resources
+                    pkgs.ncurses # tic and infocmp, for the terminfo entry
+                  ];
+                  FONTCONFIG_FILE = testFonts pkgs;
+                  WRXVT = pkgs.lib.getExe package;
+                }
+                // environment
+              )
               ''
                 set -o pipefail
                 export HOME=$TMPDIR
                 cp -r ${./tests} tests && chmod -R u+w tests
                 mkdir doc && cp -r ${./doc/etc} doc/etc
                 cd tests
+                if [ -n "$ASAN_OPTIONS" ]; then
+                  export ASAN_OPTIONS="$ASAN_OPTIONS:log_path=$TMPDIR/sanitizer"
+                  export UBSAN_OPTIONS="$UBSAN_OPTIONS:log_path=$TMPDIR/sanitizer"
+                fi
                 python3 -m unittest discover -v 2>&1 | tee $out
+                # sanitizer reports fail the check even when the tests passed
+                if ls $TMPDIR/sanitizer.* >/dev/null 2>&1; then
+                  cat $TMPDIR/sanitizer.* >&2
+                  exit 1
+                fi
               '';
+        in
+        {
+          build = wrxvt;
+          minimal = self.packages.${system}.wrxvt-minimal;
+          tests = testsWith "wrxvt-tests" wrxvt { };
+          # every test again under the sanitizers: memory errors and
+          # undefined behaviour anywhere, the random-input test included
+          tests-asan = testsWith "wrxvt-tests-asan" wrxvt-asan {
+            ASAN_OPTIONS = "detect_leaks=0";
+            UBSAN_OPTIONS = "print_stacktrace=1";
+          };
         }
       );
 

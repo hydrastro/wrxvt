@@ -179,7 +179,12 @@ make check
 cd tests && WRXVT=../src/rxvt WRXVT_LIBDIR=../src python3 -m unittest test_sgr -v
 ```
 
-Every feature commit adds tests that fail without it.
+Every feature commit adds tests that fail without it. `test_robustness`
+feeds the terminal random bytes and escape sequences with absurd
+parameters (seeded, so failures repeat) and checks it still answers;
+`nix flake check` runs the whole suite a second time on a build with
+AddressSanitizer and UBSan (`checks.*.tests-asan`), where any report
+fails the check.
 
 ## Licence
 
