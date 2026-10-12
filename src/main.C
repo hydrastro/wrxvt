@@ -230,6 +230,7 @@ rxvt_term::~rxvt_term ()
   record_stop (true);
 #endif
   free (app_title);
+  free (command_text);
 
   free (pstr.buf);
 

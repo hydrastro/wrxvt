@@ -51,6 +51,7 @@
 #include "rxvtperl.h"
 #include "version.h"
 #include "command.h"
+#include "rxvtbuf.h"
 
 #ifdef KEYSYM_RESOURCE
 # include "keyboard.h"
@@ -4630,6 +4631,116 @@ rxvt_term::notify (const char *text)
 }
 
 /*
+ * OSC 133 ; X, the marks shells put around their prompts and commands:
+ *   A  a prompt starts here (prompt:previous, prompt:next jump to them)
+ *   B  the prompt ends: the command is typed from here
+ *   C  the command runs: its output starts here (prompt:copy-output)
+ *   D [; exit status]  it ended
+ */
+void
+rxvt_term::shell_mark (const char *str)
+{
+  char mark = str[0];
+
+  if (!mark || (str[1] && str[1] != ';') || current_screen != PRIMARY)
+    return;
+
+  line_t &line = ROW (screen.cur.row);
+
+  switch (mark)
+    {
+      case 'A':
+        if (command_start)
+          command_finished (-1); // no D from this shell
+        line.f |= LINE_PROMPT;
+        prompt_command_col = -1;
+        break;
+
+      case 'B':
+        prompt_command_col = screen.cur.col;
+        break;
+
+      case 'C':
+        {
+          line.f |= LINE_OUTPUT;
+          command_start = ev::now ();
+          free (command_text);
+          command_text = 0;
+
+#if ENABLE_RECORD
+          // the command: from B on the prompt's line to here
+          for (int row = screen.cur.row - 1; row >= max (top_row, screen.cur.row - 20); row--)
+            if (ROW (row).f & LINE_PROMPT)
+              {
+                rxvt_buf text;
+                rows_text (text, row, screen.cur.row, false, " ", true, prompt_command_col);
+                // (ugly, but this is the one place: trim and shorten)
+                char *t = text.data ? text.data : (char *)"";
+                while (*t == ' ')
+                  t++;
+                size_t n = strlen (t);
+                while (n && t[n - 1] == ' ')
+                  n--;
+                if (n > 200)
+                  n = 200;
+                wchar_t *w = rxvt_utf8towcs (t, n);
+                command_text = rxvt_wcstombs (w);
+                free (w);
+                break;
+              }
+#endif
+        }
+        break;
+
+      case 'D':
+        if (command_start)
+          command_finished (str[1] == ';' && isdigit (str[2]) ? atoi (str + 2) : -1);
+        break;
+    }
+}
+
+// a command ended: a notification if it took long and the window is not
+// in front (notifyLongCommand)
+void
+rxvt_term::command_finished (int status)
+{
+  ev_tstamp took = ev::now () - command_start;
+  command_start = 0;
+
+  int seconds = rs[Rs_notifyLongCommand] ? atoi (rs[Rs_notifyLongCommand]) : 0;
+
+  if (seconds > 0 && took >= seconds && !focus)
+    {
+      char title[64], text[512];
+      long t = (long)(took + .5);
+
+      if (status > 0)
+        snprintf (title, sizeof (title), "Command failed (exit status %d)", status);
+      else
+        snprintf (title, sizeof (title), "Command finished");
+
+      if (t >= 3600)
+        snprintf (text, sizeof (text), "%s\nafter %ld h %ld min", command_text ? command_text : "",
+                  t / 3600, t / 60 % 60);
+      else if (t >= 60)
+        snprintf (text, sizeof (text), "%s\nafter %ld min %ld s", command_text ? command_text : "",
+                  t / 60, t % 60);
+      else
+        snprintf (text, sizeof (text), "%s\nafter %ld s", command_text ? command_text : "", t);
+
+      notify_as (title, *text == '\n' ? text + 1 : text);
+
+#if ENABLE_FRILLS
+      if (option (Opt_urgentOnBell))
+        set_urgency (1);
+#endif
+    }
+
+  free (command_text);
+  command_text = 0;
+}
+
+/*
  * Scroll so that the previous (dir < 0) or next (dir > 0) prompt marked
  * with OSC 133 ; A is the top line; the next one after the last prompt
  * is the bottom of the screen.
@@ -4826,6 +4937,10 @@ rxvt_term::builtin_action (const char *name, const char *arg)
         jump_to_prompt (-1);
       else if (!strcmp (arg, "next"))
         jump_to_prompt (1);
+#if ENABLE_RECORD
+      else if (!strcmp (arg, "copy-output"))
+        copy_output ();
+#endif
       else
         return false;
 
@@ -5204,10 +5319,7 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
 #endif
 
       case Shell_mark:
-        // A: a prompt starts here. B (command typed), C (its output
-        // starts) and D (it ended) need nothing yet.
-        if (str[0] == 'A' && (!str[1] || str[1] == ';') && current_screen == PRIMARY)
-          ROW (screen.cur.row).f |= LINE_PROMPT;
+        shell_mark (str);
         break;
 
 #if 0

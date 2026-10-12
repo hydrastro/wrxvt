@@ -1,5 +1,9 @@
 """Shell integration: OSC 7 (current directory), OSC 133 (prompt marks)."""
+import os
 import shutil
+import tempfile
+import textwrap
+import time
 import unittest
 
 from harness import TerminalTest
@@ -73,6 +77,75 @@ class Prompts(TerminalTest):
             result['top'] = dump()['view_top'].rstrip()
         ''', args=['-sl', '1000', '-keysym.F7', 'prompt:previous'])
         self.assertEqual(run.result['top'], '$ command 1')
+
+
+@unittest.skipUnless(shutil.which('xdotool') and shutil.which('xclip'), 'xdotool or xclip not installed')
+class CopyOutput(TerminalTest):
+    geometry = '40x10'
+
+    KEY = r"""
+import os, subprocess
+def copy_output():
+    settle()
+    window = os.environ['WINDOWID']
+    subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
+                    'windowfocus', window, 'key', 'F6'], check=True, capture_output=True)
+    settle()
+    return subprocess.run(['xclip', '-o', '-selection', 'clipboard'],
+                          capture_output=True, text=True).stdout
+"""
+
+    def copied(self, code):
+        run = self.run_in_terminal(self.KEY + textwrap.dedent(code),
+                                   args=['-sl', '100', '-keysym.F6', 'prompt:copy-output'])
+        return run.result
+
+    def test_between_the_marks(self):
+        r = self.copied(r"""
+write('\x1b]133;A\x07$ \x1b]133;B\x07ls\r\n\x1b]133;C\x07')
+write('one\r\ntwo  \r\n' + 'w' * 50 + '\r\n\x1b]133;D;0\x07')
+write('\x1b]133;A\x07$ \x1b]133;B\x07')
+result['copied'] = copy_output()
+""")
+        self.assertEqual(r['copied'], 'one\ntwo\n' + 'w' * 50)
+
+    def test_while_running(self):
+        r = self.copied(r"""
+write('\x1b]133;A\x07$ make\r\n\x1b]133;C\x07compiling a\r\ncompiling b\r\n')
+result['copied'] = copy_output()
+""")
+        self.assertEqual(r['copied'], 'compiling a\ncompiling b')
+
+    def test_prompts_only(self):
+        r = self.copied(r"""
+write('\x1b]133;A\x07$ old\r\nold output\r\n')
+write('\x1b]133;A\x07$ ls\r\nfile1\r\nfile2\r\n\x1b]133;A\x07$ ')
+result['copied'] = copy_output()
+""")
+        self.assertEqual(r['copied'], 'file1\nfile2')
+
+
+class LongCommands(TerminalTest):
+    def test_notification(self):
+        out = tempfile.mktemp(prefix='wrxvt-long-')
+        self.addCleanup(lambda: os.path.exists(out) and os.unlink(out))
+        self.run_in_terminal(r"""
+import time
+write('\x1b]133;A\x07[me@host ~]$ \x1b]133;B\x07sleep 2 && false\r\n\x1b]133;C\x07')
+time.sleep(1.2)
+write('\x1b]133;D;1\x07\x1b]133;A\x07$ ')
+# a quick one: no notification
+write('\x1b]133;B\x07true\r\n\x1b]133;C\x07\x1b]133;D;0\x07')
+settle()
+time.sleep(0.5)
+""", args=['-xrm', 'URxvt.notifyLongCommand: 1',
+           '-xrm', f'URxvt.notifyCommand: printf "%s|%s;" >>{out}'])
+        for _ in range(40):
+            if os.path.exists(out):
+                break
+            time.sleep(0.05)
+        with open(out) as f:
+            self.assertEqual(f.read(), 'Command failed (exit status 1)|sleep 2 && false\nafter 1 s;')
 
 
 if __name__ == '__main__':

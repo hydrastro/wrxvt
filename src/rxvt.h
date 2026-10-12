@@ -808,6 +808,7 @@ struct term_image
 #define LINE_FILTER     0x0008 // line needs to be filtered before display (NYI)
 #define LINE_BIDI       0x0010 // line needs bidi (NYI)
 #define LINE_PROMPT     0x0020 // a shell prompt begins on this line (OSC 133 ; A)
+#define LINE_OUTPUT     0x0040 // a command's output begins on this line (OSC 133 ; C)
 
 struct line_t
 {
@@ -1495,7 +1496,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   // the screen as text (record.C)
   void sgr_color (rxvt_buf &b, int idx, int base);
   void sgr_rend (rxvt_buf &b, rend_t r);
-  void rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const char *eol, bool join);
+  void rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const char *eol, bool join,
+                  int first_col = 0);
 
 #if ENABLE_RECORD
   term_recording *recording;
@@ -1504,7 +1506,16 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void record_output (const char *data, size_t len);
   void record_resize ();
   void scrollback_pager ();
+  void copy_output ();
 #endif
+
+  // the shell's marks (OSC 133): the command running, for long-command
+  // notifications
+  int prompt_command_col;   // where the command starts on the prompt line (B), or -1
+  ev_tstamp command_start;  // when its output started (C), or 0
+  char *command_text;
+  void shell_mark (const char *str);
+  void command_finished (int status);
   char *get_title (bool icon);
   char *app_title;      // the title as programs set it, without marks like [shared]
   void update_title ();

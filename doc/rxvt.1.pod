@@ -989,6 +989,14 @@ which.
 Where B<record:start> puts recordings, as
 F<wrxvt-YYYYMMDD-HHMMSS.cast>; the default is your home directory.
 
+=item B<notifyLongCommand:> I<seconds>
+
+A notification (B<notifyCommand>) when a command that ran at least this
+long ends while the window is not in front, with the command and its exit
+status, for builds and tests you went away from. The shell has to mark its
+commands (C<ESC ] 133 ; C ST> before, C<ESC ] 133 ; D ; >I<status>C< ST>
+after, see B<prompt:previous>). The default, C<0>, never notifies.
+
 =item B<scrollbackCommand:> I<command>
 
 What B<scrollback:pager> runs, with F</bin/sh> and the file as one more
@@ -1363,12 +1371,22 @@ has to mark its prompts with C<ESC ] 133 ; A ST> (see @@RXVT_NAME@@(7));
 for bash, for example:
 
    PS0+='\e]133;C\e\\'
-   PS1='\[\e]133;A\e\\\]'"$PS1"
+   PS1='\[\e]133;A\e\\\]'"$PS1"'\[\e]133;B\e\\\]'
 
 and the bindings:
 
    URxvt.keysym.C-S-Up: prompt:previous
    URxvt.keysym.C-S-Down: prompt:next
+
+=item prompt:copy-output
+
+Copy the output of the last command to the clipboard and the primary
+selection: from where it started (C<ESC ] 133 ; C ST>, which the C<PS0>
+above sends) to the prompt after it; while a command still runs, its
+output so far. With a shell that marks only its prompts, what is between
+the last two.
+
+   URxvt.keysym.C-S-o: prompt:copy-output
 
 =item share:start, share:stop, share:toggle, share:control
 

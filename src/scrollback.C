@@ -82,4 +82,63 @@ rxvt_term::scrollback_pager ()
   free (path);
 }
 
+/*
+ * prompt:copy-output: the output of the last command, between the shell's
+ * marks (OSC 133 C, where it starts, and A, the next prompt), to the
+ * clipboard and the primary selection. While a command runs, its output
+ * so far. Shells that only mark prompts: what is between the last two.
+ */
+void
+rxvt_term::copy_output ()
+{
+  if (current_screen != PRIMARY)
+    return;
+
+  int cur = screen.cur.row;
+  int prompt = INT_MIN, output = INT_MIN, previous = INT_MIN;
+
+  for (int row = cur; row >= top_row; row--)
+    {
+      int f = ROW (row).f;
+
+      if (output == INT_MIN && (f & LINE_OUTPUT))
+        output = row;
+
+      if (f & LINE_PROMPT)
+        {
+          if (prompt == INT_MIN)
+            prompt = row;
+          else if (previous == INT_MIN)
+            previous = row;
+        }
+
+      if (output != INT_MIN && previous != INT_MIN)
+        break;
+    }
+
+  int begin, end; // rows
+
+  if (output != INT_MIN && output > prompt)
+    begin = output, end = cur + 1;          // still running
+  else if (output != INT_MIN && prompt != INT_MIN && (previous == INT_MIN || output > previous))
+    begin = output, end = prompt;           // between its C and the prompt after it
+  else if (prompt != INT_MIN && previous != INT_MIN)
+    begin = previous + 1, end = prompt;     // only prompts are marked
+  else
+    return;
+
+  rxvt_buf text;
+  rows_text (text, begin, end, false, "\n", true);
+
+  // without the empty lines at the end
+  while (text.len && (text.data[text.len - 1] == '\n' || text.data[text.len - 1] == ' '))
+    text.len--;
+  if (text.data)
+    text.data[text.len] = 0;
+
+  wchar_t *w = rxvt_utf8towcs (text.data ? text.data : "", text.len);
+  set_selection (w, true, true);
+  free (w);
+}
+
 #endif

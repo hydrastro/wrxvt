@@ -73,7 +73,9 @@ Shell integration:
 
 - **OSC 7**: the shell's directory is put on the window as `_WRXVT_CWD`,
   so new terminals can open there.
-- **OSC 133** prompt marks, with key actions that jump between prompts.
+- **OSC 133** prompt marks, with key actions that jump between prompts
+  and copy the last command's output, and a notification when a long
+  command ends while you're elsewhere (`notifyLongCommand`).
 
 Configuration:
 
@@ -114,15 +116,17 @@ URxvt.keysym.C-S-F10:  record:toggle
 URxvt.color208:        #ff8700
 ```
 
-Shell integration for bash (prompt marks and the current directory):
+Shell integration for bash (prompt and command marks, the current
+directory):
 
 ```bash
-# ~/.bashrc
+# ~/.bashrc (at the end, so that this runs first and sees the exit status)
 __wrxvt_prompt() {
-  printf '\e]7;file://%s%s\e\\' "$HOSTNAME" "$PWD"
+  printf '\e]133;D;%s\e\\\e]7;file://%s%s\e\\' "$?" "$HOSTNAME" "$PWD"
 }
 PROMPT_COMMAND="__wrxvt_prompt${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
-PS1='\[\e]133;A\e\\\]'"$PS1"
+PS0+='\e]133;C\e\\'
+PS1='\[\e]133;A\e\\\]'"$PS1"'\[\e]133;B\e\\\]'
 ```
 
 Open a new terminal in the current one's directory from i3:

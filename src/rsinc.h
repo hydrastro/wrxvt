@@ -12,6 +12,7 @@
   def (record)
   def (recordDirectory)
   def (scrollbackCommand)
+  def (notifyLongCommand)
   def (color)
   reserve (color, TOTAL_COLORS)
   def (font)

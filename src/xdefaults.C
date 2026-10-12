@@ -104,6 +104,7 @@ optList[] = {
               STRG (Rs_record, NULL, "record", "file", "record the terminal to an asciinema file"),
               RSTRG (Rs_recordDirectory, "recordDirectory", "directory"),
               RSTRG (Rs_scrollbackCommand, "scrollbackCommand", "command"),
+              RSTRG (Rs_notifyLongCommand, "notifyLongCommand", "seconds"),
               SWCH ("dockapp", Opt_dockapp, 0, "start as dockapp"),
               BOOL (Rs_reverseVideo, "reverseVideo", "rv", Opt_reverseVideo, 0, "reverse video"),
               BOOL (Rs_loginShell, "loginShell", "ls", Opt_loginShell, 0, "login shell"),

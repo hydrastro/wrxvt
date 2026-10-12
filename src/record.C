@@ -113,10 +113,12 @@ rxvt_term::sgr_rend (rxvt_buf &b, rend_t r)
  * Rows row_begin to row_end - 1 (screen rows: 0 is the top of the screen,
  * negative ones are in the scrollback) as UTF-8 text, with SGR codes when
  * sgr is set. eol ends each line; lines that continue on the next row
- * (wrapped) are joined when join is set.
+ * (wrapped) are joined when join is set. The first row starts at
+ * first_col.
  */
 void
-rxvt_term::rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const char *eol, bool join)
+rxvt_term::rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const char *eol, bool join,
+                      int first_col)
 {
   rend_t current = DEFAULT_RSTYLE;
   bool styled = false;
@@ -134,7 +136,7 @@ rxvt_term::rows_text (rxvt_buf &b, int row_begin, int row_end, bool sgr, const c
                  && (!sgr || GET_BASEBG (l.r[end - 1]) == Color_bg) && !(l.r[end - 1] & RS_RVid))
             end--;
 
-          for (int col = 0; col < end; col++)
+          for (int col = row == row_begin ? max (first_col, 0) : 0; col < end; col++)
             {
               text_t t = l.t[col];
               rend_t r = l.r[col] & ~(RS_Careful | RS_Sel | RS_customMask | RS_linkMask | RS_fontMask);
