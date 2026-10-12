@@ -4631,6 +4631,113 @@ rxvt_term::notify (const char *text)
 }
 
 /*
+ * ESC ] 99 ; metadata ; payload ST: kitty's desktop notifications. The
+ * metadata is key=value pairs separated by colons:
+ *   i  an id: parts with the same id make one notification
+ *   d  0: more parts follow; 1 (the default): show it
+ *   p  what the payload is: title (the default) or body; "?" asks what
+ *      the terminal supports
+ *   e  1: the payload is base64
+ *   o  when to show it: always (the default), unfocused, invisible
+ * Other keys (actions, icons, sounds, urgency...) are ignored.
+ */
+void
+rxvt_term::process_kitty_notify (char *str)
+{
+  char *payload = strchr (str, ';');
+
+  if (payload)
+    *payload++ = 0;
+  else
+    payload = (char *)"";
+
+  char id[64] = "", type[16] = "title", occasion[16] = "always";
+  bool done = true, base64 = false;
+
+  for (char *kv = strtok (str, ":"); kv; kv = strtok (0, ":"))
+    {
+      char *v = strchr (kv, '=');
+      if (!v)
+        continue;
+      *v++ = 0;
+
+      if (!strcmp (kv, "i"))
+        snprintf (id, sizeof (id), "%s", v);
+      else if (!strcmp (kv, "d"))
+        done = strcmp (v, "0");
+      else if (!strcmp (kv, "p"))
+        snprintf (type, sizeof (type), "%s", v);
+      else if (!strcmp (kv, "e"))
+        base64 = !strcmp (v, "1");
+      else if (!strcmp (kv, "o"))
+        snprintf (occasion, sizeof (occasion), "%s", v);
+    }
+
+  if (!strcmp (type, "?"))
+    {
+      tt_printf ("\033]99;i=%s:p=?;a=:c=0:o=always,unfocused,invisible:p=title,body:u=0,1,2\033\\", id);
+      return;
+    }
+
+  if (strcmp (type, "title") && strcmp (type, "body"))
+    return; // close, icon, buttons, alive...
+
+  // parts of another notification: that one is dropped
+  if (kitty_note.id && strcmp (kitty_note.id, id))
+    {
+      free (kitty_note.id);
+      free (kitty_note.title);
+      free (kitty_note.body);
+      kitty_note.id = kitty_note.title = kitty_note.body = 0;
+    }
+
+  if (!kitty_note.id)
+    kitty_note.id = strdup (id);
+
+  if (base64)
+    {
+      int len = rxvt_base64_decode (payload);
+      if (len < 0)
+        return;
+      payload[len] = 0;
+    }
+
+  char *&part = strcmp (type, "body") ? kitty_note.title : kitty_note.body;
+  size_t old = part ? strlen (part) : 0;
+  if (old + strlen (payload) < 65536)
+    {
+      part = (char *)rxvt_realloc (part, old + strlen (payload) + 1);
+      strcpy (part + old, payload);
+    }
+
+  if (!done)
+    return;
+
+  // (the payload is UTF-8; notify_as takes the locale's encoding)
+  bool show = !strcmp (occasion, "always") || !focus;
+
+  if (show && ((kitty_note.title && *kitty_note.title) || (kitty_note.body && *kitty_note.body)))
+    {
+      wchar_t *wt = rxvt_utf8towcs (kitty_note.title ? kitty_note.title : "");
+      wchar_t *wb = rxvt_utf8towcs (kitty_note.body ? kitty_note.body : "");
+      char *t = rxvt_wcstombs (wt);
+      char *b = rxvt_wcstombs (wb);
+
+      notify_as (*t ? t : RESNAME, b);
+
+      free (t);
+      free (b);
+      free (wt);
+      free (wb);
+    }
+
+  free (kitty_note.id);
+  free (kitty_note.title);
+  free (kitty_note.body);
+  kitty_note.id = kitty_note.title = kitty_note.body = 0;
+}
+
+/*
  * OSC 133 ; X, the marks shells put around their prompts and commands:
  *   A  a prompt starts here (prompt:previous, prompt:next jump to them)
  *   B  the prompt ends: the command is typed from here
@@ -5268,6 +5375,10 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
         notify (str);
         break;
 
+      case Kitty_notify:
+        process_kitty_notify (str);
+        break;
+
 #if ENABLE_SIXEL
       case ITerm_command:
         process_iterm_file (str);
@@ -5398,11 +5509,24 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
         break;
 #endif
 
-#if ENABLE_PERL
       case URxvt_perl:
-        HOOK_INVOKE ((this, HOOK_OSC_SEQ_PERL, DT_STR, str, DT_STR, st.v, DT_END));
-        break;
+#if ENABLE_PERL
+        if (HOOK_INVOKE ((this, HOOK_OSC_SEQ_PERL, DT_STR, str, DT_STR, st.v, DT_END)))
+          break;
 #endif
+        // ESC ] 777 ; notify ; title ; body: notifications as foot, Ghostty
+        // and the urxvt notify extensions take them
+        if (!strncmp (str, "notify;", 7))
+          {
+            char *title = str + 7;
+            char *body = strchr (title, ';');
+
+            if (body)
+              *body++ = 0;
+
+            notify_as (*title ? title : RESNAME, body ? body : "");
+          }
+        break;
     }
 }
 /*----------------------------------------------------------------------*/

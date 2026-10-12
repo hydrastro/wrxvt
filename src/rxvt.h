@@ -449,6 +449,7 @@ enum {
   XTerm_cwd              =  7,      // the shell's current directory, as file://host/path
   XTerm_hyperlink        =  8,      // ESC ] 8 ; params ; URI ST: following text links to URI
   XTerm_notify           =  9,      // a desktop notification (iTerm2)
+  Kitty_notify           = 99,      // a desktop notification (kitty), with a title
   XTerm_Color            =  4,      // change colors
   XTerm_Color00          = 10,      // change fg color
   XTerm_Color01          = 11,      // change bg color
@@ -1492,6 +1493,9 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void spawn (const char *command, const char *arg1, const char *arg2 = 0);
   void notify (const char *text);
   void notify_as (const char *title, const char *text);
+  void process_kitty_notify (char *str);
+  // a kitty notification sent in parts (d=0)
+  struct { char *id, *title, *body; } kitty_note;
 
   // the screen as text (record.C)
   void sgr_color (rxvt_buf &b, int idx, int base);

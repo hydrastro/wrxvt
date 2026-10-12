@@ -231,6 +231,9 @@ rxvt_term::~rxvt_term ()
 #endif
   free (app_title);
   free (command_text);
+  free (kitty_note.id);
+  free (kitty_note.title);
+  free (kitty_note.body);
 
   free (pstr.buf);
 

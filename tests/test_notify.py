@@ -37,6 +37,28 @@ class Notify(TerminalTest):
     def test_progress_reports_are_not_notifications(self):
         self.assertIsNone(self.notification('\x1b]9;4;1;50\x07'))
 
+    def test_osc_777(self):
+        self.assertEqual(self.notification('\x1b]777;notify;Build;done; no errors\x07'),
+                         'Build|done; no errors')
+
+    def test_kitty_title_and_body(self):
+        self.assertEqual(self.notification('\x1b]99;i=1:d=0;Hello\x1b\\'
+                                           '\x1b]99;i=1:d=0:p=body;from \x1b\\'
+                                           '\x1b]99;i=1:p=body:e=1;a2l0dHk=\x1b\\'),
+                         'Hello|from kitty')
+
+    def test_kitty_simple_and_unfocused(self):
+        # (the test window doesn't have the focus)
+        self.assertEqual(self.notification('\x1b]99;o=unfocused;Just a title\x07'),
+                         'Just a title|')
+
+    def test_kitty_query(self):
+        run = self.run_in_terminal(r'''
+            result['reply'] = query('\x1b]99;i=q:p=?;\x1b\\', r'\x1b\\')
+        ''')
+        self.assertTrue(run.result['reply'].startswith('\x1b]99;i=q:p=?;'))
+        self.assertIn('p=title,body', run.result['reply'])
+
 
 if __name__ == '__main__':
     unittest.main()

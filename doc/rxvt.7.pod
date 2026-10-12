@@ -2252,6 +2252,7 @@ this requires insecure mode to be enabled for most of these.
 	B<< C<Ps = 55> >>	Log all scrollback buffer and all of screen to B<< C<Pt> >> [disabled]
 	B<< C<Ps = 104> >>	Reset the palette colours listed in B<< C<Pt> >> (C<;>-separated numbers) to their configured values, or all of them if there is no B<< C<Pt> >>.
 	B<< C<Ps = 110> >> .. B<< C<Ps = 119> >>	Reset the colour B<< C<Ps - 100> >> sets (C<110> the foreground, C<111> the background, C<112> the cursor...) to its configured value.
+	B<< C<Ps = 99> >>	kitty's desktop notifications: B<< C<Pt> >> is I<metadata>C<;>I<payload>, the metadata colon-separated I<key>C<=>I<value>s: C<i> (an id joining parts), C<d=0> (more parts follow), C<p=title> or C<p=body> (what the payload is; C<p=?> asks what is supported), C<e=1> (base64 payload), C<o=unfocused> (only when the window isn't focused). Shown with B<notifyCommand>, the title and the body as its two arguments.
 	B<< C<Ps = 133> >>	Shell integration marks: B<< C<Pt> >> C<A> marks the line where a prompt starts, for the C<prompt:previous> and C<prompt:next> key actions; C<B> where the command starts on the prompt's line; C<C> the line where its output starts (C<prompt:copy-output>); C<D>[C<;>I<exit status>] that it ended (B<notifyLongCommand>).
 	B<< C<Ps = 1337> >>	iTerm2's inline images: B<< C<Pt> >> is C<File=>I<key>C<=>I<value>C<;>...C<:>I<base64 file>. With C<inline=1> the picture (PNG, JPEG, GIF... with gdk-pixbuf) is shown at the cursor like a sixel picture; C<width> and C<height> are cells, C<N>C<px> or C<N>C<%>, and C<preserveAspectRatio=0> stretches it. Other OSC 1337 commands are ignored.
 	B<< C<Ps = 701> >>	Change current locale to B<< C<Pt> >>, or, if B<< C<Pt> >> is B<< C<?> >>, return the current locale (insecure mode, Compile frills).
@@ -2268,7 +2269,7 @@ this requires insecure mode to be enabled for most of these.
 	B<< C<Ps = 720> >>	Move viewing window up by B<< C<Pt> >> lines, or clear scrollback buffer if C<Pt = 0> (Compile frills).
 	B<< C<Ps = 721> >>	Move viewing window down by B<< C<Pt> >> lines, or clear scrollback buffer if C<Pt = 0> (Compile frills).
 	B<< C<Ps = 776> >>	(urxvt 9.29) Returns info about the character cell size, replies with C<ESC ] 776 ; cell-width ; cell-height ; font-ascent ST>
-	B<< C<Ps = 777> >>	Call the perl extension with the given string, which should be of the form C<extension;parameters> (Compile perl).
+	B<< C<Ps = 777> >>	Call the perl extension with the given string, which should be of the form C<extension;parameters> (Compile perl). When no extension takes it, C<notify;>I<title>C<;>I<body> is a desktop notification (the format of foot, Ghostty and the urxvt notify extensions), with B<notifyCommand>.
 
 =end table
 

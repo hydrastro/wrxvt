@@ -47,8 +47,9 @@ Talking to programs:
 - **Title stack** (`CSI 22/23 t`): the title comes back after vim exits.
 - **OSC 104 and 110-119** reset colours. `CSI 0 SP q` restores *your*
   cursor style.
-- **Desktop notifications** (OSC 9) through `notifyCommand`
-  (`notify-send` by default).
+- **Desktop notifications** (OSC 9, kitty's OSC 99 with titles and
+  bodies, and OSC 777 notify) through `notifyCommand` (`notify-send` by
+  default).
 - Control strings of any length (big OSC 52 copies). APC, PM and SOS
   strings are ignored instead of printed.
 
