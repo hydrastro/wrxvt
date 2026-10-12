@@ -2169,8 +2169,20 @@ any image file gdk-pixbuf reads); data sent directly (C<t=d>), in chunks
 cursor), image ids (C<i>) and C<q>. Compression, files, shared memory,
 animation, relative placements and z-order are answered with an error.
 Pictures are shown like sixel pictures, and the cursor moves after them.
-The last 16 transmitted images are kept for C<a=p>. Other APC strings,
-privacy messages (C<ESC ^>) and SOS strings (C<ESC X>) are ignored.
+The last 16 transmitted images are kept for C<a=p>.
+
+Unicode placeholders are supported too: C<U=1> (with C<a=p> or C<a=T>)
+makes a virtual placement of C<c> by C<r> cells (16 at most; C<p> names
+it), which shows nothing by itself. The picture then appears where the
+program prints the placeholder character U+10EEEE as text, coloured with
+the image id (the 256-colour index, or the 24-bit colour as a number):
+its diacritics are the row and column in the picture and the id's top
+byte, missing ones continuing the cell to the left. As text, the
+pictures go wherever the program (tmux, vim) moves it. C<a=d> with
+C<d=i> or C<d=I> deletes virtual placements.
+
+Other APC strings, privacy messages (C<ESC ^>) and SOS strings
+(C<ESC X>) are ignored.
 
 =head2 Device Control Strings
 

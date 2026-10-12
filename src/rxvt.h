@@ -799,6 +799,9 @@ struct rxvt_buf;
 #define IMAGE_TILE_SLOT(c)      ((int)((c) >> 20 & 0xff))
 #define IMAGE_TILE_ROW(c)       ((int)((c) >> 10 & 0x3ff))
 #define IMAGE_TILE_COL(c)       ((int)((c) & 0x3ff))
+// the kitty graphics protocol's Unicode placeholder: a cell of a picture,
+// as text (graphics.C)
+#define KITTY_PLACEHOLDER       0x10EEEEUL
 
 struct term_image
 {
@@ -973,6 +976,16 @@ emoji_join (text_t previous, unicode_t next)
 }
 #endif
 
+// the first character of a composed one
+static inline text_t
+compose_base (text_t c)
+{
+  while (compose_char *cc = rxvt_composite [c])
+    c = cc->c1;
+
+  return c;
+}
+
 /*
  * Grapheme clusters (mode 2027, grapheme.h): with the mode set, a
  * cluster (a letter and its marks, an Indic conjunct, a Hangul syllable
@@ -1010,6 +1023,19 @@ grapheme_expand (text_t c, uint32_t *out)
 }
 #endif
 
+#endif
+
+#if ENABLE_SIXEL
+// a cell of a kitty Unicode placeholder: U+10EEEE, maybe with diacritics
+static inline bool
+is_kitty_placeholder (text_t t)
+{
+# if ENABLE_COMBINING
+  if (IS_COMPOSE (t))
+    t = compose_base (t);
+# endif
+  return t == KITTY_PLACEHOLDER;
+}
 #endif
 
 #if 0
@@ -1528,6 +1554,15 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
     int w, h;
   } kitty_store[16];
   void kitty_forget (unsigned int id);
+  // virtual placements (U=1), shown where U+10EEEE placeholders are
+  struct kitty_virtual {
+    unsigned int id, placement;
+    int cols, rows;
+    term_image *fitted;          // the image fitted in cols x rows cells, or 0
+  } kitty_virtuals[16];
+  void kitty_virtual_free (unsigned int id); // 0: all
+  term_image *kitty_virtual_image (unsigned int id);
+  void draw_kitty_placeholder (Drawable d, GC gc, int x, int y, int width);
 
 #endif
   const char *initial_colors[NRS_COLORS]; // the colours as configured

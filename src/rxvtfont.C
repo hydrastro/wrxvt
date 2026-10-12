@@ -332,6 +332,12 @@ struct rxvt_font_default : rxvt_font
       return true;
 #endif
 
+#if ENABLE_SIXEL
+    // the kitty protocol's placeholders, with their diacritics: a picture
+    if (is_kitty_placeholder (unicode))
+      return true;
+#endif
+
     // we do not check for IS_COMPOSE here, as this would
     // rob other fonts from taking over.
 
@@ -379,6 +385,8 @@ rxvt_font_default::draw (rxvt_drawable &d, int x, int y,
 #if ENABLE_SIXEL
       if (IS_IMAGE_TILE (t))
         term->draw_image_tile (d, gc, x, y, t);
+      else if (is_kitty_placeholder (t))
+        term->draw_kitty_placeholder (d, gc, x, y, 1);
       else
 #endif
 #ifdef BUILTIN_GLYPHS

@@ -1358,12 +1358,17 @@ end_of_line:
               unicode_t n = rxvt_compose (*tp, c);
               if (n == NOCHAR)
                 {
+                  // (readline repeats combining characters by mistake:
+                  // dropped; emoji sequences and the kitty placeholders'
+                  // row and column marks repeat them on purpose)
+                  bool dedupe = true;
 #if ENABLE_EMOJI_SEQUENCES
-                  // emoji sequences repeat characters on purpose
-                  n = rxvt_composite.compose (*tp, c, !emoji_join (*tp, c));
-#else
-                  n = rxvt_composite.compose (*tp, c);
+                  dedupe = !emoji_join (*tp, c);
 #endif
+#if ENABLE_SIXEL
+                  dedupe = dedupe && !is_kitty_placeholder (*tp);
+#endif
+                  n = rxvt_composite.compose (*tp, c, dedupe);
                 }
 
               *tp = n;

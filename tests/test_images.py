@@ -91,6 +91,68 @@ result['noid'] = query('\\x1b_Ga=T,f=100;{data}\\x1b\\\\', r'\\x1b\\\\$', timeou
         self.assertEqual(run.result['noid'], '')
 
 
+class Placeholders(TerminalTest):
+    """Unicode placeholders: U+10EEEE cells, coloured with the image id."""
+    geometry = '40x10'
+
+    @staticmethod
+    def quadrants(w, h, colours):
+        """raw RGB, w x h, in len(colours) == 2 (left, right) or 4 parts"""
+        out = bytearray()
+        for y in range(h):
+            for x in range(w):
+                i = (x >= w // 2) + (2 * (y >= h // 2) if len(colours) == 4 else 0)
+                out += bytes(colours[i])
+        return b64(bytes(out))
+
+    def test_virtual_placement_and_placeholders(self):
+        data = self.quadrants(20, 10, [(255, 0, 0), (0, 0, 255)])
+        run = self.run_in_terminal(CELL + f'''
+write('\\x1b_Ga=T,U=1,i=42,c=2,r=1,f=24,s=20,v=10,q=2;{data}\\x1b\\\\')
+# row 0 column 0, row 0 column 1 (U+0305 is 0, U+030D is 1)
+write('\\x1b[38;5;42m\\U0010EEEE\\u0305\\u0305\\U0010EEEE\\u0305\\u030d\\x1b[39mx')
+result['cursor'] = dump()['cursor']
+shot('placed')
+write('\\x1b_Ga=d,d=i,i=42,q=2\\x1b\\\\')
+shot('deleted')
+''')
+        fw, fh = run.result['cell']
+        image = run.shots['placed']
+        self.assertTrue(red(image.pixel(fw // 2, fh // 2)))
+        p = image.pixel(fw + fw // 2, fh // 2)
+        self.assertTrue(p[2] > 200 and p[0] + p[1] < 60, p)          # blue
+        self.assertEqual(run.result['cursor'], [0, 3])                 # text: one cell each
+        self.assertFalse(any(red(q) for q in run.shots['deleted'].region(0, 0, 2 * fw, fh)))
+
+    def test_inferred_cells_and_24_bit_ids(self):
+        colours = [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 255)]
+        data = self.quadrants(20, 20, colours)
+        image_id = (2 << 24) | 300          # 300 = 0x00012c: RGB 0, 1, 44; top byte 2
+        run = self.run_in_terminal(CELL + f'''
+write('\\x1b_Ga=t,i={image_id},f=24,s=20,v=20,q=2;{data}\\x1b\\\\')
+write('\\x1b_Ga=p,U=1,i={image_id},c=2,r=2,q=2\\x1b\\\\')
+fg = '\\x1b[38;2;0;1;44m'
+# the first cell has row, column and top byte; the next ones nothing
+write(fg + '\\U0010EEEE\\u0305\\u0305\\u030e\\U0010EEEE\\x1b[m\\r\\n')
+# row 1: only the row in the first cell (and the top byte)
+write(fg + '\\U0010EEEE\\u030d\\u0305\\u030e\\U0010EEEE\\x1b[m')
+shot('inferred')
+''')
+        fw, fh = run.result['cell']
+        image = run.shots['inferred']
+        got = [image.pixel(c * fw + fw // 2, r * fh + fh // 2) for r in (0, 1) for c in (0, 1)]
+        for want, p in zip(colours, got):
+            self.assertTrue(all(abs(a - b) < 60 for a, b in zip(want, p)), (want, p))
+
+    def test_unknown_image_draws_nothing(self):
+        run = self.run_in_terminal(CELL + r'''
+write('\x1b[38;5;77m\U0010EEEE\u0305\u0305\U0010EEEE\x1b[m')
+result['cursor'] = dump()['cursor']
+shot('nothing')
+''')
+        self.assertEqual(run.result['cursor'], [0, 2])
+
+
 class ITerm(TerminalTest):
     geometry = '40x10'
 

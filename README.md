@@ -43,6 +43,9 @@ Drawing:
   inline images (img2sixel, chafa, `kitty +kitten icat`, timg, yazi,
   ranger, imgcat...). They scroll and go into the scrollback like text,
   within a memory limit (`imageMemory`, 256 MiB): the oldest go first.
+  Kitty's Unicode placeholders work as well (`kitten icat
+  --unicode-placeholder`, timg and yazi in tmux): pictures as text that
+  tmux and vim move around.
 
 Talking to programs:
 

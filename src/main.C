@@ -246,6 +246,7 @@ rxvt_term::~rxvt_term ()
   for (int i = 0; i < SIXEL_SLOTS; i++)
     free_image (i);
   kitty_forget (0);
+  kitty_virtual_free (0);
   free (kitty_pending.data);
 #endif
 
