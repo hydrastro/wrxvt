@@ -16,7 +16,7 @@ class FontSize(TerminalTest):
                 settle()
                 window = os.environ['WINDOWID']
                 subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
-                                'windowfocus', '--sync', window, 'key', *keys],
+                                'windowfocus', window, 'key', *keys],
                                check=True, capture_output=True)
                 settle()
             sizes = [cell()]

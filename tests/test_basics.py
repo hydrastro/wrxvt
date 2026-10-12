@@ -19,7 +19,7 @@ class Basics(TerminalTest):
             result['da1'] = query('\x1b[c', r'c$')
             result['osc702'] = query('\x1b]702;?\x07', r'\x07$')
         ''')
-        self.assertEqual(run.result['da1'], '\x1b[?1;2c')
+        self.assertEqual(run.result['da1'], '\x1b[?62;4;22c')
         # programs read the major and first minor digit of the version
         self.assertEqual(run.result['osc702'], '\x1b]702;rxvt-unicode;wrxvt-test;9;3\x07')
 
@@ -44,7 +44,7 @@ class KeysymOptions(TerminalTest):
             termios.tcflush(0, termios.TCIFLUSH)
             window = os.environ['WINDOWID']
             subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
-                            'windowfocus', '--sync', window, 'key', 'F9'],
+                            'windowfocus', window, 'key', 'F9'],
                            check=True, capture_output=True)
             result['typed'] = read_until('HELLO', timeout=3)
         ''', args=['-keysym.F9', 'string:HELLO'])

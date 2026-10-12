@@ -1545,8 +1545,9 @@ See B<< C<ESC [ Ps C> >>
 
 Send Device Attributes (DA)
 B<< C<Ps = 0> >> (or omitted): request attributes from terminal
-returns: B<< C<ESC [ ? 1 ; 2 c> >> (``I am a VT100 with Advanced Video
-Option'')
+returns: B<< C<ESC [ ? 62 ; 4 ; 22 c> >> (``I am a VT220 with sixel
+graphics and ANSI colour''), or B<< C<ESC [ ? 1 ; 2 c> >> (``I am a VT100
+with Advanced Video Option'') in builds without sixel graphics
 
 =item B<< C<ESC [ Ps d> >>
 
@@ -2164,6 +2165,24 @@ for settings not reported. B<< C<Pt> >> is one of:
 	B<< C<" p> >>	the conformance level (DECSCL): C<62;1>
 
 =end table
+
+=item B<< C<ESC P P1 ; P2 ; P3 q data ST> >>
+
+Sixel graphics (Compile frills): draw the picture in I<data> at the
+cursor, and put the cursor on the line below it, in the column it starts
+in. The picture takes the cells it covers like text: it scrolls, goes
+into the scrollback, and text written over it replaces it. Colours are
+defined with C<#> (RGB and HLS, 1024 registers, starting with the VT340's
+16), and raster attributes (C<">) give the pixel aspect ratio and size;
+pixels left unset show the background. Pictures can be up to 4096 pixels
+either way; up to 255 are kept, those no longer on the screen or in the
+scrollback are freed. Cells with pictures copy as blanks.
+
+=item B<< C<ESC [ ? Pi ; Pa ; Pv S> >>
+
+XTSMGRAPHICS: B<< C<Pi = 1> >> reports the number of colour registers
+(B<< C<ESC [ ? 1 ; 0 ; 1024 S> >>), B<< C<Pi = 2> >> the largest sixel
+picture (the text area, B<< C<ESC [ ? 2 ; 0 ; width ; height S> >>).
 
 =item B<< C<ESC P + q Pt ST> >>
 

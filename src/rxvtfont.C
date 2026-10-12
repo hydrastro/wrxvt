@@ -376,6 +376,11 @@ rxvt_font_default::draw (rxvt_drawable &d, int x, int y,
       int width = text - tp;
       int fwidth = term->fwidth * width;
 
+#if ENABLE_SIXEL
+      if (IS_IMAGE_TILE (t))
+        term->draw_image_tile (d, gc, x, y, t);
+      else
+#endif
 #ifdef BUILTIN_GLYPHS
       if (0x2500 <= t && t <= 0x259f)
         {

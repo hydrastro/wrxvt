@@ -757,6 +757,33 @@ typedef callback<int (int)> getfd_callback;
 
 /****************************************************************************/
 
+/*
+ * Sixel pictures (sixel.C): cells covered by a picture hold IMAGE_TILE
+ * characters naming the picture's slot and the tile, above anything
+ * Unicode or the composite characters use (int32_t negative).
+ */
+#if ENABLE_FRILLS && UNICODE_3
+# define ENABLE_SIXEL 1
+#endif
+
+#define SIXEL_SLOTS             256
+#define SIXEL_COLORS            1024     // colour registers
+#define SIXEL_MAX_SIZE          4096     // pixels, either way
+#define IMAGE_TILE_MAX          1023     // tiles, either way
+#define IMAGE_TILE(slot,row,col) ((text_t)(0xC0000000UL | (slot) << 20 | (row) << 10 | (col)))
+#define IS_IMAGE_TILE(c)        (((c) & 0xF0000000UL) == 0xC0000000UL)
+#define IMAGE_TILE_SLOT(c)      ((int)((c) >> 20 & 0xff))
+#define IMAGE_TILE_ROW(c)       ((int)((c) >> 10 & 0x3ff))
+#define IMAGE_TILE_COL(c)       ((int)((c) & 0x3ff))
+
+struct sixel_image
+{
+  int w, h;               // pixels
+  int cell_w, cell_h;     // the cell size the tiles were cut for
+  uint32_t *pixels;       // ARGB, until the pixmap is made
+  Pixmap pixmap;
+};
+
 #define LINE_LONGER     0x0001 // line is continued on the next row
 #define LINE_FILTERED   0x0002 // line has been filtered
 #define LINE_COMPRESSED 0x0004 // line has been compressed (NYI)
@@ -1397,6 +1424,17 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool kbd_detectable_repeat;
   void process_kbd_seq (unicode_t priv, unsigned int nargs, const int *arg);
   bool kitty_key (XKeyEvent &ev, KeySym keysym, bool release);
+
+#if ENABLE_SIXEL
+  sixel_image *images[SIXEL_SLOTS];
+  int image_next;
+  int image_slot ();
+  void free_image (int slot);
+  void process_sixel (const char *params, const char *data);
+  Pixmap image_pixmap (sixel_image *img);
+  void draw_image_tile (Drawable d, GC gc, int x, int y, text_t code);
+  void scr_add_image (int slot, int cols, int rows) noexcept;
+#endif
   const char *initial_colors[NRS_COLORS]; // the colours as configured
   void reset_color (int idx);
   char *font_orig[4];   // the fonts before font-size changes

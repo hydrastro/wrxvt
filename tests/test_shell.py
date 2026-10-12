@@ -30,7 +30,7 @@ class Prompts(TerminalTest):
                 # no window manager: the keyboard goes to the window under the pointer
                 window = os.environ['WINDOWID']
                 subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
-                                'windowfocus', '--sync', window, 'key', k],
+                                'windowfocus', window, 'key', k],
                                check=True, capture_output=True)
             for n in range(1, 4):
                 write(f'\x1b]133;A\x07$ command {n}\r\n')
@@ -68,7 +68,7 @@ class Prompts(TerminalTest):
                     break
                 time.sleep(0.05)
             subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
-                            'windowfocus', '--sync', window, 'key', 'F7', 'F7'],
+                            'windowfocus', window, 'key', 'F7', 'F7'],
                            check=True, capture_output=True)
             result['top'] = dump()['view_top'].rstrip()
         ''', args=['-sl', '1000', '-keysym.F7', 'prompt:previous'])

@@ -3356,6 +3356,18 @@ rxvt_term::process_csi_seq ()
               process_terminal_mode (ch, priv, nargs, arg);
             if (ch == CSI_DSR && arg[0] == 996) /* the colour scheme: dark or light */
               tt_printf ("\033[?997;%dn", color_scheme ());
+#if ENABLE_SIXEL
+            if (ch == 'S' && nargs >= 2) /* XTSMGRAPHICS: graphics limits */
+              {
+                if (arg[0] == 1)        // colour registers
+                  tt_printf ("\033[?1;0;%dS", SIXEL_COLORS);
+                else if (arg[0] == 2)   // the largest picture: the text area, up to SIXEL_MAX_SIZE
+                  tt_printf ("\033[?2;0;%d;%dS", min (Width2Pixel (ncol), SIXEL_MAX_SIZE),
+                             min (Height2Pixel (nrow), SIXEL_MAX_SIZE));
+                else                    // no ReGIS
+                  tt_printf ("\033[?%d;1;0S", arg[0]);
+              }
+#endif
             break;
 
           case '!':
@@ -3961,6 +3973,10 @@ rxvt_term::process_dcs_string (const char *s)
 
   if (pstr.final == 'q' && !strcmp (pstr.inter, "$") && noparams)
     decrqss (s);
+#if ENABLE_SIXEL
+  else if (pstr.final == 'q' && !pstr.inter[0])
+    process_sixel (pstr.params, s);
+#endif
   else if (pstr.final == 'q' && !strcmp (pstr.inter, "+") && noparams)
     xtgettcap (s);
 }

@@ -221,6 +221,11 @@ rxvt_term::~rxvt_term ()
 
   free (pstr.buf);
 
+#if ENABLE_SIXEL
+  for (int i = 0; i < SIXEL_SLOTS; i++)
+    free_image (i);
+#endif
+
   for (int i = 0; i < 4; i++)
     free (font_orig[i]);
 

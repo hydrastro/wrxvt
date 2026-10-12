@@ -14,7 +14,7 @@ def keys(*names):
     window = os.environ['WINDOWID']
     command = list(names) if names[0] == 'keydown' else ['key', '--delay', '20', *names]
     subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
-                    'windowfocus', '--sync', window, *command],
+                    'windowfocus', window, *command],
                    check=True, capture_output=True)
     return read_until(r'(?!)', timeout=0.4)
 '''

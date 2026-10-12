@@ -1266,6 +1266,53 @@ end_of_line:
   assert (screen.cur.row >= 0);
 }
 
+#if ENABLE_SIXEL
+/*
+ * Put a picture's tiles at the cursor, cols x rows cells (cut at the right
+ * edge), scrolling as text would, and leave the cursor on the line below,
+ * in the column the picture starts in.
+ */
+void
+rxvt_term::scr_add_image (int slot, int cols, int rows) noexcept
+{
+  want_refresh = 1;
+  ZERO_SCROLLBACK ();
+
+  int col0 = screen.cur.col;
+  int width = min (cols, ncol - col0);
+
+  screen.flags &= ~Screen_WrapNext;
+
+  for (int r = 0; r < rows; r++)
+    {
+      line_t &l = ROW (screen.cur.row);
+
+      // wide characters the picture covers partly
+      if (col0 < ncol && l.t[col0] == NOCHAR)
+        scr_kill_char (l, col0);
+      if (col0 + width < ncol && l.t[col0 + width] == NOCHAR)
+        scr_kill_char (l, col0 + width);
+
+      for (int c = 0; c < width; c++)
+        {
+          text_t code = IMAGE_TILE (slot, r, c);
+          l.t[col0 + c] = code;
+          l.r[col0 + c] = SET_FONT (rstyle & ~(RS_baseattrMask | RS_linkMask), FONTSET (rstyle)->find_font (code));
+        }
+
+      l.touch (col0 + width);
+
+      // the next line (after the last one too)
+      if (screen.cur.row == screen.bscroll)
+        scr_scroll_text (screen.tscroll, screen.bscroll, 1);
+      else if (screen.cur.row < nrow - 1)
+        screen.cur.row++;
+    }
+
+  screen.cur.col = col0;
+}
+#endif
+
 /* ------------------------------------------------------------------------- */
 /*
  * Process Backspace.  Move back the cursor back a position, wrap if have to
@@ -3123,6 +3170,13 @@ rxvt_term::selection_make (Time tm)
                 }
 
               ofs += rxvt_composite.expand (*t++, new_selection_text + ofs);
+            }
+#endif
+#if ENABLE_SIXEL
+          else if (IS_IMAGE_TILE (*t))
+            {
+              new_selection_text[ofs++] = ' '; // pictures copy as blanks
+              t++;
             }
 #endif
           else

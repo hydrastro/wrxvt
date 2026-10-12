@@ -29,6 +29,8 @@ Drawing:
   opens them with `url-launcher`.
 - **Synchronized output** (mode 2026): no tearing when a program redraws
   everything.
+- **Sixel graphics**: pictures (img2sixel, chafa, yazi, lsix, gnuplot's
+  sixel terminal) that scroll and go into the scrollback like text.
 
 Talking to programs:
 
