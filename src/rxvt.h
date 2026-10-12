@@ -1376,6 +1376,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool jump_to_prompt (int dir);
   bool builtin_action (const char *name, const char *arg);
   void change_font_size (int delta);
+  int default_cursor_style;
   char *font_orig[4];   // the fonts before font-size changes
   int font_delta;
   bool font_size_set;

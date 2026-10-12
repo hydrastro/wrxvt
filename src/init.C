@@ -844,6 +844,15 @@ rxvt_term::init2 (int argc, const char *const *argv)
 
   const char **cmd_argv = init_resources (argc, argv);
 
+  // the configured cursor as a DECSCUSR style, for CSI 0 SP q
+  default_cursor_style = (option (Opt_cursorUnderline) ? 3 : 1)
+#ifdef CURSOR_BLINK
+                         + !option (Opt_cursorBlink)
+#else
+                         + 1
+#endif
+                         ;
+
 #ifdef KEYSYM_RESOURCE
   keyboard->register_done ();
 #endif

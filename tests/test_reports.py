@@ -47,6 +47,13 @@ class Decrqss(TerminalTest):
         self.assertEqual(self.ask('\x1b[6 q', ' q'), f'\x1bP1$r6 q{ST}')
         self.assertEqual(self.ask('\x1b[3 q', ' q'), f'\x1bP1$r3 q{ST}')
 
+    def test_cursor_style_0_is_the_configured_one(self):
+        run = self.run_in_terminal(r'''
+            write('\x1b[6 q\x1b[0 q')
+            result['reply'] = query('\x1bP$q q\x1b\\', r'\x1b\\$')
+        ''', args=['-uc', '+bc'])   # a steady underline
+        self.assertEqual(run.result['reply'], f'\x1bP1$r4 q{ST}')
+
     def test_unknown_setting(self):
         self.assertEqual(self.ask('', 'xyz'), f'\x1bP0$r{ST}')
 

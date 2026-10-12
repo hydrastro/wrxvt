@@ -5280,8 +5280,10 @@ rxvt_term::set_cursor_style (int style)
   if (!IN_RANGE_INC (style, 0, 6))
     return;
 
+  // 0 is the style the user configured (cursorUnderline, cursorBlink),
+  // so programs that reset the cursor when they exit leave it as it was
   if (style == 0)
-    style = 1;
+    style = default_cursor_style;
 
   cursor_type = (style - 1) / 2;
   set_option (Opt_cursorUnderline, cursor_type == 1);

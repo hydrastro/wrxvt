@@ -1686,7 +1686,7 @@ Set Cursor Style (DECSCUSR)
 
 =begin table
 
-	B<< C<Ps = 0> >>	Blink Block
+	B<< C<Ps = 0> >>	The configured style (B<cursorUnderline>, B<cursorBlink>)
 	B<< C<Ps = 1> >>	Blink Block
 	B<< C<Ps = 2> >>	Steady Block
 	B<< C<Ps = 3> >>	Blink Underline
