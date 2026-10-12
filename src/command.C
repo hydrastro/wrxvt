@@ -3659,6 +3659,8 @@ rxvt_term::tcap_value (const char *name, bool &boolean)
     // focus events
     { "fe",     "\033[?1004h" },
     { "fd",     "\033[?1004l" },
+    // setting the selection (OSC 52), as tmux writes it
+    { "Ms",     "\033]52;%p1%s;%p2%s\007" },
     // XTVERSION, the request for the terminal's name and version
     { "XR",     "\033[>0q" },
   };
@@ -3723,6 +3725,165 @@ rxvt_term::xtgettcap (const char *request)
 
       p = *end ? end + 1 : end;
     }
+}
+
+/*----------------------------------------------------------------------*/
+/*
+ * OSC 52: ESC ] 52 ; Pc ; Pd ST, set the selections named in Pc to the
+ * base64 text Pd, or report them if Pd is "?".
+ */
+static const char base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static char *
+base64_encode (const char *data, unsigned int len)
+{
+  char *out = (char *)rxvt_malloc ((len + 2) / 3 * 4 + 1);
+  char *p = out;
+
+  for (unsigned int i = 0; i < len; i += 3)
+    {
+      uint32_t v = (unsigned char)data[i] << 16;
+      if (i + 1 < len) v |= (unsigned char)data[i + 1] << 8;
+      if (i + 2 < len) v |= (unsigned char)data[i + 2];
+
+      *p++ = base64_chars[v >> 18 & 63];
+      *p++ = base64_chars[v >> 12 & 63];
+      *p++ = i + 1 < len ? base64_chars[v >> 6 & 63] : '=';
+      *p++ = i + 2 < len ? base64_chars[v & 63] : '=';
+    }
+
+  *p = 0;
+  return out;
+}
+
+// decodes in place, returns the length, or -1 if it isn't base64
+static int
+base64_decode (char *str)
+{
+  uint32_t v = 0;
+  int bits = 0, len = 0;
+  bool padding = false;
+
+  for (char *p = str; *p; p++)
+    {
+      if (*p == '=')
+        {
+          padding = true;
+          continue;
+        }
+
+      const char *c = strchr (base64_chars, *p);
+      if (!c || padding)
+        return -1;
+
+      v = v << 6 | (c - base64_chars);
+      bits += 6;
+
+      if (bits >= 8)
+        {
+          bits -= 8;
+          str[len++] = v >> bits & 0xff;
+        }
+    }
+
+  return len;
+}
+
+void
+rxvt_term::selection_report (char target, const char *data, unsigned int len)
+{
+  char *encoded = base64_encode (data ? data : "", data ? len : 0);
+
+  tt_printf ("\033]52;%c;", target);
+  tt_write (encoded, strlen (encoded));
+  tt_write ("\033\\", 2);
+
+  free (encoded);
+}
+
+void
+rxvt_term::process_selection_seq (char *str, string_term &st)
+{
+  char *data = strchr (str, ';');
+  if (!data)
+    return;
+
+  *data++ = 0;
+
+  // the selections: c the clipboard; p, s and cut buffers 0-7 primary
+  // (they are what the user selects); none means "s 0", the selection
+  bool clipboard = false, primary = false;
+  char target = 0;
+
+  for (char *p = *str ? str : (char *)"s"; *p; p++)
+    if (*p == 'c')
+      {
+        clipboard = true;
+        target = target ? target : 'c';
+      }
+    else if (*p == 'p' || *p == 's' || IN_RANGE_INC (*p, '0', '7'))
+      {
+        primary = true;
+        target = target ? target : *p;
+      }
+
+  if (!target)
+    return;
+
+  if (!strcmp (data, "?"))
+    {
+      // the selection could hold anything (a password just copied), so
+      // programs can read it only with the insecure option
+      if (!option (Opt_insecure))
+        return;
+
+      // a terminal of this process (wrxvtd runs many) has it?
+      rxvt_term *owner = clipboard ? display->clipboard_owner : display->selection_owner;
+
+      if (owner)
+        {
+          wchar_t *own = clipboard ? owner->selection.clip_text : owner->selection.text;
+          unsigned int own_len = clipboard ? owner->selection.clip_len : owner->selection.len;
+          char *text = own ? rxvt_wcstombs (own, own_len) : strdup ("");
+          selection_report (target, text, strlen (text));
+          free (text);
+        }
+      else if (!selection_req)
+        {
+          // another program has it: ask it, and answer when it replies
+          selection_req = new rxvt_selection (display, clipboard ? Sel_Clipboard : Sel_Primary,
+                                              CurrentTime, vt, xa[XA_VT_SELECTION], this);
+          selection_req->report = target;
+          selection_req->run ();
+        }
+
+      return;
+    }
+
+  int len = base64_decode (data);
+  if (len < 0)
+    return;
+
+  data[len] = 0;
+  wchar_t *text = rxvt_mbstowcs (data, len);
+
+  if (primary)
+    {
+      selection_clear (false);
+      selection.text = wcsdup (text);
+      selection.len = wcslen (text);
+      selection_grab (CurrentTime, false);
+    }
+
+  if (clipboard)
+    {
+      selection_clear (true);
+      selection.clip_text = wcsdup (text);
+      selection.clip_len = wcslen (text);
+      selection_grab (CurrentTime, true);
+    }
+
+  free (text);
 }
 
 /*----------------------------------------------------------------------*/
@@ -4003,6 +4164,10 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
 
       case XTerm_logfile:
         // TODO, when secure mode?
+        break;
+
+      case XTerm_selection:
+        process_selection_seq (str, st);
         break;
 
 #if 0

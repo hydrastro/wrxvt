@@ -2147,7 +2147,7 @@ hexadecimal (only the name for a boolean), or C<< ESC P 0 + r I<name> ST >>
 for an unknown name. The names known are C<TN> (and C<name>), C<Co> (and
 C<colors>), C<RGB>, C<Tc>, C<Smulx>, C<Setulc>, C<ol>, C<smxx>, C<rmxx>,
 C<dim>, C<Smol>, C<Rmol>, C<Ss>, C<Se>, C<BE>, C<BD>, C<PS>, C<PE>, C<fe>,
-C<fd> and C<XR>: the features of this terminal that its terminfo entry
+C<fd>, C<Ms> and C<XR>: the features of this terminal that its terminfo entry
 doesn't describe.
 
 =back
@@ -2185,6 +2185,7 @@ this requires insecure mode to be enabled for most of these.
 	B<< C<Ps = 46> >>	Change Log File to B<< C<Pt> >> I<unimplemented>
 	B<< C<Ps = 49> >>	Change default background colour to B<< C<Pt> >>. [deprecated, use 11]
 	B<< C<Ps = 50> >>	Set fontset to B<< C<Pt> >>, with the following special values of B<< C<Pt> >> (B<rxvt>) B<< C<#+n> >> change up B<< C<n> >> B<< C<#-n> >> change down B<< C<n> >> if B<< C<n> >> is missing of 0, a value of 1 is used I<empty> change to font0 B<< C<n> >> change to font B<< C<n> >>
+	B<< C<Ps = 52> >>	Set the selections named in the first part of B<< C<Pt> >> (C<c> the clipboard; C<p>, C<s> or C<0>-C<7> the primary selection; empty means C<s>) to the base64-encoded text in the second part, e.g. C<ESC ] 52 ; c ; aGVsbG8= ST>. If the second part is B<< C<?> >>, report the selection the same way (insecure mode only).
 	B<< C<Ps = 55> >>	Log all scrollback buffer and all of screen to B<< C<Pt> >> [disabled]
 	B<< C<Ps = 701> >>	Change current locale to B<< C<Pt> >>, or, if B<< C<Pt> >> is B<< C<?> >>, return the current locale (insecure mode, Compile frills).
 	B<< C<Ps = 702> >>	Request version if B<< C<Pt> >> is B<< C<?> >>, returning C<rxvt-unicode>, the resource name, the major and minor version numbers, e.g. C<ESC ] 702 ; rxvt-unicode ; urxvt ; 7 ; 4 ST>.

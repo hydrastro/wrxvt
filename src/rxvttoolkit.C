@@ -1003,6 +1003,7 @@ rxvt_selection::rxvt_selection (rxvt_display *disp, int selnum, Time tm, Window 
   selection_wait = Sel_normal;
   selection_type = selnum;
   cb_sv = 0;
+  report = 0;
 }
 
 void
@@ -1054,7 +1055,9 @@ rxvt_selection::finish (char *data, unsigned int len)
 {
   if (!cb_sv)
     {
-      if (data)
+      if (report)
+        term->selection_report (report, data, len);
+      else if (data)
         term->paste (data, len);
 
       term->selection_req = 0;

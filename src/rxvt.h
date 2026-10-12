@@ -451,6 +451,7 @@ enum {
   XTerm_Color_HTC        = 19,      // change actual 'Highlight' fg color
   XTerm_logfile          = 46,      // not implemented
   XTerm_font             = 50,
+  XTerm_selection        = 52,      // set or query the clipboard or primary selection
 
   XTerm_konsole30        = 30,      // reserved for konsole
   XTerm_konsole31        = 31,      // reserved for konsole
@@ -1456,6 +1457,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void end_string (unicode_t terminator);
   void process_dcs_seq ();
   void process_dcs_string (const char *s);
+  void process_selection_seq (char *str, string_term &st);
+  void selection_report (char target, const char *data, unsigned int len);
   void decrqss (const char *setting);
   void xtgettcap (const char *request);
   const char *tcap_value (const char *name, bool &boolean);

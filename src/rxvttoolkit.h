@@ -387,6 +387,7 @@ struct rxvt_selection
   ~rxvt_selection ();
 
   rxvt_term *term; // terminal to paste to, may be 0
+  char report;     // if set, report the text with OSC 52 for this target instead of pasting it
   void *cb_sv;     // managed by perl
 
   rxvt_display *display;
