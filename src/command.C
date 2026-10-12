@@ -3784,6 +3784,8 @@ rxvt_term::tcap_value (const char *name, bool &boolean)
     // focus events
     { "fe",     "\033[?1004h" },
     { "fd",     "\033[?1004l" },
+    // synchronized output (mode 2026), as tmux writes it
+    { "Sync",   "\033[?2026%?%p1%{1}%-%tl%eh%;" },
     // setting the selection (OSC 52), as tmux writes it
     { "Ms",     "\033]52;%p1%s;%p2%s\007" },
     // XTVERSION, the request for the terminal's name and version

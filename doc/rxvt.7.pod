@@ -2174,7 +2174,7 @@ hexadecimal (only the name for a boolean), or C<< ESC P 0 + r I<name> ST >>
 for an unknown name. The names known are C<TN> (and C<name>), C<Co> (and
 C<colors>), C<RGB>, C<Tc>, C<Smulx>, C<Setulc>, C<ol>, C<smxx>, C<rmxx>,
 C<dim>, C<Smol>, C<Rmol>, C<Ss>, C<Se>, C<BE>, C<BD>, C<PS>, C<PE>, C<fe>,
-C<fd>, C<Ms> and C<XR>: the features of this terminal that its terminfo entry
+C<fd>, C<Sync>, C<Ms> and C<XR>: the features of this terminal that its terminfo entry
 doesn't describe.
 
 =back
