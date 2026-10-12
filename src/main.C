@@ -645,6 +645,12 @@ rxvt_init ()
   assert (("fontMask must not overlap other RS masks",
            0 == (RS_fontMask & (RS_Sel | RS_baseattrMask | RS_customMask | RS_bgMask | RS_fgMask))));
 
+  // Before any resource database exists: libX11 1.8 turns on locking
+  // when the first display opens, and a database made before that (the
+  // command line's -xrm and -keysym options) has no lock, so freeing it
+  // with the display would crash.
+  XInitThreads ();
+
   rxvt_get_ttymode (&rxvt_term::def_tio);
 
   // get rid of stdin/stdout as we don't need them, to free resources

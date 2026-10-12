@@ -477,7 +477,9 @@ bool rxvt_display::ref_init ()
   assert (ecb_array_length (xa_names) == NUM_XA);
   XInternAtoms (dpy, (char **)xa_names, NUM_XA, False, xa);
 
-  XrmSetDatabase (dpy, get_resources (false));
+  XrmDatabase database = get_resources (false);
+  // always one, even empty: then the command line's options go into it
+  XrmSetDatabase (dpy, database ? database : XrmGetStringDatabase (""));
 
 #ifdef POINTER_BLANK
   XColor blackcolour;
@@ -542,7 +544,8 @@ rxvt_display::ref_next ()
   /* work around a bug in XrmSetDatabase where it frees the db */
   dpy->db = 0;
 #endif
-  XrmSetDatabase (dpy, get_resources (true));
+  XrmDatabase database = get_resources (true);
+  XrmSetDatabase (dpy, database ? database : XrmGetStringDatabase (""));
 }
 
 rxvt_display::~rxvt_display ()
@@ -558,7 +561,11 @@ rxvt_display::~rxvt_display ()
 #if USE_XIM
   xims.clear ();
 #endif
-  XrmDestroyDatabase (XrmGetDatabase (dpy));
+  // the database is ours (the display always has one, so Xlib never made
+  // its own): free it once, as XCloseDisplay may free the display's too
+  XrmDatabase database = XrmGetDatabase (dpy);
+  XrmSetDatabase (dpy, 0);
+  XrmDestroyDatabase (database);
   XCloseDisplay (dpy);
 }
 

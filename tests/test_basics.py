@@ -50,6 +50,17 @@ class KeysymOptions(TerminalTest):
         ''', args=['-keysym.F9', 'string:HELLO'])
         self.assertEqual(run.result['typed'], 'HELLO')
 
+    def test_exits_cleanly(self):
+        # the options' database is the display's then, and is freed with it
+        import os
+        import subprocess
+        from harness import binary
+        done = subprocess.run([binary(), '-display', self.display.name, '-xrm', 'URxvt.a: b',
+                               '-keysym.F9', 'string:x', '-e', 'true'],
+                              env={**os.environ, 'DISPLAY': self.display.name},
+                              capture_output=True, timeout=20)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

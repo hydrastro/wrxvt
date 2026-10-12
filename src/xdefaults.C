@@ -802,16 +802,12 @@ void
 rxvt_term::extract_resources ()
 {
 #ifndef NO_RESOURCES
+  // (the display always has a database, an empty one without any
+  // resources: the options go into it, where the keysym resources and
+  // perl look later)
   XrmDatabase database = XrmGetDatabase (dpy);
   XrmMergeDatabases (option_db, &database);
   option_db = NULL;
-
-  // without any resources (no ~/.Xdefaults, nothing loaded with xrdb)
-  // the display has no database, and the merge made a new one of the
-  // options alone: give it to the display, where the keysym resources
-  // and perl look later
-  if (!XrmGetDatabase (dpy))
-    XrmSetDatabase (dpy, database);
   /*
    * Query resources for options that affect us
    */

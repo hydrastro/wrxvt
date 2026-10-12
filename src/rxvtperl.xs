@@ -461,6 +461,9 @@ rxvt_perl_interp::eval (const char *str)
 void
 rxvt_perl_interp::usage (rxvt_term *term, int type)
 {
+  if (!perl)
+    return;
+
   localise_env set_environ (perl_environ);
 
   ENTER;
@@ -481,6 +484,9 @@ rxvt_perl_interp::usage (rxvt_term *term, int type)
 uint8_t
 rxvt_perl_interp::parse_resource (rxvt_term *term, const char *name, bool arg, bool longopt, bool flag, const char *value)
 {
+  if (!perl)
+    return 0; // the interpreter didn't start (urxvt.pm not found...)
+
   localise_env set_environ (perl_environ);
 
   ENTER;
