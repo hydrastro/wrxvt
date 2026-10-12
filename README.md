@@ -127,9 +127,6 @@ Fixes:
 
 Planned at some point, and why not now:
 
-- **Grapheme clusters (mode 2027)**: emoji sequences are drawn as one
-  emoji already; full clustering (Indic scripts, Hangul) needs Unicode's
-  segmentation rules in the cell model.
 - **Detachable sessions in the daemon, tmux control mode**: tmux does
   both today; wrxvt's pictures and keyboard protocol work through tmux 3.4.
 - **Native tabs and splits**: i3 (or any tiling window manager) does it.
@@ -137,8 +134,11 @@ Planned at some point, and why not now:
   extension and `scrollback:pager` cover it.
 - **Other renderers** (OpenGL, KMS/framebuffer without X, Wayland), BiDi,
   ligatures: each a project of its own; XRender stays, and is fast.
-- **Unicode placeholders for kitty pictures, text sizing (OSC 66), file
-  transfer**: few programs send them.
+- **Text sizing (OSC 66), kitty's file transfer**: only kitty and few
+  programs use them.
+- **Text that isn't one cell per cluster**: Indic conjuncts get the
+  width of their first letter (mode 2027), as in other terminals; the
+  cell grid has no room for other widths.
 
 The [terminfo entry](doc/etc/rxvt-unicode.terminfo) describes the new
 features as extended capabilities (`tic -x`).
@@ -157,6 +157,9 @@ URxvt.url-launcher:    firefox
 URxvt.notifyCommand:   notify-send --app-name=wrxvt --
 URxvt.keysym.C-S-F12:  share:toggle
 URxvt.keysym.C-S-F11:  share:control
+! type on your phone, over HTTPS (the link to type: Ctrl+Shift+F11)
+URxvt.shareAddress:     0.0.0.0
+URxvt.shareCertificate: auto
 URxvt.keysym.C-S-F10:  record:toggle
 URxvt.color208:        #ff8700
 ```
