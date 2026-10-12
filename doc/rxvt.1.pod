@@ -1619,6 +1619,17 @@ CLIPBOARD selection to be inserted.
 
 =back
 
+=head1 DRAG AND DROP
+
+Files dragged onto the window from a file manager (Thunar, Nautilus,
+Dolphin...) or a browser are typed as their paths, quoted for the shell
+where needed and followed by a space, ready for a command:
+
+   cp '/home/me/My Music/song.flac' /tmp/notes.txt
+
+Dragged text is pasted. Both arrive as one paste, so bracketed paste
+applies, and a shell takes them as text, not as commands to run.
+
 =head1 CHANGING FONTS
 
 Changing fonts (or font sizes, respectively) via the keypad is not yet

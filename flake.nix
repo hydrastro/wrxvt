@@ -74,7 +74,7 @@
               {
                 nativeBuildInputs = [
                   self.packages.${system}.wrxvt
-                  pkgs.python3
+                  (pkgs.python3.withPackages (p: [ p.python-xlib ])) # xlib: a drag source
                   pkgs.perl
                   pkgs.xvfb
                   pkgs.imagemagick
@@ -105,7 +105,7 @@
             packages = [
               pkgs.autoconf
               pkgs.automake
-              pkgs.python3
+              (pkgs.python3.withPackages (p: [ p.python-xlib ]))
               pkgs.xvfb
               pkgs.imagemagick
               pkgs.xdotool

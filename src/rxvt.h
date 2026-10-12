@@ -765,6 +765,7 @@ typedef callback<int (int)> getfd_callback;
 #endif
 
 #if ENABLE_FRILLS
+# define ENABLE_DND 1           // dnd.C: drag and drop
 # define ENABLE_SHARE 1         // share.C: the terminal on a web page
 # define ENABLE_RECORD 1        // record.C: asciinema recordings
 #endif
@@ -1507,6 +1508,18 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   char *app_title;      // the title as programs set it, without marks like [shared]
   void update_title ();
   void set_selection (const wchar_t *text, bool primary, bool clipboard);
+
+#if ENABLE_DND
+  // drag and drop (dnd.C)
+  Window dnd_source;
+  Atom dnd_type;
+  void dnd_init ();
+  Atom dnd_choose_type (const Atom *types, unsigned long count);
+  void dnd_send (Window to, const char *message, long l1, long l2 = 0, long l3 = 0, long l4 = 0);
+  void dnd_finish (bool accepted);
+  bool dnd_client_message (XClientMessageEvent &ev);
+  void dnd_selection_notify (XSelectionEvent &ev);
+#endif
 
 #if ENABLE_SHARE
   // sharing the terminal on a web page (share.C)

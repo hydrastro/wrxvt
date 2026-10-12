@@ -62,6 +62,11 @@ Sharing:
   what is shown (not what is typed), for `asciinema play`, the web player
   or agg.
 
+Mouse:
+
+- **Drag and drop**: files dropped on the window become their paths,
+  quoted for the shell; dropped text is pasted.
+
 Shell integration:
 
 - **OSC 7**: the shell's directory is put on the window as `_WRXVT_CWD`,

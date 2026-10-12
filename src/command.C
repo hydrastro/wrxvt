@@ -1842,6 +1842,15 @@ rxvt_term::x_cb (XEvent &ev)
         button_release (ev.xbutton);
         break;
 
+#if ENABLE_DND
+      case SelectionNotify:
+        // the data of a drop
+        if (ev.xselection.requestor == parent
+            && ev.xselection.selection == display->atom ("XdndSelection"))
+          dnd_selection_notify (ev.xselection);
+        break;
+#endif
+
       case ClientMessage:
         if (ev.xclient.format == 32
             && !HOOK_INVOKE ((this, HOOK_CLIENT_MESSAGE, DT_XEVENT, &ev, DT_END)))
@@ -1863,6 +1872,10 @@ rxvt_term::x_cb (XEvent &ev)
 #endif
                   }
               }
+#if ENABLE_DND
+            else if (dnd_client_message (ev.xclient))
+              ;
+#endif
 #if ENABLE_XEMBED
             else if (ev.xclient.format == 32 && ev.xclient.message_type == xa[XA_XEMBED])
               {

@@ -927,6 +927,10 @@ rxvt_term::init2 (int argc, const char *const *argv)
 
   HOOK_INVOKE ((this, HOOK_START, DT_END));
 
+#if ENABLE_DND
+  dnd_init ();
+#endif
+
 #if ENABLE_SHARE
   if (option (Opt_share))
     share_start ();

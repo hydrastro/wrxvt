@@ -84,6 +84,7 @@ src/share.C
 src/share-page.h
 src/rxvtbuf.h
 src/record.C
+src/dnd.C
 src/scrollbar-next.C
 src/scrollbar-rxvt.C
 src/scrollbar-xterm.C
