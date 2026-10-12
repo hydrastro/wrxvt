@@ -446,6 +446,7 @@ enum {
   XTerm_property         =  3,      // change X property
   XTerm_cwd              =  7,      // the shell's current directory, as file://host/path
   XTerm_hyperlink        =  8,      // ESC ] 8 ; params ; URI ST: following text links to URI
+  XTerm_notify           =  9,      // a desktop notification (iTerm2)
   XTerm_Color            =  4,      // change colors
   XTerm_Color00          = 10,      // change fg color
   XTerm_Color01          = 11,      // change bg color
@@ -1377,6 +1378,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void process_hyperlink (char *str);
   const char *link_at (int x, int y);
   bool open_link (int x, int y);
+  void spawn (const char *command, const char *arg1, const char *arg2 = 0);
+  void notify (const char *text);
 
   // hyperlinks (OSC 8), indexed by the RS_link bits; 0 is unused
   struct hyperlink { char *id, *uri; } *links;

@@ -954,6 +954,13 @@ and sextants (U+1FB00-U+1FB3B) itself, so they fill their cells exactly
 and join up. Use this if you have a good font and want to use its
 glyphs; option B<-sbg>.
 
+=item B<notifyCommand:> I<command>
+
+The command that shows desktop notifications programs send with
+C<ESC ] 9 ; text ST>: it is run by F</bin/sh> with the window title and
+the text as two more arguments. The default is C<notify-send -->; an
+empty value ignores notifications.
+
 =item B<termName:> I<termname>
 
 Specifies the terminal type name to be set in the B<TERM> environment

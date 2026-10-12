@@ -4064,24 +4064,13 @@ rxvt_term::link_at (int x, int y)
 }
 
 /*
- * Open the hyperlink at x, y with the url-launcher resource (the same
- * as the matcher extension's), xdg-open by default.
+ * Run command with sh -c, the arguments as $1 and $2 (never interpreted
+ * by the shell), detached from the terminal.
  */
-bool
-rxvt_term::open_link (int x, int y)
+void
+rxvt_term::spawn (const char *command, const char *arg1, const char *arg2)
 {
-  const char *uri = link_at (x, y);
-  if (!uri)
-    return false;
-
-  const char *launcher = x_resource ("url-launcher");
-  if (!launcher || !*launcher)
-    launcher = "xdg-open";
-
-  char *command = (char *)rxvt_malloc (strlen (launcher) + 8);
-  sprintf (command, "%s \"$1\"", launcher);
-
-  // fork twice, so the launcher is not our child and needs no reaping
+  // fork twice, so the command is not our child and needs no reaping
   pid_t pid = fork ();
 
   if (pid == 0)
@@ -4099,18 +4088,73 @@ rxvt_term::open_link (int x, int y)
           if (env)
             environ = env;
 
-          execl ("/bin/sh", "sh", "-c", command, "sh", uri, (char *)0);
+          execl ("/bin/sh", "sh", "-c", command, "sh", arg1, arg2, (char *)0);
         }
 
       _exit (0);
     }
 
-  free (command);
-
   if (pid > 0)
     waitpid (pid, 0, 0);
+}
+
+/*
+ * Open the hyperlink at x, y with the url-launcher resource (the same
+ * as the matcher extension's), xdg-open by default.
+ */
+bool
+rxvt_term::open_link (int x, int y)
+{
+  const char *uri = link_at (x, y);
+  if (!uri)
+    return false;
+
+  const char *launcher = x_resource ("url-launcher");
+  if (!launcher || !*launcher)
+    launcher = "xdg-open";
+
+  char *command = (char *)rxvt_malloc (strlen (launcher) + 8);
+  sprintf (command, "%s \"$1\"", launcher);
+  spawn (command, uri);
+  free (command);
 
   return true;
+}
+
+/*
+ * OSC 9 ; text: a desktop notification (as in iTerm2), shown with the
+ * notifyCommand resource, notify-send by default, given the window
+ * title and the text.
+ */
+void
+rxvt_term::notify (const char *text)
+{
+  // ConEmu's progress reports (9;4;...) and other numbered subcommands
+  if (isdigit (text[0]) && text[1] == ';')
+    return;
+
+  const char *notifier = rs[Rs_notifyCommand];
+  if (!notifier)
+    notifier = "notify-send --";
+
+  if (!*notifier)
+    return; // disabled
+
+  char *title = 0;
+  XFetchName (dpy, parent, &title);
+
+  char *command = (char *)rxvt_malloc (strlen (notifier) + 16);
+  sprintf (command, "%s \"$1\" \"$2\"", notifier);
+  spawn (command, title && *title ? title : RESNAME, text);
+  free (command);
+
+  if (title)
+    XFree (title);
+
+#if ENABLE_FRILLS
+  if (!focus && option (Opt_urgentOnBell))
+    set_urgency (1);
+#endif
 }
 
 /*
@@ -4453,6 +4497,10 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
 
       case XTerm_hyperlink:
         process_hyperlink (str);
+        break;
+
+      case XTerm_notify:
+        notify (str);
         break;
 
       case Shell_mark:

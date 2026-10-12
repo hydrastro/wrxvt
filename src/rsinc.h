@@ -6,6 +6,7 @@
   def (geometry)
   def (reverseVideo)
   def (chdir)
+  def (notifyCommand)
   def (color)
   reserve (color, TOTAL_COLORS)
   def (font)
