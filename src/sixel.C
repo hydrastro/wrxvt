@@ -316,6 +316,15 @@ rxvt_term::image_slot ()
   return image_next;
 }
 
+// the bytes pictures may take (imageMemory, in MiB)
+size_t
+rxvt_term::image_memory_max ()
+{
+  double mib = rs[Rs_imageMemory] ? atof (rs[Rs_imageMemory]) : 0;
+
+  return mib > 0 ? (size_t)(mib * 1048576) : IMAGE_MEMORY_MAX;
+}
+
 void
 rxvt_term::free_image (int slot)
 {
@@ -358,8 +367,32 @@ rxvt_term::place_image (uint32_t *pixels, int w, int h, int cols, int rows, int 
       return false;
     }
 
+  // within the memory pictures may take: the oldest go (their cells
+  // become blank), as kitty does with its storage quota
+  for (;;)
+    {
+      size_t total = (size_t)w * h * 4;
+      int oldest = 0;
+
+      for (int i = 1; i < SIXEL_SLOTS; i++)
+        if (term_image *im = images[i])
+          {
+            total += (size_t)im->w * im->h * 4;
+            if (!oldest || im->serial < images[oldest]->serial)
+              oldest = i;
+          }
+
+      if (total <= image_memory_max () || !oldest)
+        break;
+
+      scr_erase_images ([] (rxvt_term *, term_image *im, void *victim) { return im == victim; },
+                        images[oldest]);
+      free_image (oldest);
+    }
+
   term_image *img = new term_image;
   img->kitty_id = kitty_id;
+  img->serial = ++image_serial;
   img->pixmap = 0;
   img->pixels = pixels;
   img->w = w;

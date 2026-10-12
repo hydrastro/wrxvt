@@ -791,6 +791,7 @@ struct rxvt_buf;
 #define SIXEL_SLOTS             256
 #define SIXEL_COLORS            1024     // colour registers
 #define SIXEL_MAX_SIZE          4096     // pixels, either way
+#define IMAGE_MEMORY_MAX        (256UL << 20) // bytes of pictures a terminal keeps (imageMemory)
 #define IMAGE_TILE_MAX          1023     // tiles, either way
 #define IMAGE_TILE(slot,row,col) ((text_t)(0xC0000000UL | (slot) << 20 | (row) << 10 | (col)))
 #define IS_IMAGE_TILE(c)        (((c) & 0xF0000000UL) == 0xC0000000UL)
@@ -801,6 +802,7 @@ struct rxvt_buf;
 struct term_image
 {
   unsigned int kitty_id;  // the image id the kitty protocol gave it, or 0
+  unsigned long serial;   // the order they came in
   int w, h;               // pixels
   int cell_w, cell_h;     // the cell size the tiles were cut for
   uint32_t *pixels;       // ARGB, until the pixmap is made
@@ -1461,6 +1463,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
 #if ENABLE_SIXEL
   term_image *images[SIXEL_SLOTS];
   int image_next;
+  unsigned long image_serial;
+  size_t image_memory_max ();
   int image_slot ();
   void free_image (int slot);
   void process_sixel (const char *params, const char *data);

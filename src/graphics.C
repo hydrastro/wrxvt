@@ -489,6 +489,26 @@ rxvt_term::process_kitty_graphics (char *str)
           // keep it for a=p: replace the same id, or the oldest
           kitty_forget (id);
 
+          // the stored ones take at most half of imageMemory: the oldest go
+          for (;;)
+            {
+              size_t total = (size_t)w * h * 4;
+              for (auto &st : kitty_store)
+                if (st.pixels)
+                  total += (size_t)st.w * st.h * 4;
+
+              int first = 0;
+              while (first < (int)ecb_array_length (kitty_store) && !kitty_store[first].pixels)
+                first++;
+
+              if (total <= image_memory_max () / 2 || first == (int)ecb_array_length (kitty_store))
+                break;
+
+              free (kitty_store[first].pixels);
+              kitty_store[first].pixels = 0;
+              kitty_store[first].id = 0;
+            }
+
           int slot = 0;
           for (int i = 0; i < (int)ecb_array_length (kitty_store); i++)
             if (!kitty_store[i].pixels)

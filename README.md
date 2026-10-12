@@ -37,7 +37,8 @@ Drawing:
   everything.
 - **Pictures**: sixel graphics, the kitty graphics protocol and iTerm2
   inline images (img2sixel, chafa, `kitty +kitten icat`, timg, yazi,
-  ranger, imgcat...). They scroll and go into the scrollback like text.
+  ranger, imgcat...). They scroll and go into the scrollback like text,
+  within a memory limit (`imageMemory`, 256 MiB): the oldest go first.
 
 Talking to programs:
 

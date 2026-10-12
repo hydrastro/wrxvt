@@ -13,6 +13,7 @@
   def (recordDirectory)
   def (scrollbackCommand)
   def (notifyLongCommand)
+  def (imageMemory)
   def (color)
   reserve (color, TOTAL_COLORS)
   def (font)

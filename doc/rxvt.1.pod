@@ -989,6 +989,14 @@ which.
 Where B<record:start> puts recordings, as
 F<wrxvt-YYYYMMDD-HHMMSS.cast>; the default is your home directory.
 
+=item B<imageMemory:> I<MiB>
+
+How much memory the pictures of a terminal (sixel, kitty, iTerm2) may
+take, 256 by default; half of it for the pictures kitty programs keep for
+later. Past it, the oldest pictures go, and their cells become blank, so
+a program can't make the terminal use all the memory with pictures. A
+smaller value suits an old computer; fractions work (C<0.5>).
+
 =item B<notifyLongCommand:> I<seconds>
 
 A notification (B<notifyCommand>) when a command that ran at least this

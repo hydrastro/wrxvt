@@ -117,5 +117,25 @@ result['cursor'] = dump()['cursor']
         self.assertEqual(run.result['cursor'], [0, 0])
 
 
+class Memory(TerminalTest):
+    geometry = '60x10'
+
+    def test_oldest_pictures_go(self):
+        # 100x100 pixels: 40000 bytes each; room for two in 0.08 MiB
+        data = b64(png(100, 100))
+        run = self.run_in_terminal(CELL + f"""
+for n, col in enumerate((1, 21, 41)):
+    write('\\x1b[1;%dH\\x1b_Ga=T,f=100,C=1,q=2;{data}\\x1b\\\\' % col)
+    shot('after%d' % n)
+""", args=['-xrm', 'URxvt.imageMemory: 0.08'])
+        fw, fh = run.result['cell']
+        first, second = run.shots['after1'], run.shots['after2']
+        # two fit
+        self.assertTrue(red(first.pixel(5, 5)) and red(first.pixel(20 * fw + 5, 5)))
+        # the third one pushed the first out: its cells are blank now
+        self.assertFalse(red(second.pixel(5, 5)))
+        self.assertTrue(red(second.pixel(20 * fw + 5, 5)) and red(second.pixel(40 * fw + 5, 5)))
+
+
 if __name__ == '__main__':
     unittest.main()
