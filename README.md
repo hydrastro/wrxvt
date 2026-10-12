@@ -70,6 +70,9 @@ Shell integration:
 
 Configuration:
 
+- **Colours follow the X resources**: after `xrdb -merge` (or a theme
+  switch) open windows take the new colours, and programs using mode
+  2031 hear that dark became light.
 - `color16` to `color255` resources.
 - Built-in key actions: `font-size:increase|decrease|reset` (the names
   of the popular perl extension) and `prompt:previous|next`.

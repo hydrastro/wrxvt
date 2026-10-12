@@ -626,6 +626,11 @@ rxvt_term::init_resources (int argc, const char *const *argv)
 
   cmd_argv = get_options (argc, argv);
 
+#if ENABLE_RESOURCE_RELOAD
+  for (int i = 0; i < NRS_COLORS; i++)
+    colors_from_options[i] = rs[Rs_color + i];
+#endif
+
   if (!(display = displays.get (rs[Rs_display_name])))
     rxvt_fatal ("can't open display %s, aborting.\n", rs[Rs_display_name]);
 
@@ -634,6 +639,10 @@ rxvt_term::init_resources (int argc, const char *const *argv)
 
   set (display);
   extract_resources ();
+
+#if ENABLE_RESOURCE_RELOAD
+  resources_ev.start (display, display->root);
+#endif
 
 #if ENABLE_FRILLS
   if (rs[Rs_visual])

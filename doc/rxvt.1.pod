@@ -1715,6 +1715,13 @@ high-intensity (potentially bold/blink) versions of the same, and 72 (or
 240 in 256 colour mode) colours arranged in an 4x4x4 (or 6x6x6) colour RGB
 cube plus a 8 (24) colour greyscale ramp.
 
+The colours follow the X resources: when they change (C<xrdb -merge>,
+a script switching between a dark and a light theme), open windows take
+the new colours at once, as if they had just started. Colours given on
+the command line (B<-fg>, B<-bg>, B<--color>I<n>...) stay as they are,
+and programs that asked for colour scheme reports (mode 2031) are told
+when the background went from dark to light or back.
+
 B<@@RXVT_NAME@@> supports direct 24-bit fg/bg RGB colour escapes
 C< ESC [ 38 ; 2 ; R ; G ; Bm > / C< ESC [ 48 ; 2; R ; G ; Bm >. However the
 number of 24-bit colours that can be used is limited: an internal 7x7x5 (256

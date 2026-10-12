@@ -187,6 +187,10 @@ rxvt_term::rxvt_term ()
   bell_ev.set             <rxvt_term, &rxvt_term::bell_cb>    (this);
 #endif
   child_ev.set            <rxvt_term, &rxvt_term::child_cb>   (this);
+#if ENABLE_RESOURCE_RELOAD
+  resources_ev.set        <rxvt_term, &rxvt_term::resources_cb> (this);
+  resources_reload_ev.set <rxvt_term, &rxvt_term::resources_reload_cb> (this);
+#endif
   flush_ev.set            <rxvt_term, &rxvt_term::flush_cb>   (this);
   sync_ev.set             <rxvt_term, &rxvt_term::sync_cb>    (this);
   destroy_ev.set          <rxvt_term, &rxvt_term::destroy_cb> (this);
@@ -367,6 +371,10 @@ rxvt_term::destroy ()
       scrollbar_ev.stop (display);
 #if ENABLE_PERL
       rootwin_ev.stop (display);
+#endif
+#if ENABLE_RESOURCE_RELOAD
+      resources_ev.stop (display);
+      resources_reload_ev.stop ();
 #endif
       termwin_ev.stop (display);
       vt_ev.stop (display);

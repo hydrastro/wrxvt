@@ -81,6 +81,7 @@
                   pkgs.xdotool
                   pkgs.xclip # OSC 52
                   pkgs.xprop # OSC 7
+                  pkgs.xrdb # colours that follow the resources
                   pkgs.ncurses # tic and infocmp, for the terminfo entry
                 ];
                 FONTCONFIG_FILE = testFonts pkgs;
@@ -110,6 +111,7 @@
               pkgs.xdotool
               pkgs.xclip
               pkgs.xprop
+              pkgs.xrdb
               pkgs.gdb
             ];
             FONTCONFIG_FILE = testFonts pkgs;

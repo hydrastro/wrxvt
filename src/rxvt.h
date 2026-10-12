@@ -760,6 +760,10 @@ typedef callback<int (int)> getfd_callback;
 
 /****************************************************************************/
 
+#if ENABLE_FRILLS && defined(XTERM_COLOR_CHANGE) && !defined(NO_RESOURCES)
+# define ENABLE_RESOURCE_RELOAD 1  // colours follow X resource changes
+#endif
+
 #if ENABLE_FRILLS
 # define ENABLE_SHARE 1         // share.C: the terminal on a web page
 # define ENABLE_RECORD 1        // record.C: asciinema recordings
@@ -1469,6 +1473,12 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
 
 #endif
   const char *initial_colors[NRS_COLORS]; // the colours as configured
+#if ENABLE_RESOURCE_RELOAD
+  bool colors_from_options[NRS_COLORS];    // given on the command line: they stay
+  void resources_cb (XEvent &xev);
+  xevent_watcher resources_ev;
+  void resources_reload_cb (ev::timer &w, int revents); ev::timer resources_reload_ev;
+#endif
   void reset_color (int idx);
   char *font_orig[4];   // the fonts before font-size changes
   int font_delta;

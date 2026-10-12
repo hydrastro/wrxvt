@@ -849,6 +849,65 @@ rxvt_term::extract_resources ()
 #endif /* NO_RESOURCES */
 }
 
+#if ENABLE_RESOURCE_RELOAD
+/*
+ * The colours follow the X resources: when they change (xrdb -merge, a
+ * theme switch), the window takes the new colours, as if it had just
+ * started. Colours given on the command line (-fg, -bg...) stay. Programs
+ * that asked for colour scheme reports (mode 2031) get one if the
+ * background went from dark to light or back.
+ */
+void
+rxvt_term::resources_cb (XEvent &ev)
+{
+  if (ev.type == PropertyNotify && ev.xproperty.atom == XA_RESOURCE_MANAGER)
+    {
+      // xrdb may change it more than once: wait until it's done
+      resources_reload_ev.set (0.1);
+      resources_reload_ev.start ();
+    }
+}
+
+void
+rxvt_term::resources_reload_cb (ev::timer &w, int revents)
+{
+  make_current ();
+
+  XrmDatabase database = display->get_resources (true);
+  if (!database)
+    return;
+
+  for (unsigned int entry = 0; entry < ecb_array_length (optList); entry++)
+    {
+      int idx = optList[entry].doff - Rs_color;
+      const char *kw = optList[entry].kw;
+
+      if (!kw || idx < 0 || idx >= NRS_COLORS || colors_from_options[idx])
+        continue;
+
+      const char *value = get_res (database, rs[Rs_name], kw);
+      if (!value)
+        value = get_res (database, RESCLASS, kw);
+#ifdef RESFALLBACK
+      if (!value)
+        value = get_res (database, RESFALLBACK, kw);
+#endif
+
+      // a colour no longer set keeps its value
+      if (!value || !*value || (initial_colors[idx] && !strcmp (initial_colors[idx], value)))
+        continue;
+
+      char *copy = strdup (value);
+      allocated.push_back ((void *)copy);
+      initial_colors[idx] = copy;
+      set_window_color (idx, copy);
+    }
+
+  XrmDestroyDatabase (database);
+  refresh_check ();
+}
+#endif
+
 struct rxvt_enumerate_closure
 {
   rxvt_term *term;

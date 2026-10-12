@@ -116,7 +116,7 @@ class TerminalTest(unittest.TestCase):
             raise unittest.SkipTest('Xvfb not installed')
         cls.display = Display.get()
 
-    def run_in_terminal(self, code, args=(), geometry=None, timeout=20, env=None):
+    def run_in_terminal(self, code, args=(), geometry=None, timeout=20, env=None, colors=True):
         work = Path(tempfile.mkdtemp(prefix='wrxvt-test-'))
         self.addCleanup(shutil.rmtree, work, ignore_errors=True)
         code_path = work / 'code.py'
@@ -126,7 +126,8 @@ class TerminalTest(unittest.TestCase):
                        'HOME': str(work), **(env or {})}
         environment.pop('WINDOWID', None)
         command = [binary(), '-display', self.display.name, '-geometry', geometry or self.geometry,
-                   '-fn', FONT, '-bg', 'black', '-fg', 'white', '+sb', '-b', '0', '-w', '0',
+                   '-fn', FONT, *(['-bg', 'black', '-fg', 'white'] if colors else []),
+                   '+sb', '-b', '0', '-w', '0',
                    '-perl-lib', str(HERE / 'perl'), '-pe', 'wrxvt-test', '-name', 'wrxvt-test',
                    *args, '-e', 'python3', str(HERE / 'inner.py'), str(result_path), str(code_path)]
         process = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE,
