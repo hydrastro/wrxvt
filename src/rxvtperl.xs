@@ -857,6 +857,10 @@ BOOT:
     const_iv (RS_Blink),
     const_iv (RS_RVid),
     const_iv (RS_Uline),
+    const_iv (RS_Faint),
+    const_iv (RS_Strike),
+    const_iv (RS_Overline),
+    const_iv (RS_Conceal),
 
     // TODO: should support all colour constants, create colorinc.h &c
     const_iv (Color_fg),

@@ -389,7 +389,14 @@ enum {
 #define RS_RVid                 (1UL << 30)    // reverse video
 #define RS_Uline                (1UL << 31)    // underline
 
-#define RS_baseattrMask         (RS_Italic | RS_Bold | RS_Blink | RS_RVid | RS_Uline)
+// attributes that didn't fit in rxvt-unicode's 32 bits (see rend_t)
+#define RS_Faint                ((rend_t)1 << 32)   // SGR 2: dim
+#define RS_Strike               ((rend_t)1 << 33)   // SGR 9: crossed out
+#define RS_Overline             ((rend_t)1 << 34)   // SGR 53
+#define RS_Conceal              ((rend_t)1 << 35)   // SGR 8: invisible
+
+#define RS_baseattrMask         (RS_Italic | RS_Bold | RS_Blink | RS_RVid | RS_Uline \
+                                 | RS_Faint | RS_Strike | RS_Overline | RS_Conceal)
 #define RS_attrMask             (RS_baseattrMask | RS_fontMask)
 
 #define DEFAULT_RSTYLE  (RS_None | (Color_fg    << RS_fgShift) | (Color_bg     << RS_bgShift))
@@ -1421,6 +1428,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void process_color_seq (int report, int color, const char *str, string_term &st);
   void process_xterm_seq (int op, char *str, string_term &st);
   unsigned int map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsigned int a);
+  int faint_color (int fore, int back);
   int privcases (int mode, unsigned long bit);
   void process_terminal_mode (int mode, int priv, unsigned int nargs, const int *arg);
   void process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub = 0);

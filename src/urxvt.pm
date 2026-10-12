@@ -616,11 +616,14 @@ being reset. Useful as a base to start when creating renditions.
 Return the rendition mask used for overlays by default.
 
 =item $rendbit = urxvt::RS_Bold, urxvt::RS_Italic, urxvt::RS_Blink,
-urxvt::RS_RVid, urxvt::RS_Uline
+urxvt::RS_RVid, urxvt::RS_Uline, urxvt::RS_Faint, urxvt::RS_Strike,
+urxvt::RS_Overline, urxvt::RS_Conceal
 
-Return the bit that enabled bold, italic, blink, reverse-video and
-underline, respectively. To enable such a style, just logically OR it into
-the bitset.
+Return the bit that enabled bold, italic, blink, reverse-video,
+underline, faint, crossed-out, overline and invisible, respectively. To
+enable such a style, just logically OR it into the bitset. Renditions are
+64 bits wide in wrxvt; the last four bits are above bit 31, so they need
+a perl with 64-bit integers (any 64-bit system).
 
 =item $foreground = urxvt::GET_BASEFG $rend
 

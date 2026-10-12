@@ -663,6 +663,22 @@ rxvt_term::scr_color (unsigned int color, int fgbg) noexcept
 
 /* ------------------------------------------------------------------------- */
 /*
+ * The colour faint (SGR 2) text is drawn in: halfway between the
+ * foreground and the background, in one of the 24-bit colour slots.
+ */
+int
+rxvt_term::faint_color (int fore, int back)
+{
+  rgba f, b;
+
+  pix_colors[fore].get (f);
+  pix_colors[back].get (b);
+
+  return map_rgb24_color ((f.r + b.r) >> 9, (f.g + b.g) >> 9, (f.b + b.b) >> 9, f.a >> 8);
+}
+
+/* ------------------------------------------------------------------------- */
+/*
  * Change the rendition style for following text
  */
 void
@@ -2473,6 +2489,12 @@ rxvt_term::scr_refresh () noexcept
 #endif
                 }
 
+              if (rend & RS_Faint)
+                fore = faint_color (fore, back);
+
+              if (rend & RS_Conceal)
+                fore = back;
+
 #ifdef TEXT_BLINK
               if (rend & RS_Blink && (back == Color_bg || fore == Color_bg))
                 {
@@ -2543,6 +2565,23 @@ rxvt_term::scr_refresh () noexcept
               XDrawLine (dpy, vt, gc,
                          xpixel, ypixel + font->ascent + 1,
                          xpixel + Width2Pixel (count) - 1, ypixel + font->ascent + 1);
+            }
+
+          if (ecb_unlikely (rend & (RS_Strike | RS_Overline) && fore != back))
+            {
+              // as thick as the font's strokes, roughly
+              int thickness = max (1, (font->ascent + font->descent) / 16);
+
+              XSetForeground (dpy, gc, pix_colors[fore]);
+
+              // through the middle of the lower-case letters
+              if (rend & RS_Strike)
+                XFillRectangle (dpy, vt, gc, xpixel,
+                                ypixel + font->ascent - font->ascent * 3 / 10 - thickness / 2,
+                                Width2Pixel (count), thickness);
+
+              if (rend & RS_Overline)
+                XFillRectangle (dpy, vt, gc, xpixel, ypixel, Width2Pixel (count), thickness);
             }
         }                     /* for (col....) */
     }                         /* for (row....) */

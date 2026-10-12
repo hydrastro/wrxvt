@@ -3993,7 +3993,9 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
           case 1:
             rendset = 1, rendstyle = RS_Bold;
             break;
-          //case 2: // low intensity
+          case 2: // faint
+            rendset = 1, rendstyle = RS_Faint;
+            break;
           case 3:
             rendset = 1, rendstyle = RS_Italic;
             break;
@@ -4012,10 +4014,12 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
           case 7:
             rendset = 1, rendstyle = RS_RVid;
             break;
-          case 8:
-            // invisible. NYI
+          case 8: // invisible
+            rendset = 1, rendstyle = RS_Conceal;
             break;
-          //case 9: // crossed out
+          case 9: // crossed out
+            rendset = 1, rendstyle = RS_Strike;
+            break;
           //case 10: // scoansi acs off, primary font
           //case 11: // scoansi acs on, first alt font
           //case 12: // scoansi acs on, |0x80, second alt font
@@ -4025,8 +4029,8 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
           case 21: // disable bold, faint, sometimes doubly underlined (iso 8613)
             rendset = 0, rendstyle = RS_Bold;
             break;
-          case 22: // bold off (vt220)
-            rendset = 0, rendstyle = RS_Bold;
+          case 22: // normal intensity: neither bold nor faint
+            rendset = 0, rendstyle = RS_Bold | RS_Faint;
             break;
           case 23: // disable italic
             rendset = 0, rendstyle = RS_Italic;
@@ -4043,8 +4047,18 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
           case 27: // reverse off (vt220)
             rendset = 0, rendstyle = RS_RVid;
             break;
-          //case 28: // visible. NYI
-          //case 29: // not crossed-out
+          case 28: // visible
+            rendset = 0, rendstyle = RS_Conceal;
+            break;
+          case 29: // not crossed out
+            rendset = 0, rendstyle = RS_Strike;
+            break;
+          case 53: // overlined
+            rendset = 1, rendstyle = RS_Overline;
+            break;
+          case 55: // not overlined
+            rendset = 0, rendstyle = RS_Overline;
+            break;
         }
 
       if (rendset != -1)
