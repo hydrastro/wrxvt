@@ -1317,7 +1317,9 @@ example:
    URxvt.keysym.C-0:     font-size:reset
 
 These are the action names of the popular C<font-size> perl extension,
-which is no longer needed.
+which is no longer needed for them, and its C<font-size.step> resource
+sets the step here too (other actions of the extension, like
+C<incglobal>, still go to it if it is installed).
 
 =item prompt:previous, prompt:next
 

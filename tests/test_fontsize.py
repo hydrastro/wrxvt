@@ -36,6 +36,18 @@ class FontSize(TerminalTest):
         self.assertEqual(reset, start)
         self.assertIn('pixelsize=16', run.result['font'])
 
+    def test_step_resource(self):
+        run = self.run_in_terminal(r'''
+            import os, subprocess
+            settle()
+            window = os.environ['WINDOWID']
+            subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
+                            'windowfocus', window, 'key', 'F7'], check=True, capture_output=True)
+            settle()
+            result['font'] = query('\x1b]50;?\x07', r'\x07$')
+        ''', args=['-insecure', '-keysym.F7', 'font-size:increase', '-xrm', 'URxvt.font-size.step: 3'])
+        self.assertIn('pixelsize=19', run.result['font'])
+
 
 if __name__ == '__main__':
     unittest.main()

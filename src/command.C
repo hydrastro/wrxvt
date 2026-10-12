@@ -4703,7 +4703,11 @@ rxvt_term::change_font_size (int delta)
       font_size_set = true;
     }
 
-  font_delta = delta ? font_delta + delta : 0;
+  // the step of the font-size perl extension's resource, so its settings carry over
+  const char *step = x_resource ("font-size.step");
+  int n = step ? atoi (step) : 1;
+
+  font_delta = delta ? font_delta + delta * (n > 0 ? n : 1) : 0;
 
   for (int i = 0; i < fonts; i++)
     if (font_orig[i])
