@@ -41,6 +41,13 @@ operator delete (void *p) noexcept
   free (p);
 }
 
+// C++14 sized deallocation (std::vector uses it): the same
+void
+operator delete (void *p, size_t) noexcept
+{
+  free (p);
+}
+
 char *
 rxvt_wcstombs (const wchar_t *str, int len)
 {
