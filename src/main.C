@@ -221,6 +221,12 @@ rxvt_term::~rxvt_term ()
 
   free (pstr.buf);
 
+  for (int i = 0; i < title_depth; i++)
+    {
+      free (title_stack[i].title);
+      free (title_stack[i].icon);
+    }
+
   if (links)
     {
       for (int i = 0; i <= LINK_MAX; i++)

@@ -1721,11 +1721,15 @@ Window Operations
 	B<< C<Ps = 8> >>	B<< C<ESC [ 8 ; R ; C t> >> Resize to R rows and C columns
 	B<< C<Ps = 11> >>	Report window state (responds with C<Ps = 1> or C<Ps = 2>)
 	B<< C<Ps = 13> >>	Report window position (responds with C<Ps = 3>)
-	B<< C<Ps = 14> >>	Report window pixel size (responds with C<Ps = 4>)
-	B<< C<Ps = 18> >>	Report window text size (responds with C<Ps = 7>)
+	B<< C<Ps = 14> >>	Report the text area size in pixels (responds with C<ESC [ 4 ; height ; width t>); C<ESC [ 14 ; 2 t> the whole window's
+	B<< C<Ps = 15> >>	Report the screen size in pixels (responds with C<Ps = 5>)
+	B<< C<Ps = 16> >>	Report the character cell size in pixels (responds with C<ESC [ 6 ; height ; width t>)
+	B<< C<Ps = 18> >>	Report window text size (responds with C<ESC [ 8 ; rows ; columns t>)
 	B<< C<Ps = 19> >>	Currently the same as C<Ps = 18>, but responds with C<Ps = 9>
-	B<< C<Ps = 20> >>	Reports icon label (B<< C<ESC ] L NAME \234> >>) (insecure mode)
-	B<< C<Ps = 21> >>	Reports window title (B<< C<ESC ] l NAME \234> >>) (insecure mode)
+	B<< C<Ps = 20> >>	Reports icon label (B<< C<ESC ] L NAME ESC \> >>) (insecure mode)
+	B<< C<Ps = 21> >>	Reports window title (B<< C<ESC ] l NAME ESC \> >>) (insecure mode)
+	B<< C<Ps = 22> >>	Save the title and icon name on a stack (C<ESC [ 22 ; 1 t> only the icon name, C<ESC [ 22 ; 2 t> only the title), up to 10 deep
+	B<< C<Ps = 23> >>	Restore the title and icon name saved last (C<; 1> and C<; 2> as for C<Ps = 22>)
 	B<< C<Ps = 24..> >>	Set window height to C<Ps> rows
 
 =end table

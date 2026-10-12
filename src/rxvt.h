@@ -645,6 +645,7 @@ enum {
 #define IMBUFSIZ               128     // input modifier buffer sizes
 #define KBUFSZ                 512     // size of keyboard mapping buffer
 #define SYNC_OUTPUT_TIMEOUT    0.5     // seconds a synchronized update (mode 2026) may hold the screen
+#define TITLE_STACK_MAX        10      // titles CSI 22 t can save
 #define LINK_MAX               0x7fff  // hyperlinks a terminal remembers (15 rendition bits)
 #define STRING_MAX             (1 << 22) // longest control string (OSC, DCS...) in characters
 #define CBUFSIZ                32768   // size of command buffer (longest command sequence possible)
@@ -1380,6 +1381,11 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool open_link (int x, int y);
   void spawn (const char *command, const char *arg1, const char *arg2 = 0);
   void notify (const char *text);
+  char *get_title (bool icon);
+
+  // the title stack (CSI 22 t, CSI 23 t)
+  struct title_stack_entry { char *title, *icon; } title_stack[TITLE_STACK_MAX];
+  int title_depth;
 
   // hyperlinks (OSC 8), indexed by the RS_link bits; 0 is unused
   struct hyperlink { char *id, *uri; } *links;

@@ -3272,6 +3272,30 @@ rxvt_term::process_csi_seq ()
 }
 /*}}} */
 
+// the window title (or icon name) in the locale's encoding; free () it
+char *
+rxvt_term::get_title (bool icon)
+{
+  XTextProperty prop;
+  char *title = 0;
+
+  if (XGetTextProperty (dpy, parent, &prop, icon ? XA_WM_ICON_NAME : XA_WM_NAME))
+    {
+      char **list;
+      int count;
+
+      if (XmbTextPropertyToTextList (dpy, &prop, &list, &count) >= Success && count > 0)
+        {
+          title = strdup (list[0]);
+          XFreeStringList (list);
+        }
+
+      XFree (prop.value);
+    }
+
+  return title ? title : strdup ("");
+}
+
 #if !ENABLE_MINIMAL
 void
 rxvt_term::process_window_ops (const int *args, unsigned int nargs)
@@ -3337,9 +3361,21 @@ rxvt_term::process_window_ops (const int *args, unsigned int nargs)
                                &x, &y, &wdummy);
         tt_printf ("\033[3;%d;%dt", x, y);
         break;
-      case 14:			/* report window size (pixels) */
+      case 14:			/* report text area size (pixels), with 2: the window's */
+        if (nargs > 1 && args[1] == 2)
+          {
+            XGetWindowAttributes (dpy, parent, &wattr);
+            tt_printf ("\033[4;%d;%dt", wattr.height, wattr.width);
+          }
+        else
+          tt_printf ("\033[4;%d;%dt", Height2Pixel (nrow), Width2Pixel (ncol));
+        break;
+      case 15:			/* report screen size (pixels) */
         XGetWindowAttributes (dpy, parent, &wattr);
-        tt_printf ("\033[4;%d;%dt", wattr.height, wattr.width);
+        tt_printf ("\033[5;%d;%dt", HeightOfScreen (wattr.screen), WidthOfScreen (wattr.screen));
+        break;
+      case 16:			/* report character cell size (pixels) */
+        tt_printf ("\033[6;%d;%dt", fheight, fwidth);
         break;
       case 18:			/* report text area size (chars) */
         tt_printf ("\033[8;%d;%dt", nrow, ncol);
@@ -3348,20 +3384,56 @@ rxvt_term::process_window_ops (const int *args, unsigned int nargs)
         tt_printf ("\033[9;%d;%dt", nrow, ncol);
         break;
       case 20:			/* report icon label */
-        {
-          char *s;
-          XGetIconName (dpy, parent, &s);
-          tt_printf ("\033]L%-.250s\234", option (Opt_insecure) && s ? s : "");	/* 8bit ST */
-          XFree (s);
-        }
-        break;
       case 21:			/* report window title */
         {
-          char *s;
-          XFetchName (dpy, parent, &s);
-          tt_printf ("\033]l%-.250s\234", option (Opt_insecure) && s ? s : "");	/* 8bit ST */
-          XFree (s);
+          char *s = get_title (args[0] == 20);
+          tt_printf ("\033]%c%-.250s\033\\", args[0] == 20 ? 'L' : 'l', option (Opt_insecure) ? s : "");
+          free (s);
         }
+        break;
+
+      /*
+       * the title stack: programs (vim, for one) save the title, set their
+       * own, and restore it when they exit. 0 is both, 1 the icon name,
+       * 2 the title.
+       */
+      case 22:			/* push the title and/or icon name */
+        {
+          int which = nargs > 1 ? args[1] : 0;
+          title_stack_entry e = { 0, 0 };
+
+          if (which == 0 || which == 2)
+            e.title = get_title (false);
+
+          if (which == 0 || which == 1)
+            e.icon = get_title (true);
+
+          if (title_depth == TITLE_STACK_MAX)
+            {
+              // full: forget the oldest
+              free (title_stack[0].title);
+              free (title_stack[0].icon);
+              memmove (title_stack, title_stack + 1, (TITLE_STACK_MAX - 1) * sizeof (title_stack[0]));
+              title_depth--;
+            }
+
+          title_stack[title_depth++] = e;
+        }
+        break;
+      case 23:			/* pop the title and/or icon name */
+        if (title_depth)
+          {
+            int which = nargs > 1 ? args[1] : 0;
+            title_stack_entry &e = title_stack[--title_depth];
+
+            if (e.title && (which == 0 || which == 2))
+              set_title (e.title);
+            if (e.icon && (which == 0 || which == 1))
+              set_icon_name (e.icon);
+
+            free (e.title);
+            free (e.icon);
+          }
         break;
     }
 }
@@ -4140,16 +4212,13 @@ rxvt_term::notify (const char *text)
   if (!*notifier)
     return; // disabled
 
-  char *title = 0;
-  XFetchName (dpy, parent, &title);
+  char *title = get_title (false);
 
   char *command = (char *)rxvt_malloc (strlen (notifier) + 16);
   sprintf (command, "%s \"$1\" \"$2\"", notifier);
-  spawn (command, title && *title ? title : RESNAME, text);
+  spawn (command, *title ? title : RESNAME, text);
   free (command);
-
-  if (title)
-    XFree (title);
+  free (title);
 
 #if ENABLE_FRILLS
   if (!focus && option (Opt_urgentOnBell))
