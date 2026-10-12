@@ -439,6 +439,7 @@ enum {
   XTerm_iconName         =  1,
   XTerm_title            =  2,
   XTerm_property         =  3,      // change X property
+  XTerm_cwd              =  7,      // the shell's current directory, as file://host/path
   XTerm_Color            =  4,      // change colors
   XTerm_Color00          = 10,      // change fg color
   XTerm_Color01          = 11,      // change bg color
@@ -483,6 +484,8 @@ enum {
   URxvt_view_down        = 721,
 
   URxvt_cellinfo         = 776,     // returns font cell width, height etc.
+
+  Shell_mark             = 133,     // FinalTerm/iTerm2 shell integration: prompt and command marks
   URxvt_perl             = 777,     // for use by perl extensions, starts with "extension-name;"
 };
 
@@ -746,6 +749,7 @@ typedef callback<int (int)> getfd_callback;
 #define LINE_COMPRESSED 0x0004 // line has been compressed (NYI)
 #define LINE_FILTER     0x0008 // line needs to be filtered before display (NYI)
 #define LINE_BIDI       0x0010 // line needs bidi (NYI)
+#define LINE_PROMPT     0x0020 // a shell prompt begins on this line (OSC 133 ; A)
 
 struct line_t
 {
@@ -1360,6 +1364,9 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void sync_cb (ev::timer &w, int revents); ev::timer sync_ev;
   void sync_output (bool on);
   int color_scheme ();
+  bool jump_to_prompt (int dir);
+  bool builtin_action (const char *name, const char *arg);
+  void set_cwd (const char *uri);
   void color_scheme_check ();
   int reported_color_scheme;
   void cmdbuf_reify ();

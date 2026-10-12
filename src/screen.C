@@ -372,6 +372,7 @@ rxvt_term::scr_reset ()
                   qline = row_buf + qrow;
                   qline->alloc (); // redundant with next line
                   qline->l = ncol;
+                  qline->f = qrow == q ? prev_row_buf [p].f & LINE_PROMPT : 0;
                   qline->is_longer (1);
 
                   int qcol = 0;

@@ -3934,6 +3934,99 @@ rxvt_term::process_selection_seq (char *str, string_term &st)
 
 /*----------------------------------------------------------------------*/
 /*
+ * OSC 7: the shell tells its current directory as file://host/path. It is
+ * published as the _WRXVT_CWD property of the window, so a window manager
+ * binding can open a new terminal in the same place:
+ *
+ *   wrxvt -cd "$(xprop -id "$(xdotool getactivewindow)" _WRXVT_CWD | cut -d'"' -f2)"
+ */
+void
+rxvt_term::set_cwd (const char *uri)
+{
+  if (strncmp (uri, "file://", 7))
+    return;
+
+  const char *path = strchr (uri + 7, '/'); // skip the host name
+  if (!path)
+    return;
+
+  // undo the percent-encoding
+  char *dir = (char *)rxvt_malloc (strlen (path) + 1);
+  char *d = dir;
+
+  for (const char *p = path; *p; p++)
+    {
+      int hi, lo;
+
+      if (*p == '%'
+          && (hi = hex_digit (p[1])) >= 0
+          && (lo = hex_digit (p[2])) >= 0)
+        {
+          *d++ = hi * 16 + lo;
+          p += 2;
+        }
+      else
+        *d++ = *p;
+    }
+
+  *d = 0;
+
+  set_utf8_property (display->atom ("_WRXVT_CWD"), dir);
+  free (dir);
+}
+
+/*
+ * Scroll so that the previous (dir < 0) or next (dir > 0) prompt marked
+ * with OSC 133 ; A is the top line; the next one after the last prompt
+ * is the bottom of the screen.
+ */
+bool
+rxvt_term::jump_to_prompt (int dir)
+{
+  if (current_screen != PRIMARY)
+    return false;
+
+  if (dir < 0)
+    {
+      for (int row = view_start - 1; row >= top_row; row--)
+        if (ROW (row).f & LINE_PROMPT)
+          return scr_changeview (row);
+
+      return false;
+    }
+
+  for (int row = view_start + 1; row < 0; row++)
+    if (ROW (row).f & LINE_PROMPT)
+      return scr_changeview (row);
+
+  return scr_changeview (0);
+}
+
+/*
+ * Actions for keysym bindings (URxvt.keysym.C-S-Up: prompt:previous)
+ * that wrxvt does without perl.
+ */
+bool
+rxvt_term::builtin_action (const char *name, const char *arg)
+{
+  if (!strcmp (name, "prompt"))
+    {
+      if (!strcmp (arg, "previous"))
+        jump_to_prompt (-1);
+      else if (!strcmp (arg, "next"))
+        jump_to_prompt (1);
+      else
+        return false;
+
+      refresh_check ();
+      return true;
+    }
+
+  return false;
+}
+
+/*----------------------------------------------------------------------*/
+/*
  * process OPERATING SYSTEM COMMAND sequence `ESC ] Ps ; Pt (ST|BEL)'
  */
 void
@@ -4214,6 +4307,17 @@ rxvt_term::process_xterm_seq (int op, char *str, string_term &st)
 
       case XTerm_selection:
         process_selection_seq (str, st);
+        break;
+
+      case XTerm_cwd:
+        set_cwd (str);
+        break;
+
+      case Shell_mark:
+        // A: a prompt starts here. B (command typed), C (its output
+        // starts) and D (it ended) need nothing yet.
+        if (str[0] == 'A' && (!str[1] || str[1] == ';') && current_screen == PRIMARY)
+          ROW (screen.cur.row).f |= LINE_PROMPT;
         break;
 
 #if 0

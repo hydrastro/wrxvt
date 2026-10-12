@@ -1292,6 +1292,21 @@ this:
    URxvt.keysym.C-M-c: builtin-string:
    URxvt.keysym.C-M-v: builtin-string:
 
+=item prompt:previous, prompt:next
+
+Scroll back to the previous shell prompt, so that it is the top line, or
+forward to the next one (or the bottom, after the last prompt). The shell
+has to mark its prompts with C<ESC ] 133 ; A ST> (see @@RXVT_NAME@@(7));
+for bash, for example:
+
+   PS0+='\e]133;C\e\\'
+   PS1='\[\e]133;A\e\\\]'"$PS1"
+
+and the bindings:
+
+   URxvt.keysym.C-S-Up: prompt:previous
+   URxvt.keysym.C-S-Down: prompt:next
+
 =item EXTENSION:STRING
 
 An action of this form invokes the action B<STRING>, if any, provided

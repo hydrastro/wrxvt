@@ -37,6 +37,9 @@ sub on_osc_seq_perl {
       nrow   => $self->nrow,
       cursor => [ $self->screen_cur ],
       saved  => -$self->top_row,
+      view_start => $self->view_start,
+      # the text at the top of the view (row 0 when not scrolled back)
+      view_top   => $self->ROW_t ($self->view_start),
       attr   => \%attr,
    );
 
