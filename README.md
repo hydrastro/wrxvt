@@ -30,6 +30,9 @@ Drawing:
   whatever the font.
 - **Hyperlinks** (OSC 8): drawn with a dashed underline. Control-click
   opens them with `url-launcher`.
+- **Hints** (`hints:open`, `hints:copy`, `hints:insert`): letters on
+  every link, path and git hash on the screen; type one to open, copy or
+  insert it, without the mouse.
 - **Synchronized output** (mode 2026): no tearing when a program redraws
   everything.
 - **Pictures**: sixel graphics, the kitty graphics protocol and iTerm2

@@ -222,6 +222,11 @@ rxvt_term::scr_reset ()
   share_changed (); // a new size for the viewers
 #endif
 
+#if ENABLE_HINTS
+  if (hints)
+    hints_end (); // they were for the old size
+#endif
+
   view_start = 0;
   num_scr = 0;
 

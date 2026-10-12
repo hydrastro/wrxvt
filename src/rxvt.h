@@ -766,6 +766,7 @@ typedef callback<int (int)> getfd_callback;
 #endif
 
 #if ENABLE_FRILLS
+# define ENABLE_HINTS 1         // hints.C: pick things on the screen with the keyboard
 # define ENABLE_DND 1           // dnd.C: drag and drop
 # define ENABLE_SHARE 1         // share.C: the terminal on a web page
 # define ENABLE_RECORD 1        // record.C: asciinema recordings
@@ -773,6 +774,9 @@ typedef callback<int (int)> getfd_callback;
 
 struct share_server;
 struct term_recording;
+struct term_hints;
+struct hint;
+struct hint_line;
 struct rxvt_buf;
 
 /*
@@ -1533,6 +1537,25 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   char *app_title;      // the title as programs set it, without marks like [shared]
   void update_title ();
   void set_selection (const wchar_t *text, bool primary, bool clipboard);
+
+#if ENABLE_HINTS
+  // hints (hints.C)
+  enum { HINTS_OPEN, HINTS_COPY, HINTS_INSERT };
+  term_hints *hints;
+  void hints_start (int action);
+  void hints_end ();
+  void hints_key (XKeyEvent &ev);
+  void hints_find ();
+  void hints_scan_line (const hint_line &l);
+  void hints_add (int row, int col, int cells, char *text);
+  void hints_add_match (const hint_line &l, int from, int to);
+  bool hints_overlap (int row, int col, int cells);
+  void hints_set_cell (int row, int col, text_t t, rend_t r);
+  void hints_draw ();
+  void hints_act (hint &m);
+  char *hints_path (const char *text);
+#endif
+  char *shell_cwd;          // the shell's directory (OSC 7)
 
 #if ENABLE_DND
   // drag and drop (dnd.C)

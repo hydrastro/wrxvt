@@ -231,6 +231,11 @@ rxvt_term::~rxvt_term ()
 #endif
   free (app_title);
   free (command_text);
+  free (shell_cwd);
+#if ENABLE_HINTS
+  if (hints)
+    hints_end ();
+#endif
   free (kitty_note.id);
   free (kitty_note.title);
   free (kitty_note.body);

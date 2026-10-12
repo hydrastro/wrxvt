@@ -1411,6 +1411,20 @@ or make a GIF with agg. For example:
 
    URxvt.keysym.C-S-F10: record:toggle
 
+=item hints:open, hints:copy, hints:insert
+
+Pick something on the screen with the keyboard: a label of one or two
+letters appears on every link (OSC 8 hyperlinks and URLs), file path (a
+word with a slash; a C<:line:column> after it is left out) and git hash.
+Typing a label opens it with B<url-launcher> (B<hints:open>; relative
+paths from the shell's directory), copies it to the clipboard and the
+primary selection (B<hints:copy>), or types it at the cursor
+(B<hints:insert>). Escape, or a key no label starts with, gives up.
+While the labels show, the program's output waits. For example:
+
+   URxvt.keysym.C-S-o: hints:open
+   URxvt.keysym.C-S-y: hints:copy
+
 =item scrollback:pager
 
 Open the whole scrollback and screen, with their colours, in a pager:

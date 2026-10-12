@@ -39,7 +39,7 @@ COMMON = \
 	command.o rxvtfont.o init.o main.o misc.o \
 	screen.o scrollbar.o scrollbar-next.o scrollbar-rxvt.o \
 	scrollbar-xterm.o scrollbar-plain.o xdefaults.o encoding.o \
-	rxvttoolkit.o rxvtutil.o keyboard.o rxvtimg.o sixel.o graphics.o share.o record.o dnd.o scrollback.o \
+	rxvttoolkit.o rxvtutil.o keyboard.o rxvtimg.o sixel.o graphics.o share.o record.o dnd.o scrollback.o hints.o \
 	ev_cpp.o @PERL_O@
 
 COMMON_DAEMON = rxvtdaemon.o
@@ -270,3 +270,5 @@ dnd.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
 dnd.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h
 scrollback.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
 scrollback.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h
+hints.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
+hints.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h callback.h rsinc.h optinc.h rxvtbuf.h

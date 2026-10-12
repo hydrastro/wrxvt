@@ -423,6 +423,14 @@ rxvt_term::key_press (XKeyEvent &ev)
     return;
 #endif
 
+#if ENABLE_HINTS
+  if (hints)
+    {
+      hints_key (ev);
+      return;
+    }
+#endif
+
   /*
    * use Num_Lock to toggle Keypad on/off.  If Num_Lock is off, allow an
    * escape sequence to toggle the Keypad.
@@ -4449,7 +4457,8 @@ rxvt_term::set_cwd (const char *uri)
   *d = 0;
 
   set_utf8_property (display->atom ("_WRXVT_CWD"), dir);
-  free (dir);
+  free (shell_cwd);
+  shell_cwd = dir;
 }
 
 /*
@@ -5034,6 +5043,22 @@ rxvt_term::builtin_action (const char *name, const char *arg)
   if (!strcmp (name, "scrollback") && !strcmp (arg, "pager"))
     {
       scrollback_pager ();
+      return true;
+    }
+#endif
+
+#if ENABLE_HINTS
+  if (!strcmp (name, "hints"))
+    {
+      if (!strcmp (arg, "open"))
+        hints_start (HINTS_OPEN);
+      else if (!strcmp (arg, "copy"))
+        hints_start (HINTS_COPY);
+      else if (!strcmp (arg, "insert"))
+        hints_start (HINTS_INSERT);
+      else
+        return false;
+
       return true;
     }
 #endif
