@@ -1,4 +1,5 @@
 """The harness itself, and behaviour wrxvt inherits from rxvt-unicode."""
+import shutil
 import unittest
 
 from harness import TerminalTest
@@ -31,6 +32,23 @@ class Basics(TerminalTest):
         r, g, b = image.pixel(3, 3)
         self.assertGreater(r, 150)
         self.assertLess(g + b, 60)
+
+
+class KeysymOptions(TerminalTest):
+    @unittest.skipUnless(shutil.which('xdotool'), 'xdotool not installed')
+    def test_keysym_from_the_command_line(self):
+        # Xvfb has no resource database: the options must still work
+        run = self.run_in_terminal(r'''
+            import os, subprocess
+            settle()
+            termios.tcflush(0, termios.TCIFLUSH)
+            window = os.environ['WINDOWID']
+            subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
+                            'windowfocus', '--sync', window, 'key', 'F9'],
+                           check=True, capture_output=True)
+            result['typed'] = read_until('HELLO', timeout=3)
+        ''', args=['-keysym.F9', 'string:HELLO'])
+        self.assertEqual(run.result['typed'], 'HELLO')
 
 
 if __name__ == '__main__':
