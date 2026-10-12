@@ -13,12 +13,15 @@
   harfbuzz,
   pkg-config,
   gdk-pixbuf,
+  openssl,
   perl,
   libptytty,
   makeDesktopItem,
   perlSupport ? true,
   gdkPixbufSupport ? true,
   emojiSequences ? true,
+  shareTls ? true, # HTTPS for share:start
+
   src ? ../.,
   version ? "9.32",
 }:
@@ -64,7 +67,8 @@ stdenv.mkDerivation {
     libxext
   ]
   ++ lib.optional gdkPixbufSupport gdk-pixbuf
-  ++ lib.optional emojiSequences harfbuzz;
+  ++ lib.optional emojiSequences harfbuzz
+  ++ lib.optional shareTls openssl;
 
   outputs = [
     "out"
@@ -78,6 +82,7 @@ stdenv.mkDerivation {
     (lib.enableFeature perlSupport "perl")
     (lib.enableFeature gdkPixbufSupport "pixbuf")
     (lib.enableFeature emojiSequences "emoji-sequences")
+    (lib.enableFeature shareTls "share-tls")
     "CXXFLAGS=-std=c++17"
   ];
 

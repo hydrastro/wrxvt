@@ -24,7 +24,11 @@ Drawing:
 - **Colon sub-parameters** in SGR (`38:2::R:G:B`, `4:3`), and renditions
   widened to 64 bits to make room for all of the above.
 - **Emoji sequences** (flags, skin tones, ZWJ families) drawn as one
-  emoji, with `--enable-emoji-sequences` (needs HarfBuzz).
+  emoji, with `--enable-emoji-sequences` (needs HarfBuzz), which also
+  draws other clusters (Indic conjuncts, marks) with the font's shaping.
+- **Grapheme clusters** (mode 2027): a program that sets it gets each
+  cluster (a letter and its marks, an Indic conjunct, a flag, an emoji
+  sequence) in one cell, or two if wide, by Unicode's rules.
 - **Built-in glyphs** for braille (U+2800-28FF), powerline arrows
   (U+E0B0-E0B7) and sextants (U+1FB00-1FB3B). They join up exactly
   whatever the font.
@@ -39,6 +43,9 @@ Drawing:
   inline images (img2sixel, chafa, `kitty +kitten icat`, timg, yazi,
   ranger, imgcat...). They scroll and go into the scrollback like text,
   within a memory limit (`imageMemory`, 256 MiB): the oldest go first.
+  Kitty's Unicode placeholders work as well (`kitten icat
+  --unicode-placeholder`, timg and yazi in tmux): pictures as text that
+  tmux and vim move around.
 
 Talking to programs:
 
@@ -63,9 +70,14 @@ Talking to programs:
 Sharing:
 
 - **Share the terminal on a web page** (`share:start`, `-share`): a
-  link to watch and a link that can also type, each with its own random
-  key, for pair programming, teaching or demos. Local by default; the
-  title says when someone is watching.
+  link to watch and a link that can also type (`share:control`), each
+  with its own random key, for pair programming, teaching, demos, or
+  your own phone. The typing page takes any keyboard (input methods and
+  phone keyboards included), has a bar with Esc, Tab, Ctrl, Alt and the
+  arrows, and passes clicks and the wheel to programs that use the mouse.
+  Local by default; HTTPS for the network (`shareCertificate: auto` makes
+  a certificate, `--enable-share-tls`); the title says when someone is
+  watching.
 - **The scrollback in a pager** (`scrollback:pager`): everything, with
   its colours, in `less` in a new window.
 - **Recording** (`record:toggle`, `-record FILE`): asciinema files of
@@ -115,9 +127,6 @@ Fixes:
 
 Planned at some point, and why not now:
 
-- **Grapheme clusters (mode 2027)**: emoji sequences are drawn as one
-  emoji already; full clustering (Indic scripts, Hangul) needs Unicode's
-  segmentation rules in the cell model.
 - **Detachable sessions in the daemon, tmux control mode**: tmux does
   both today; wrxvt's pictures and keyboard protocol work through tmux 3.4.
 - **Native tabs and splits**: i3 (or any tiling window manager) does it.
@@ -125,10 +134,11 @@ Planned at some point, and why not now:
   extension and `scrollback:pager` cover it.
 - **Other renderers** (OpenGL, KMS/framebuffer without X, Wayland), BiDi,
   ligatures: each a project of its own; XRender stays, and is fast.
-- **Unicode placeholders for kitty pictures, text sizing (OSC 66), file
-  transfer**: few programs send them.
-- **Encryption for sharing**: share on 127.0.0.1 through `ssh -L` or a
-  TLS proxy.
+- **Text sizing (OSC 66), kitty's file transfer**: only kitty and few
+  programs use them.
+- **Text that isn't one cell per cluster**: Indic conjuncts get the
+  width of their first letter (mode 2027), as in other terminals; the
+  cell grid has no room for other widths.
 
 The [terminfo entry](doc/etc/rxvt-unicode.terminfo) describes the new
 features as extended capabilities (`tic -x`).
@@ -147,6 +157,9 @@ URxvt.url-launcher:    firefox
 URxvt.notifyCommand:   notify-send --app-name=wrxvt --
 URxvt.keysym.C-S-F12:  share:toggle
 URxvt.keysym.C-S-F11:  share:control
+! type on your phone, over HTTPS (the link to type: Ctrl+Shift+F11)
+URxvt.shareAddress:     0.0.0.0
+URxvt.shareCertificate: auto
 URxvt.keysym.C-S-F10:  record:toggle
 URxvt.color208:        #ff8700
 ```
@@ -189,9 +202,13 @@ module (any libev 4.33 source works):
 
 ```sh
 cvs -z3 -d :pserver:anonymous@cvs.schmorp.de/schmorpforge co libev
-./configure --enable-everything --enable-256-color --enable-emoji-sequences
+./configure --enable-everything --enable-256-color --enable-emoji-sequences --enable-share-tls
 make
 ```
+
+`--enable-emoji-sequences` needs HarfBuzz and FreeType 2.11, and
+`--enable-share-tls` (HTTPS for sharing) OpenSSL 1.1.1 or later; both
+are optional and not part of `--enable-everything`.
 
 ## Tests
 

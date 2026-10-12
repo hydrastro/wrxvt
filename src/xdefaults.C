@@ -101,6 +101,8 @@ optList[] = {
               RSTRG (Rs_notifyCommand, "notifyCommand", "string"),
               RSTRG (Rs_shareAddress, "shareAddress", "address"),
               RSTRG (Rs_sharePort, "sharePort", "number"),
+              RSTRG (Rs_shareCertificate, "shareCertificate", "file|auto"),
+              RSTRG (Rs_shareKey, "shareKey", "file"),
               STRG (Rs_record, NULL, "record", "file", "record the terminal to an asciinema file"),
               RSTRG (Rs_recordDirectory, "recordDirectory", "directory"),
               RSTRG (Rs_scrollbackCommand, "scrollbackCommand", "command"),
@@ -349,6 +351,12 @@ static const char optionsstring[] = "options: "
 #endif
 #if HAVE_PIXBUF
                                     "pixbuf,"
+#endif
+#if HAVE_HARFBUZZ
+                                    "emoji-sequences,"
+#endif
+#if HAVE_OPENSSL
+                                    "share-tls,"
 #endif
 #if defined(USE_XIM)
                                     "XIM,"

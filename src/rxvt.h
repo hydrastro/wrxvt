@@ -640,6 +640,7 @@ enum {
 #define PrivMode_SyncOutput     (1UL<<28) // mode 2026: hold the screen until the update is complete
 #define PrivMode_ColorScheme    (1UL<<29) // mode 2031: report dark/light changes
 #define PrivMode_ExtMousePixels (1UL<<30) // mode 1016: SGR mouse reports in pixels
+#define PrivMode_Grapheme       (1UL<<31) // mode 2027: grapheme clusters in one cell
 
 #define PrivMode_mouse_report   (PrivMode_MouseX10|PrivMode_MouseX11|PrivMode_MouseBtnEvent|PrivMode_MouseAnyEvent)
 
@@ -798,6 +799,9 @@ struct rxvt_buf;
 #define IMAGE_TILE_SLOT(c)      ((int)((c) >> 20 & 0xff))
 #define IMAGE_TILE_ROW(c)       ((int)((c) >> 10 & 0x3ff))
 #define IMAGE_TILE_COL(c)       ((int)((c) & 0x3ff))
+// the kitty graphics protocol's Unicode placeholder: a cell of a picture,
+// as text (graphics.C)
+#define KITTY_PLACEHOLDER       0x10EEEEUL
 
 struct term_image
 {
@@ -972,6 +976,66 @@ emoji_join (text_t previous, unicode_t next)
 }
 #endif
 
+// the first character of a composed one
+static inline text_t
+compose_base (text_t c)
+{
+  while (compose_char *cc = rxvt_composite [c])
+    c = cc->c1;
+
+  return c;
+}
+
+/*
+ * Grapheme clusters (mode 2027, grapheme.h): with the mode set, a
+ * cluster (a letter and its marks, an Indic conjunct, a Hangul syllable
+ * in jamo, a flag, an emoji sequence) goes into one cell, two if wide.
+ */
+#if ENABLE_FRILLS && UNICODE_3
+# define ENABLE_GRAPHEMES 1
+# include "grapheme.h"
+
+enum { GRAPHEME_MAX = 32 }; // code points in a cluster, at most
+
+// the code points of a cell, in order; 0 if there are too many
+static inline unsigned int
+grapheme_expand (text_t c, uint32_t *out)
+{
+  unsigned int n = 0;
+
+  while (compose_char *cc = rxvt_composite [c])
+    {
+      if (cc->c2 != NOCHAR)
+        {
+          if (n == GRAPHEME_MAX - 1)
+            return 0;
+          out[n++] = cc->c2;
+        }
+      c = cc->c1;
+    }
+
+  out[n++] = c;
+
+  for (unsigned int i = 0; i < n / 2; ++i)
+    ::swap (out[i], out[n - i - 1]);
+
+  return n;
+}
+#endif
+
+#endif
+
+#if ENABLE_SIXEL
+// a cell of a kitty Unicode placeholder: U+10EEEE, maybe with diacritics
+static inline bool
+is_kitty_placeholder (text_t t)
+{
+# if ENABLE_COMBINING
+  if (IS_COMPOSE (t))
+    t = compose_base (t);
+# endif
+  return t == KITTY_PLACEHOLDER;
+}
 #endif
 
 #if 0
@@ -1490,6 +1554,15 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
     int w, h;
   } kitty_store[16];
   void kitty_forget (unsigned int id);
+  // virtual placements (U=1), shown where U+10EEEE placeholders are
+  struct kitty_virtual {
+    unsigned int id, placement;
+    int cols, rows;
+    term_image *fitted;          // the image fitted in cols x rows cells, or 0
+  } kitty_virtuals[16];
+  void kitty_virtual_free (unsigned int id); // 0: all
+  term_image *kitty_virtual_image (unsigned int id);
+  void draw_kitty_placeholder (Drawable d, GC gc, int x, int y, int width);
 
 #endif
   const char *initial_colors[NRS_COLORS]; // the colours as configured
@@ -1576,7 +1649,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
 #if ENABLE_SHARE
   // sharing the terminal on a web page (share.C)
   share_server *share;
-  void share_start ();
+  void share_start (bool control = false);
   void share_stop ();
   void share_copy_link (bool control);
   void share_changed ();
@@ -1825,6 +1898,9 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void scr_underline_color (int color) noexcept;
   void draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend);
   void scr_add_lines (const wchar_t *str, int len, int minlines = 0) noexcept;
+#if ENABLE_GRAPHEMES
+  bool scr_add_to_cluster (unicode_t c) noexcept;
+#endif
   void scr_backspace () noexcept;
   void scr_tab (int count, bool ht = false) noexcept;
   void scr_gotorc (int row, int col, int relative) noexcept;

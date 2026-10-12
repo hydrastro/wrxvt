@@ -87,6 +87,10 @@ src/record.C
 src/dnd.C
 src/scrollback.C
 src/hints.C
+src/grapheme.h
+src/grapheme-properties.h
+src/emoji-sequences.h
+src/emoji-properties.h
 src/scrollbar-next.C
 src/scrollbar-rxvt.C
 src/scrollbar-xterm.C

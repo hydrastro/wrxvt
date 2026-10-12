@@ -739,6 +739,7 @@ enable_combining
 enable_xft
 enable_font_styles
 enable_emoji_sequences
+enable_share_tls
 enable_pixbuf
 enable_startup_notification
 enable_transparency
@@ -1417,6 +1418,8 @@ Optional Features:
   --enable-emoji-sequences
                           draw flags, skin tones, families... as one emoji
                           (needs harfbuzz)
+  --enable-share-tls      serve shared terminals over HTTPS too (needs
+                          OpenSSL)
   --enable-pixbuf         enable integration with gdk-pixbuf for background
                           images
   --enable-startup-notification
@@ -5188,6 +5191,15 @@ then :
 fi
 
 
+# Check whether --enable-share-tls was given.
+if test ${enable_share_tls+y}
+then :
+  enableval=$enable_share_tls; if test x$enableval = xyes -o x$enableval = xno; then
+    support_share_tls=$enableval
+  fi
+fi
+
+
 # Check whether --enable-pixbuf was given.
 if test ${enable_pixbuf+y}
 then :
@@ -7672,6 +7684,39 @@ printf "%s\n" "#define HAVE_HARFBUZZ 1" >>confdefs.h
 printf "%s\n" "no" >&6; }
 
     as_fn_error $? "--enable-emoji-sequences needs harfbuzz and freetype2 >= 2.11" "$LINENO" 5
+
+  fi
+
+fi
+
+if test x$support_share_tls = xyes; then
+  if test x$support_frills != xyes; then
+    as_fn_error $? "--enable-share-tls needs --enable-frills (sharing)" "$LINENO" 5
+  fi
+  if ! "$PKG_CONFIG" --atleast-version=1.1.1 openssl; then
+    as_fn_error $? "--enable-share-tls needs OpenSSL 1.1.1 or later (libssl and libcrypto)" "$LINENO" 5
+  fi
+
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for openssl (using pkg-config)" >&5
+printf %s "checking for openssl (using pkg-config)... " >&6; }
+  if test $PKG_CONFIG != no && $PKG_CONFIG --exists openssl; then
+    OPENSSL_CFLAGS="`$PKG_CONFIG --cflags openssl`"
+    OPENSSL_LIBS="`$PKG_CONFIG --libs openssl`"
+
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+printf "%s\n" "ok" >&6; }
+
+    LIBS="$LIBS $OPENSSL_LIBS"
+    CPPFLAGS="$CPPFLAGS $OPENSSL_CFLAGS"
+
+printf "%s\n" "#define HAVE_OPENSSL 1" >>confdefs.h
+
+
+  else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+
+    as_fn_error $? "--enable-share-tls needs OpenSSL (libssl and libcrypto, 1.1.1 or later)" "$LINENO" 5
 
   fi
 

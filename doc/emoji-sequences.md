@@ -23,11 +23,17 @@ transformed using the Xft face matrix, including scaled bitmap color fonts;
 the locked FreeType face is restored afterward. The drawing buffer is sized
 by glyphs, so a shaped run is not truncated to the number of terminal cells.
 
-This is **emoji shaping, not a general grapheme-width implementation**.
-Terminal columns retain the existing sum of `wcwidth` results; a family emoji
-may occupy more than two columns even when represented by one visual glyph.
-Changing that policy requires coordinated decisions about applications,
-readline, ncurses and tmux. The original codepoints remain in urxvt's
+By default this is **emoji shaping, not a general grapheme-width
+implementation**. Terminal columns retain the existing sum of `wcwidth`
+results; a family emoji may occupy more than two columns even when
+represented by one visual glyph, because that is what programs counting with
+`wcwidth` (readline, ncurses, tmux) expect. Programs that count grapheme
+clusters instead can say so with mode 2027: a family emoji then takes two
+columns (see `graphemes.md`).
+
+The same HarfBuzz path also shapes other clusters of several code points
+(combining marks, Indic conjuncts, Hangul jamo) with the first font that has
+all of them; emoji sequences only with colour fonts. The original codepoints remain in urxvt's
 composition chain. Verify selection/copying with your applications.
 
 At most 64 codepoints are shaped per sequence. Each font caches at most 256

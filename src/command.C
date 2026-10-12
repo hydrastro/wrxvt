@@ -5025,7 +5025,7 @@ rxvt_term::builtin_action (const char *name, const char *arg)
       else if (!strcmp (arg, "toggle"))
         share ? share_stop () : share_start ();
       else if (!strcmp (arg, "control"))
-        share ? share_copy_link (true) : (void)0;
+        share_start (true); // sharing if it isn't yet, and the link that can type
       else
         return false;
 
@@ -5742,6 +5742,9 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                   { 2004, PrivMode_BracketPaste },
 #endif
                   { 2026, PrivMode_SyncOutput },
+#if ENABLE_GRAPHEMES
+                  { 2027, PrivMode_Grapheme },
+#endif
                   { 2031, PrivMode_ColorScheme },
                 };
 

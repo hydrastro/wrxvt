@@ -332,6 +332,12 @@ struct rxvt_font_default : rxvt_font
       return true;
 #endif
 
+#if ENABLE_SIXEL
+    // the kitty protocol's placeholders, with their diacritics: a picture
+    if (is_kitty_placeholder (unicode))
+      return true;
+#endif
+
     // we do not check for IS_COMPOSE here, as this would
     // rob other fonts from taking over.
 
@@ -379,6 +385,8 @@ rxvt_font_default::draw (rxvt_drawable &d, int x, int y,
 #if ENABLE_SIXEL
       if (IS_IMAGE_TILE (t))
         term->draw_image_tile (d, gc, x, y, t);
+      else if (is_kitty_placeholder (t))
+        term->draw_kitty_placeholder (d, gc, x, y, 1);
       else
 #endif
 #ifdef BUILTIN_GLYPHS
@@ -1309,11 +1317,18 @@ rxvt_font_xft::shape_emoji (text_t c) const
   emoji_seq &s = emoji_seqs[c];
   uint32_t chars[EMOJI_MAX_CODEPOINTS];
   unsigned int n = emoji_expand (c, chars);
-  if (!emoji_is_sequence (chars, n)) return s;
+  // Emoji sequences only from colour fonts (a text font that has the
+  // parts would draw them in black and white). Other clusters of several
+  // code points (a letter and its marks, an Indic conjunct, Hangul jamo:
+  // grapheme clusters, mode 2027) from any font that has all of them,
+  // which places the marks and forms the conjuncts; without one, urxvt's
+  // own drawing of the parts on top of each other is the fallback.
+  bool emoji = emoji_is_sequence (chars, n);
+  if (!emoji && n < 2) return s;
 
   FT_Face face = XftLockFace (f);
   if (!face) return s;
-  if (FT_HAS_COLOR (face))
+  if (!emoji || FT_HAS_COLOR (face))
     {
       // Xft can scale bitmap emoji through a FreeType matrix. Shape in the
       // untransformed coordinate system, then transform every shaped origin.

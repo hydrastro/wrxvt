@@ -2122,6 +2122,29 @@ So that a program that never ends an update can't freeze the window, the
 update also ends by itself half a second after it began. C<CSI ? 2026 $ p>
 (DECRQM) tells whether the mode is supported and set.
 
+=item B<< C<Pm = 2027> >> (Grapheme clusters)
+
+=begin table
+
+	B<< C<h> >>	Keep each grapheme cluster in one cell (two if wide)
+	B<< C<l> >>	Character widths as C<wcwidth> gives them (the default)
+
+=end table
+
+A grapheme cluster is what a reader sees as one character: a letter and
+its marks, an Indic conjunct (consonant, virama, consonant), a Hangul
+syllable written in jamo, a flag, an emoji sequence (a family joined
+with ZWJ). With the mode set, the characters that
+continue a cluster (Unicode's rules, UAX #29) go into its cell and move
+the cursor no further; the cluster takes the width of its first
+character, or two cells when VS16 or a flag's second letter make it an
+emoji. Without it, each character takes the columns C<wcwidth> says, as
+in other programs that don't know about clusters. Programs that measure
+text by clusters (and set the mode) then agree with the terminal on where
+the cursor is. Characters of no width never take a cell of their own.
+C<CSI ? 2027 $ p> tells whether the mode is supported and set; see also
+F<doc/graphemes.md>.
+
 =item B<< C<Pm = 2031> >> (Colour scheme updates)
 
 =begin table
@@ -2146,8 +2169,20 @@ any image file gdk-pixbuf reads); data sent directly (C<t=d>), in chunks
 cursor), image ids (C<i>) and C<q>. Compression, files, shared memory,
 animation, relative placements and z-order are answered with an error.
 Pictures are shown like sixel pictures, and the cursor moves after them.
-The last 16 transmitted images are kept for C<a=p>. Other APC strings,
-privacy messages (C<ESC ^>) and SOS strings (C<ESC X>) are ignored.
+The last 16 transmitted images are kept for C<a=p>.
+
+Unicode placeholders are supported too: C<U=1> (with C<a=p> or C<a=T>)
+makes a virtual placement of C<c> by C<r> cells (16 at most; C<p> names
+it), which shows nothing by itself. The picture then appears where the
+program prints the placeholder character U+10EEEE as text, coloured with
+the image id (the 256-colour index, or the 24-bit colour as a number):
+its diacritics are the row and column in the picture and the id's top
+byte, missing ones continuing the cell to the left. As text, the
+pictures go wherever the program (tmux, vim) moves it. C<a=d> with
+C<d=i> or C<d=I> deletes virtual placements.
+
+Other APC strings, privacy messages (C<ESC ^>) and SOS strings
+(C<ESC X>) are ignored.
 
 =head2 Device Control Strings
 

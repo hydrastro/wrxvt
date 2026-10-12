@@ -18,8 +18,13 @@ sub on_osc_seq_perl {
    my @rows;
    for my $row (0 .. $self->nrow - 1) {
       my $rend = $self->ROW_r ($row);
+      my $text = $self->ROW_t ($row);
+      (my $plain = $text) =~ s/[\x{110000}-\x{1fffff}]/?/g;   # composed: one character each
       push @rows, {
-         text => $self->ROW_t ($row),
+         text => $plain,
+         # each cell's characters (composed ones expanded); "" for the
+         # second cell of a wide character
+         cells => [ map { $self->special_decode ($_) } split //, $text ],
          rend => [ map { 0 + $_ } @$rend ],
          # colour indices: 0 default fg, 1 default bg, palette colour N is N + 2
          fg   => [ map { urxvt::GET_BASEFG $_ } @$rend ],
@@ -39,7 +44,7 @@ sub on_osc_seq_perl {
       saved  => -$self->top_row,
       view_start => $self->view_start,
       # the text at the top of the view (row 0 when not scrolled back)
-      view_top   => $self->ROW_t ($self->view_start),
+      view_top   => do { (my $t = $self->ROW_t ($self->view_start)) =~ s/[\x{110000}-\x{1fffff}]/?/g; $t },
       attr   => \%attr,
    );
 

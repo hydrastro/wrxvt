@@ -23,6 +23,15 @@ class Basics(TerminalTest):
         self.assertEqual(run.result['row'].rstrip(), 'abc')
         self.assertEqual(run.result['cursor'], [0, 3])
 
+    def test_perl_sees_composed_characters(self):
+        # x + combining acute (no precomposed form) is one composed cell;
+        # extensions get its characters (they used to get "?")
+        run = self.run_in_terminal(r'''
+            write('x\u0301y \U0001F600')
+            result['cells'] = dump()['rows'][0]['cells'][:5]
+        ''')
+        self.assertEqual(run.result['cells'], ['x\u0301', 'y', ' ', '\U0001F600', ''])
+
     def test_device_attributes_and_version(self):
         run = self.run_in_terminal(r'''
             result['da1'] = query('\x1b[c', r'c$')

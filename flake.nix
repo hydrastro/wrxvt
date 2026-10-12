@@ -49,6 +49,7 @@
             perlSupport = false;
             gdkPixbufSupport = false;
             emojiSequences = false;
+            shareTls = false;
           };
           default = self.packages.${system}.wrxvt;
         }
@@ -113,6 +114,9 @@
                 export HOME=$TMPDIR
                 cp -r ${./tests} tests && chmod -R u+w tests
                 mkdir doc && cp -r ${./doc/etc} doc/etc
+                # the Unicode tables' unit tests (test_units.py) include these
+                mkdir src && cp ${./src/grapheme.h} ${./src/grapheme-properties.h} \
+                  ${./src/emoji-sequences.h} ${./src/emoji-properties.h} src/
                 cd tests
                 if [ -n "$ASAN_OPTIONS" ]; then
                   export ASAN_OPTIONS="$ASAN_OPTIONS:log_path=$TMPDIR/sanitizer"
@@ -161,7 +165,7 @@
                 echo "unpacking libev into ./libev (a separate CVS module)"
                 tar -xzf ${pkgs.libev.src} && mv libev-${pkgs.libev.version} libev
               fi
-              echo "build: ./configure --enable-everything --enable-emoji-sequences && make"
+              echo "build: ./configure --enable-everything --enable-256-color --enable-emoji-sequences --enable-share-tls && make"
               echo "test:  make check"
             '';
           };
