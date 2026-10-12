@@ -12,3 +12,5 @@
 /result-*
 *.o
 *~
+/_inst/
+__pycache__/

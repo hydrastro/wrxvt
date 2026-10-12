@@ -488,7 +488,9 @@ our $NOCHAR = chr 0xffff;
 =item $urxvt::LIBDIR
 
 The rxvt-unicode library directory, where, among other things, the perl
-modules and scripts are stored.
+modules and scripts are stored. The C<WRXVT_LIBDIR> environment variable
+overrides it, which runs an uninstalled build: point it at the source's
+F<src> directory.
 
 =item $urxvt::RESCLASS, $urxvt::RESCLASS
 

@@ -410,7 +410,7 @@ rxvt_perl_interp::init ()
           "-e"
           "BEGIN {"
           "   urxvt->bootstrap;"
-          "   unshift @INC, '" LIBDIR "';"
+          "   unshift @INC, $urxvt::LIBDIR;"
           "}"
           ""
           "use urxvt;",
@@ -804,7 +804,12 @@ PROTOTYPES: ENABLE
 
 BOOT:
 {
-  sv_setsv (get_sv ("urxvt::LIBDIR",   1), newSVpvn (LIBDIR,   sizeof (LIBDIR)   - 1));
+  // WRXVT_LIBDIR runs an uninstalled build: point it at the source's src/
+  // directory, which has urxvt.pm and perl/ in the same layout as LIBDIR.
+  const char *libdir = getenv ("WRXVT_LIBDIR");
+  if (!libdir || !*libdir)
+    libdir = LIBDIR;
+  sv_setsv (get_sv ("urxvt::LIBDIR",   1), newSVpvn (libdir, strlen (libdir)));
   sv_setsv (get_sv ("urxvt::RESNAME",  1), newSVpvn (RESNAME,  sizeof (RESNAME)  - 1));
   sv_setsv (get_sv ("urxvt::RESCLASS", 1), newSVpvn (RESCLASS, sizeof (RESCLASS) - 1));
   sv_setsv (get_sv ("urxvt::RXVTNAME", 1), newSVpvn (RXVTNAME, sizeof (RXVTNAME) - 1));
