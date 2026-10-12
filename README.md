@@ -24,7 +24,11 @@ Drawing:
 - **Colon sub-parameters** in SGR (`38:2::R:G:B`, `4:3`), and renditions
   widened to 64 bits to make room for all of the above.
 - **Emoji sequences** (flags, skin tones, ZWJ families) drawn as one
-  emoji, with `--enable-emoji-sequences` (needs HarfBuzz).
+  emoji, with `--enable-emoji-sequences` (needs HarfBuzz), which also
+  draws other clusters (Indic conjuncts, marks) with the font's shaping.
+- **Grapheme clusters** (mode 2027): a program that sets it gets each
+  cluster (a letter and its marks, an Indic conjunct, a flag, an emoji
+  sequence) in one cell, or two if wide, by Unicode's rules.
 - **Built-in glyphs** for braille (U+2800-28FF), powerline arrows
   (U+E0B0-E0B7) and sextants (U+1FB00-1FB3B). They join up exactly
   whatever the font.

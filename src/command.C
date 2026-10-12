@@ -5742,6 +5742,9 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                   { 2004, PrivMode_BracketPaste },
 #endif
                   { 2026, PrivMode_SyncOutput },
+#if ENABLE_GRAPHEMES
+                  { 2027, PrivMode_Grapheme },
+#endif
                   { 2031, PrivMode_ColorScheme },
                 };
 

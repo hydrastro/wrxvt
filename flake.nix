@@ -113,6 +113,9 @@
                 export HOME=$TMPDIR
                 cp -r ${./tests} tests && chmod -R u+w tests
                 mkdir doc && cp -r ${./doc/etc} doc/etc
+                # the Unicode tables' unit tests (test_units.py) include these
+                mkdir src && cp ${./src/grapheme.h} ${./src/grapheme-properties.h} \
+                  ${./src/emoji-sequences.h} ${./src/emoji-properties.h} src/
                 cd tests
                 if [ -n "$ASAN_OPTIONS" ]; then
                   export ASAN_OPTIONS="$ASAN_OPTIONS:log_path=$TMPDIR/sanitizer"

@@ -640,6 +640,7 @@ enum {
 #define PrivMode_SyncOutput     (1UL<<28) // mode 2026: hold the screen until the update is complete
 #define PrivMode_ColorScheme    (1UL<<29) // mode 2031: report dark/light changes
 #define PrivMode_ExtMousePixels (1UL<<30) // mode 1016: SGR mouse reports in pixels
+#define PrivMode_Grapheme       (1UL<<31) // mode 2027: grapheme clusters in one cell
 
 #define PrivMode_mouse_report   (PrivMode_MouseX10|PrivMode_MouseX11|PrivMode_MouseBtnEvent|PrivMode_MouseAnyEvent)
 
@@ -969,6 +970,43 @@ emoji_join (text_t previous, unicode_t next)
   uint32_t sequence[EMOJI_MAX_CODEPOINTS];
   unsigned int n = emoji_expand (previous, sequence);
   return emoji_can_join (sequence, n, next);
+}
+#endif
+
+/*
+ * Grapheme clusters (mode 2027, grapheme.h): with the mode set, a
+ * cluster (a letter and its marks, an Indic conjunct, a Hangul syllable
+ * in jamo, a flag, an emoji sequence) goes into one cell, two if wide.
+ */
+#if ENABLE_FRILLS && UNICODE_3
+# define ENABLE_GRAPHEMES 1
+# include "grapheme.h"
+
+enum { GRAPHEME_MAX = 32 }; // code points in a cluster, at most
+
+// the code points of a cell, in order; 0 if there are too many
+static inline unsigned int
+grapheme_expand (text_t c, uint32_t *out)
+{
+  unsigned int n = 0;
+
+  while (compose_char *cc = rxvt_composite [c])
+    {
+      if (cc->c2 != NOCHAR)
+        {
+          if (n == GRAPHEME_MAX - 1)
+            return 0;
+          out[n++] = cc->c2;
+        }
+      c = cc->c1;
+    }
+
+  out[n++] = c;
+
+  for (unsigned int i = 0; i < n / 2; ++i)
+    ::swap (out[i], out[n - i - 1]);
+
+  return n;
 }
 #endif
 
@@ -1825,6 +1863,9 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void scr_underline_color (int color) noexcept;
   void draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend);
   void scr_add_lines (const wchar_t *str, int len, int minlines = 0) noexcept;
+#if ENABLE_GRAPHEMES
+  bool scr_add_to_cluster (unicode_t c) noexcept;
+#endif
   void scr_backspace () noexcept;
   void scr_tab (int count, bool ht = false) noexcept;
   void scr_gotorc (int row, int col, int relative) noexcept;

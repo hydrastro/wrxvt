@@ -2122,6 +2122,29 @@ So that a program that never ends an update can't freeze the window, the
 update also ends by itself half a second after it began. C<CSI ? 2026 $ p>
 (DECRQM) tells whether the mode is supported and set.
 
+=item B<< C<Pm = 2027> >> (Grapheme clusters)
+
+=begin table
+
+	B<< C<h> >>	Keep each grapheme cluster in one cell (two if wide)
+	B<< C<l> >>	Character widths as C<wcwidth> gives them (the default)
+
+=end table
+
+A grapheme cluster is what a reader sees as one character: a letter and
+its marks, an Indic conjunct (consonant, virama, consonant), a Hangul
+syllable written in jamo, a flag, an emoji sequence (a family joined
+with ZWJ). With the mode set, the characters that
+continue a cluster (Unicode's rules, UAX #29) go into its cell and move
+the cursor no further; the cluster takes the width of its first
+character, or two cells when VS16 or a flag's second letter make it an
+emoji. Without it, each character takes the columns C<wcwidth> says, as
+in other programs that don't know about clusters. Programs that measure
+text by clusters (and set the mode) then agree with the terminal on where
+the cursor is. Characters of no width never take a cell of their own.
+C<CSI ? 2027 $ p> tells whether the mode is supported and set; see also
+F<doc/graphemes.md>.
+
 =item B<< C<Pm = 2031> >> (Colour scheme updates)
 
 =begin table

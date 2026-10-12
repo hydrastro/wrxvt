@@ -955,6 +955,94 @@ rxvt_term::scr_scroll_text (int row1, int row2, int count) noexcept
 }
 
 /* ------------------------------------------------------------------------- */
+#if ENABLE_GRAPHEMES
+/*
+ * Mode 2027: if c continues the grapheme cluster just written (in the
+ * cell before the cursor, or the last cell of the line when the next
+ * character wraps), add it to that cell and return true.
+ */
+bool
+rxvt_term::scr_add_to_cluster (unicode_t c) noexcept
+{
+  line_t *l = &ROW(screen.cur.row);
+  int col;
+  bool just_before = true; // the cluster ends right before the cursor
+
+  if (screen.flags & Screen_WrapNext)
+    {
+      col = screen.cur.col; // the last column, already written
+      just_before = false;
+    }
+  else if (screen.cur.col > 0)
+    col = screen.cur.col - 1;
+  else if (screen.cur.row > top_row && ROW(screen.cur.row - 1).is_longer ())
+    {
+      l = &ROW(screen.cur.row - 1);
+      col = ncol - 1;
+      just_before = false;
+    }
+  else
+    return false;
+
+  if (!l->valid () || !l->t)
+    return false;
+
+  while (col > 0 && l->t[col] == NOCHAR)
+    col--;
+
+  text_t *tp = l->t + col;
+  rend_t *rp = l->r + col;
+
+  if (*tp == NOCHAR
+# if ENABLE_SIXEL
+      || IS_IMAGE_TILE (*tp)
+# endif
+     )
+    return false;
+
+  uint32_t cluster[GRAPHEME_MAX];
+  unsigned int n = grapheme_expand (*tp, cluster);
+
+  if (!grapheme_continues (cluster, n, c))
+    return false;
+
+  bool widen = grapheme_widens (cluster, n, c)
+               && (col + 1 >= ncol || l->t[col + 1] != NOCHAR); // one cell now
+
+  l->touch ();
+  *tp = rxvt_composite.compose (*tp, c, false); // (sequences repeat characters on purpose)
+  *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
+
+  // a second cell, if there is room and nothing written after it yet
+  if (widen && just_before && l == &ROW(screen.cur.row) && col + 1 < ncol
+      && screen.cur.col == col + 1)
+    {
+      l->t[col + 1] = NOCHAR;
+      l->r[col + 1] = *rp;
+
+      // the rest of a wide character that was there
+      for (int i = col + 2; i < ncol && l->t[i] == NOCHAR; i++)
+        {
+          l->t[i] = ' ';
+          l->r[i] = *rp;
+        }
+
+      if (col + 2 < ncol)
+        screen.cur.col = col + 2;
+      else
+        {
+          l->l = ncol;
+          if (screen.flags & Screen_Autowrap)
+            screen.flags |= Screen_WrapNext;
+        }
+
+      max_it (l->l, screen.cur.col);
+    }
+
+  return true;
+}
+#endif
+
 /*
  * Add text given in <str> of length <len> to screen struct
  */
@@ -1044,6 +1132,21 @@ rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
            */
           CLEAR_SELECTION ();
         }
+
+#if ENABLE_GRAPHEMES
+      // Grapheme clusters (mode 2027): a character that continues the
+      // cluster before the cursor goes into its cell, even at the end of
+      // the line, and takes no columns of its own; only VS16 and a flag's
+      // second letter can make a one-cell cluster two cells wide. (Below
+      // U+0300 only the rare Prepend characters are continued: skipped,
+      // so plain text stays fast.)
+      if (ecb_unlikely ((priv_modes & PrivMode_Grapheme) && c >= 0x300)
+          && scr_add_to_cluster (c))
+        {
+          line = &ROW(screen.cur.row);
+          continue;
+        }
+#endif
 
       if (ecb_unlikely (screen.flags & Screen_WrapNext))
         {
