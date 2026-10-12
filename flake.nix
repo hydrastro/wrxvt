@@ -79,13 +79,19 @@
                   pkgs.xvfb
                   pkgs.imagemagick
                   pkgs.xdotool
+                  pkgs.xclip # OSC 52
+                  pkgs.xprop # OSC 7
+                  pkgs.ncurses # tic and infocmp, for the terminfo entry
                 ];
                 FONTCONFIG_FILE = testFonts pkgs;
                 WRXVT = pkgs.lib.getExe self.packages.${system}.wrxvt;
               }
               ''
+                set -o pipefail
                 export HOME=$TMPDIR
-                cp -r ${./tests} tests && chmod -R u+w tests && cd tests
+                cp -r ${./tests} tests && chmod -R u+w tests
+                mkdir doc && cp -r ${./doc/etc} doc/etc
+                cd tests
                 python3 -m unittest discover -v 2>&1 | tee $out
               '';
         }
@@ -102,6 +108,8 @@
               pkgs.xvfb
               pkgs.imagemagick
               pkgs.xdotool
+              pkgs.xclip
+              pkgs.xprop
               pkgs.gdb
             ];
             FONTCONFIG_FILE = testFonts pkgs;
