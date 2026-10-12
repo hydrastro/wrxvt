@@ -14,6 +14,15 @@ class Basics(TerminalTest):
         ''')
         self.assertEqual(run.result['rows'], ['hello', 'world'])
 
+    def test_del_is_ignored(self):
+        run = self.run_in_terminal(r'''
+            write('a\x7fb\x7f\x7fc')
+            result['row'] = dump()['rows'][0]['text']
+            result['cursor'] = dump()['cursor']
+        ''')
+        self.assertEqual(run.result['row'].rstrip(), 'abc')
+        self.assertEqual(run.result['cursor'], [0, 3])
+
     def test_device_attributes_and_version(self):
         run = self.run_in_terminal(r'''
             result['da1'] = query('\x1b[c', r'c$')

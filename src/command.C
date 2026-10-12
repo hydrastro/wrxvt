@@ -2743,6 +2743,14 @@ rxvt_term::cmd_parse ()
               if (ecb_unlikely (ch == NOCHAR || (IS_CONTROL (ch) && ch != C0_LF && ch != C0_CR && ch != C0_HT)))
                 break;
 
+              // DEL is ignored (ECMA-48, xterm), not a character to show
+              if (ecb_unlikely (ch == 0x7f))
+                {
+                  seq_begin = cmdbuf_ptr;
+                  ch = next_char ();
+                  continue;
+                }
+
               *str++ = ch;
 
               if (ecb_unlikely (ch == C0_LF || str >= eol))
