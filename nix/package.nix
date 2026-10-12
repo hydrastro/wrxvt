@@ -74,6 +74,7 @@ stdenv.mkDerivation {
   configureFlags = [
     "--with-terminfo=${placeholder "terminfo"}/share/terminfo"
     "--enable-everything"
+    "--enable-256-color" # not part of --enable-everything
     (lib.enableFeature perlSupport "perl")
     (lib.enableFeature gdkPixbufSupport "pixbuf")
     (lib.enableFeature emojiSequences "emoji-sequences")
