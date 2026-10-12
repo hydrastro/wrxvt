@@ -17,11 +17,19 @@ sub on_osc_seq_perl {
 
    my @rows;
    for my $row (0 .. $self->nrow - 1) {
+      my $rend = $self->ROW_r ($row);
       push @rows, {
          text => $self->ROW_t ($row),
-         rend => [ map { 0 + $_ } @{ $self->ROW_r ($row) } ],
+         rend => [ map { 0 + $_ } @$rend ],
+         # colour indices: 0 default fg, 1 default bg, palette colour N is N + 2
+         fg   => [ map { urxvt::GET_BASEFG $_ } @$rend ],
+         bg   => [ map { urxvt::GET_BASEBG $_ } @$rend ],
       };
    }
+
+   # the attribute bits of this build (missing ones are null)
+   my %attr = map { $_ => scalar eval "urxvt::RS_$_" }
+              qw(Bold Italic Blink RVid Uline Faint Strike Overline Conceal);
 
    my %screen = (
       rows   => \@rows,
@@ -29,6 +37,7 @@ sub on_osc_seq_perl {
       nrow   => $self->nrow,
       cursor => [ $self->screen_cur ],
       saved  => -$self->top_row,
+      attr   => \%attr,
    );
 
    open my $fh, ">", "$path.tmp" or return 1;

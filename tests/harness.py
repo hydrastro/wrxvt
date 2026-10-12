@@ -155,3 +155,19 @@ class TerminalTest(unittest.TestCase):
         screens = sorted(work.glob('result.json.screen*'))
         screen = json.loads(screens[-1].read_text()) if screens else None
         return Run(result, shots, screen)
+
+
+def cell(screen, row, col):
+    """One cell of a dump(): its character, colours and attribute names."""
+    r = screen['rows'][row]
+    rend = r['rend'][col]
+    attrs = {name for name, bit in screen['attr'].items() if bit is not None and rend & bit}
+    return {'char': r['text'][col], 'fg': r['fg'][col], 'bg': r['bg'][col], 'attrs': attrs}
+
+
+DEFAULT_FG, DEFAULT_BG = 0, 1
+
+
+def palette(n):
+    """The colour index of palette colour n (0-255) in a dump."""
+    return n + 2

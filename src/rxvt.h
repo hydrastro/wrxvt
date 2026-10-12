@@ -1420,7 +1420,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   unsigned int map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsigned int a);
   int privcases (int mode, unsigned long bit);
   void process_terminal_mode (int mode, int priv, unsigned int nargs, const int *arg);
-  void process_sgr_mode (unsigned int nargs, const int *arg);
+  void process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub = 0);
   void set_cursor_style (int style);
   // init.C
   void init (stringvec *argv, stringvec *envv);

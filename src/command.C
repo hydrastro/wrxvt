@@ -2815,6 +2815,10 @@ rxvt_term::process_csi_seq ()
   unsigned int nargs, p;
   int n, ndef;
   int arg[ESC_ARGS] = { };
+  // bit p set: arg[p] is a subparameter of the argument before it, i.e. it
+  // followed a ':' (ISO 8613-6), as in "4:3" or "38:2::255:0:0"
+  uint32_t sub = 0;
+  bool colon = false;
 
   nargs = 0;
 
@@ -2838,11 +2842,16 @@ rxvt_term::process_csi_seq ()
           else
             n = n * 10 + ch - '0';
         }
-      else if (ch == ';')
+      else if (ch == ';' || ch == ':')
         {
           if (nargs < ESC_ARGS)
-            arg[nargs++] = n;
+            {
+              if (colon)
+                sub |= 1U << nargs;
+              arg[nargs++] = n;
+            }
           n = -1;
+          colon = ch == ':';
         }
       else if (IS_CONTROL (ch))
         process_nonprinting (ch);
@@ -2855,7 +2864,11 @@ rxvt_term::process_csi_seq ()
     return;
 
   if (nargs < ESC_ARGS)
-    arg[nargs++] = n;
+    {
+      if (colon)
+        sub |= 1U << nargs;
+      arg[nargs++] = n;
+    }
 
   i = ch - CSI_ICH;
   ndef = get_byte_array_bit (csi_defaults, i);
@@ -3022,7 +3035,7 @@ rxvt_term::process_csi_seq ()
         break;
 
       case CSI_SGR:		/* 8.3.118: (0) SELECT GRAPHIC RENDITION */
-        process_sgr_mode (nargs, arg);
+        process_sgr_mode (nargs, arg, sub);
         break;
 
       case CSI_DSR:		/* 8.3.36: (0) DEVICE STATUS REPORT */
@@ -3947,7 +3960,7 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
 
 /*{{{ process sgr sequences */
 void ecb_hot
-rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
+rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
 {
   unsigned int i;
   short rendset;
@@ -3959,8 +3972,16 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
       return;
     }
 
+  // is arg[i] a subparameter (it followed a ':')?
+  #define SGR_SUB(i) ((i) < nargs && (sub >> (i) & 1))
+
   for (i = 0; i < nargs; i++)
     {
+      // subparameters the code below doesn't use belong to an argument we
+      // already handled: never read them as arguments of their own
+      if (SGR_SUB (i))
+        continue;
+
       rendset = -1;
       switch (arg[i])
         {
@@ -3975,7 +3996,11 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
             rendset = 1, rendstyle = RS_Italic;
             break;
           case 4:
-            rendset = 1, rendstyle = RS_Uline;
+            // 4:0 is "no underline", 4:1 to 4:5 are underline styles
+            if (SGR_SUB (i + 1) && arg[i + 1] == 0)
+              rendset = 0, rendstyle = RS_Uline;
+            else
+              rendset = 1, rendstyle = RS_Uline;
             break;
           case 5: // slowly blinking
           case 6: // rapidly blinking
@@ -4062,12 +4087,36 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg)
               unsigned int fgbg = arg[i] == 38 ? Color_fg : Color_bg;
               unsigned int idx;
 
-              if (nargs > i + 2 && arg[i + 1] == 5)
+              if (SGR_SUB (i + 1))
+                {
+                  // the ISO 8613-6 form with colons: 38:5:N, 38:2:R:G:B and
+                  // 38:2:CS:R:G:B (CS, the colour space id, is usually empty)
+                  unsigned int count = 0;
+                  while (SGR_SUB (i + 1 + count))
+                    count++;
+
+                  if (arg[i + 1] == 5 && count >= 2)
+                    {
+                      if (IN_RANGE_INC (arg[i + 2], 0, 255))
+                        scr_color (minCOLOR + arg[i + 2], fgbg);
+                    }
+                  else if (arg[i + 1] == 2 && count >= 4)
+                    {
+                      unsigned int first = count >= 5 ? i + 3 : i + 2;
+                      scr_color (map_rgb24_color (arg[first], arg[first + 1], arg[first + 2], 0xff), fgbg);
+                    }
+
+                  i += count;
+                }
+              else if (nargs > i + 2 && arg[i + 1] == 5)
                 {
                   idx = minCOLOR + arg[i + 2];
                   i += 2;
 
-                  scr_color (idx, fgbg);
+                  // only the 256 palette colours: higher numbers would pick
+                  // the slots used internally for 24-bit colours
+                  if (IN_RANGE_INC (arg[i], 0, 255))
+                    scr_color (idx, fgbg);
                 }
               else if (nargs > i + 4 && arg[i + 1] == 2)
                 {
