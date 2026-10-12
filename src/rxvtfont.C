@@ -265,6 +265,23 @@ rxvt_font::clear_rect (rxvt_drawable &d, int x, int y, int w, int h, int color) 
 
 /////////////////////////////////////////////////////////////////////////////
 
+#ifdef BUILTIN_GLYPHS
+// characters drawn by the built-in font: their glyphs are geometric, and
+// fonts often get them wrong (gaps between lines, dots off the grid) or
+// lack them
+static inline bool
+is_builtin_glyph (unicode_t c)
+{
+  return (0x2500 <= c && c <= 0x259f)     // box drawing, block elements
+      || (0x2800 <= c && c <= 0x28ff)     // braille patterns (plots, graphs)
+      || (0xe0b0 <= c && c <= 0xe0b7)     // powerline arrows and semicircles
+#if UNICODE_3
+      || (0x1fb00 <= c && c <= 0x1fb3b)   // sextants (legacy computing)
+#endif
+      ;
+}
+#endif
+
 struct rxvt_font_default : rxvt_font
 {
   struct rxvt_fontset *fs;
@@ -311,8 +328,7 @@ struct rxvt_font_default : rxvt_font
       return true;
 
 #ifdef BUILTIN_GLYPHS
-    if (unicode >= 0x2500 && unicode <= 0x259f &&
-        !term->option (Opt_skipBuiltinGlyphs))
+    if (is_builtin_glyph (unicode) && !term->option (Opt_skipBuiltinGlyphs))
       return true;
 #endif
 
@@ -441,6 +457,84 @@ rxvt_font_default::draw (rxvt_drawable &d, int x, int y,
                 }
             }
         }
+      else if (0x2800 <= t && t <= 0x28ff)
+        {
+          // braille: dots 1-3 and 7 down the left, 4-6 and 8 down the right
+          static const unsigned char dot_col[8] = { 0, 0, 0, 1, 1, 1, 0, 1 };
+          static const unsigned char dot_row[8] = { 0, 1, 2, 0, 1, 2, 3, 3 };
+
+          int W = fwidth, H = term->fheight;
+          int size = max (1, min (W / 2, H / 4) * 2 / 3); // the dots fill 2/3 of their grid
+
+          for (int i = 0; i < 8; i++)
+            if ((t - 0x2800) & (1 << i))
+              {
+                int cx = x + W * (2 * dot_col[i] + 1) / 4;
+                int cy = y + H * (2 * dot_row[i] + 1) / 8;
+
+                if (size >= 4)
+                  XFillArc (disp, d, gc, cx - size / 2, cy - size / 2, size, size, 0, 360 * 64);
+                else
+                  XFillRectangle (disp, d, gc, cx - size / 2, cy - size / 2, size, size);
+              }
+        }
+      else if (0xe0b0 <= t && t <= 0xe0b7)
+        {
+          // powerline: E0B0 E0B1 a solid and a thin arrow pointing right,
+          // E0B2 E0B3 left; E0B4-E0B7 the same as semicircles
+          int W = fwidth, H = term->fheight;
+          bool left = t & 2, thin = t & 1;
+
+          if (t <= 0xe0b3)
+            {
+              XPoint p[3] = {
+                { (short)(left ? x + W - 1 : x), (short)y },
+                { (short)(left ? x : x + W - 1), (short)(y + (H - 1) / 2) },
+                { (short)(left ? x + W - 1 : x), (short)(y + H - 1) },
+              };
+
+              if (thin)
+                XDrawLines (disp, d, gc, p, 3, CoordModeOrigin);
+              else
+                {
+                  // a filled polygon leaves out its right and bottom edges
+                  p[left ? 0 : 1].x++;
+                  p[2].y++;
+                  XFillPolygon (disp, d, gc, p, 3, Convex, CoordModeOrigin);
+                }
+            }
+          else
+            {
+              // the circle's centre is on the cell edge the shape is flat
+              // on; cx is the left of its bounding box
+              int cx = left ? x : x - W;
+              int start = left ? 90 * 64 : 270 * 64;
+
+              if (thin)
+                XDrawArc (disp, d, gc, cx, y, 2 * W - 1, H - 1, start, 180 * 64);
+              else
+                XFillArc (disp, d, gc, cx, y, 2 * W, H, start, 180 * 64);
+            }
+        }
+#if UNICODE_3
+      else if (0x1fb00 <= t && t <= 0x1fb3b)
+        {
+          // sextants: the 2x3 block patterns, in order, without the four
+          // in block elements (empty, full, left and right half)
+          int bits = t - 0x1fb00 + 1;
+          if (bits >= 21) bits++;
+          if (bits >= 42) bits++;
+
+          int W = fwidth, H = term->fheight;
+          int xs[3] = { x, x + W / 2, x + W };
+          int ys[4] = { y, y + H / 3, y + H - H / 3, y + H };
+
+          for (int i = 0; i < 6; i++)
+            if (bits & (1 << i))
+              XFillRectangle (disp, d, gc, xs[i & 1], ys[i / 2],
+                              xs[(i & 1) + 1] - xs[i & 1], ys[i / 2 + 1] - ys[i / 2]);
+        }
+#endif
 #else
       if (0)
         ;

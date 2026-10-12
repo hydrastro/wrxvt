@@ -944,10 +944,13 @@ WM, the rxvt-unicode window will not have window decorations; option B<-bl>.
 
 =item B<skipBuiltinGlyphs:> I<boolean>
 
-Compile I<frills>: Disable the usage of the built-in block graphics/line
-drawing characters and just rely on what the specified fonts provide. Use
-this if you have a good font and want to use its block graphic glyphs;
-option B<-sbg>.
+Compile I<frills>: Disable the usage of the built-in glyphs and just rely
+on what the specified fonts provide. The terminal draws box drawing and
+block elements (U+2500-U+259F), braille patterns (U+2800-U+28FF, used for
+plots and graphs), the powerline arrows and semicircles (U+E0B0-U+E0B7)
+and sextants (U+1FB00-U+1FB3B) itself, so they fill their cells exactly
+and join up. Use this if you have a good font and want to use its
+glyphs; option B<-sbg>.
 
 =item B<termName:> I<termname>
 
