@@ -1625,6 +1625,9 @@ Character Attributes (SGR)
 	B<< C<Pm = 3 / 23> >>	On / Off Italic
 	B<< C<Pm = 4 / 24> >>	On / Off Underline
 	B<< C<Pm = 4:0 / 4:1> >>	Off / On Underline (colon form)
+	B<< C<Pm = 4:2 / 21> >>	Double underline
+	B<< C<Pm = 4:3> >>	Curly underline
+	B<< C<Pm = 4:4 / 4:5> >>	Dotted / dashed underline
 	B<< C<Pm = 5 / 25> >>	On / Off Slow Blink (bright bg)
 	B<< C<Pm = 6 / 26> >>	On / Off Rapid Blink (bright bg)
 	B<< C<Pm = 7 / 27> >>	On / Off Inverse
@@ -1644,6 +1647,8 @@ Character Attributes (SGR)
 	B<< C<Pm = 48;2;R;G;B> >>	set bg to 24-bit colour #RGB (ISO 8613-3)
 	B<< C<Pm = 38:5:N / 48:5:N> >>	the same with colons (ISO 8613-6)
 	B<< C<Pm = 38:2::R:G:B> >>	(also 38:2:R:G:B, and 48 for the background)
+	B<< C<Pm = 58:5:N / 58:2::R:G:B> >>	Underline colour (also with semicolons)
+	B<< C<Pm = 59> >>	Default underline colour (the text colour)
 	B<< C<Pm = 39 / 49> >>	fg/bg Default
 	B<< C<Pm = 90 / 100> >>	fg/bg Bright Black
 	B<< C<Pm = 91 / 101> >>	fg/bg Bright Red

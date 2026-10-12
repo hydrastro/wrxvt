@@ -162,7 +162,11 @@ def cell(screen, row, col):
     r = screen['rows'][row]
     rend = r['rend'][col]
     attrs = {name for name, bit in screen['attr'].items() if bit is not None and rend & bit}
-    return {'char': r['text'][col], 'fg': r['fg'][col], 'bg': r['bg'][col], 'attrs': attrs}
+    info = {'char': r['text'][col], 'fg': r['fg'][col], 'bg': r['bg'][col], 'attrs': attrs}
+    # underline style and colour (see RS_ulStyleShift, RS_ulColor in rxvt.h)
+    info['ul_style'] = (rend >> 36) & 7 if 'Uline' in attrs else None
+    info['ul_color'] = (rend >> 40) & 0x1ff if rend >> 39 & 1 else None
+    return info
 
 
 DEFAULT_FG, DEFAULT_BG = 0, 1

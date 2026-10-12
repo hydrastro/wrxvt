@@ -679,6 +679,112 @@ rxvt_term::faint_color (int fore, int back)
 
 /* ------------------------------------------------------------------------- */
 /*
+ * Draw the underline of a run of cells starting at pixel x, in the GC's
+ * colour. y is the top of the row. Patterns are aligned to absolute
+ * pixel positions, so runs drawn separately join up seamlessly.
+ */
+void
+rxvt_term::draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend)
+{
+  int base = y + font->ascent + 1;          // where rxvt-unicode draws it
+  int bottom = y + fheight - 1;             // the last pixel row of the cell
+  int thick = max (1, (font->ascent + font->descent) / 16);
+  int room = max (0, bottom - base);        // pixels below the line
+
+  switch (GET_ULSTYLE (rend))
+    {
+      case UL_double:
+        {
+          int gap = room >= 3 * thick ? thick : 1;
+          int first = min (base, bottom - 2 * thick - gap + 1);
+          XFillRectangle (dpy, vt, gc, x, first, width, thick);
+          XFillRectangle (dpy, vt, gc, x, first + thick + gap, width, thick);
+        }
+        break;
+
+      case UL_curly:
+        {
+          // one wave per cell, as tall as the room below the baseline allows
+          int amp = clamp ((room - thick + 1) / 2, 1, max (1, fwidth / 4));
+          int mid = min (base + amp, bottom - amp);
+          int period = max (4, fwidth);
+
+          // each half wave is a parabola, close enough to a sine (and no libm)
+          XPoint *pts = rxvt_temp_buf<XPoint> (width + 1);
+          for (int i = 0; i <= width; i++)
+            {
+              int a = ((x + i) % period + period) % period * 2; // 0 .. 2 * period
+              int sign = a < period ? 1 : -1;
+              if (a >= period)
+                a -= period;
+
+              int h = (4 * amp * a * (period - a) + period * period / 2) / (period * period);
+
+              pts[i].x = x + i;
+              pts[i].y = mid - sign * h;
+            }
+
+          XSetLineAttributes (dpy, gc, thick, LineSolid, CapButt, JoinRound);
+          XDrawLines (dpy, vt, gc, pts, width + 1, CoordModeOrigin);
+          XSetLineAttributes (dpy, gc, 0, LineSolid, CapButt, JoinMiter);
+        }
+        break;
+
+      case UL_dotted:
+        {
+          int step = 2 * thick;
+          for (int px = x + (step - x % step) % step; px < x + width; px += step)
+            XFillRectangle (dpy, vt, gc, px, base, min (thick, x + width - px), thick);
+        }
+        break;
+
+      case UL_dashed:
+        {
+          int dash = max (2, fwidth / 2), step = dash + max (1, fwidth / 4);
+          int start = x - (x % step);
+          for (int px = start; px < x + width; px += step)
+            {
+              int from = max (px, x), to = min (px + dash, x + width);
+              if (to > from)
+                XFillRectangle (dpy, vt, gc, from, base, to - from, thick);
+            }
+        }
+        break;
+
+      default: // UL_single
+        XFillRectangle (dpy, vt, gc, x, base, width, thick);
+        break;
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+/*
+ * Underline with a style (SGR 4:N), -1 for none
+ */
+void
+rxvt_term::scr_underline (int style) noexcept
+{
+  if (style < 0)
+    rstyle &= ~RS_Uline;
+  else
+    rstyle = (rstyle & ~RS_ulStyleMask) | RS_Uline
+             | ((rend_t)min (style, (int)UL_dashed) << RS_ulStyleShift);
+}
+
+/*
+ * Underline colour (SGR 58), -1 for the default (the text colour)
+ */
+void
+rxvt_term::scr_underline_color (int color) noexcept
+{
+  rstyle &= ~(RS_ulColor | RS_ulColorMask);
+
+  if (IN_RANGE_INC (color, minCOLOR, maxTermCOLOR24))
+    rstyle |= RS_ulColor | ((rend_t)color << RS_ulColorShift);
+}
+
+/* ------------------------------------------------------------------------- */
+/*
  * Change the rendition style for following text
  */
 void
@@ -2554,6 +2660,8 @@ rxvt_term::scr_refresh () noexcept
               if (showcursor && focus && row == screen.cur.row
                   && IN_RANGE_EXC (col, cur_col, cur_col + cursorwidth))
                 XSetForeground (dpy, gc, pix_colors[ccol1]);
+              else if (rend & RS_ulColor) // the program's colour (SGR 58)
+                XSetForeground (dpy, gc, pix_colors[GET_ULCOLOR (rend)]);
               else
 #if ENABLE_FRILLS
               if (ISSET_PIXCOLOR (Color_underline))
@@ -2562,9 +2670,7 @@ rxvt_term::scr_refresh () noexcept
 #endif
                 XSetForeground (dpy, gc, pix_colors[fore]);
 
-              XDrawLine (dpy, vt, gc,
-                         xpixel, ypixel + font->ascent + 1,
-                         xpixel + Width2Pixel (count) - 1, ypixel + font->ascent + 1);
+              draw_underline (xpixel, ypixel, Width2Pixel (count), font, rend);
             }
 
           if (ecb_unlikely (rend & (RS_Strike | RS_Overline) && fore != back))

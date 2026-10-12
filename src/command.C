@@ -4000,11 +4000,12 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
             rendset = 1, rendstyle = RS_Italic;
             break;
           case 4:
-            // 4:0 is "no underline", 4:1 to 4:5 are underline styles
-            if (SGR_SUB (i + 1) && arg[i + 1] == 0)
-              rendset = 0, rendstyle = RS_Uline;
+            // 4:0 is "no underline", 4:1 to 4:5 single, double, curly,
+            // dotted and dashed
+            if (SGR_SUB (i + 1))
+              scr_underline (arg[i + 1] <= 0 ? -1 : arg[i + 1] - 1);
             else
-              rendset = 1, rendstyle = RS_Uline;
+              scr_underline (UL_single);
             break;
           case 5: // slowly blinking
           case 6: // rapidly blinking
@@ -4026,8 +4027,8 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
           //...
           //case 19: // ninth alt font
           //case 20: // gothic
-          case 21: // disable bold, faint, sometimes doubly underlined (iso 8613)
-            rendset = 0, rendstyle = RS_Bold;
+          case 21: // doubly underlined (ECMA-48, as in xterm, VTE, kitty)
+            scr_underline (UL_double);
             break;
           case 22: // normal intensity: neither bold nor faint
             rendset = 0, rendstyle = RS_Bold | RS_Faint;
@@ -4099,9 +4100,10 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
 
           case 38: // set fg color, ISO 8613-6
           case 48: // set bg color, ISO 8613-6
+          case 58: // set underline color (kitty, VTE, xterm...)
             {
-              unsigned int fgbg = arg[i] == 38 ? Color_fg : Color_bg;
-              unsigned int idx;
+              unsigned int which = arg[i];
+              int idx = -1;
 
               if (SGR_SUB (i + 1))
                 {
@@ -4114,40 +4116,41 @@ rxvt_term::process_sgr_mode (unsigned int nargs, const int *arg, uint32_t sub)
                   if (arg[i + 1] == 5 && count >= 2)
                     {
                       if (IN_RANGE_INC (arg[i + 2], 0, 255))
-                        scr_color (minCOLOR + arg[i + 2], fgbg);
+                        idx = minCOLOR + arg[i + 2];
                     }
                   else if (arg[i + 1] == 2 && count >= 4)
                     {
                       unsigned int first = count >= 5 ? i + 3 : i + 2;
-                      scr_color (map_rgb24_color (arg[first], arg[first + 1], arg[first + 2], 0xff), fgbg);
+                      idx = map_rgb24_color (arg[first], arg[first + 1], arg[first + 2], 0xff);
                     }
 
                   i += count;
                 }
               else if (nargs > i + 2 && arg[i + 1] == 5)
                 {
-                  idx = minCOLOR + arg[i + 2];
-                  i += 2;
-
                   // only the 256 palette colours: higher numbers would pick
                   // the slots used internally for 24-bit colours
-                  if (IN_RANGE_INC (arg[i], 0, 255))
-                    scr_color (idx, fgbg);
+                  if (IN_RANGE_INC (arg[i + 2], 0, 255))
+                    idx = minCOLOR + arg[i + 2];
+                  i += 2;
                 }
               else if (nargs > i + 4 && arg[i + 1] == 2)
                 {
-                  unsigned int r = arg[i + 2];
-                  unsigned int g = arg[i + 3];
-                  unsigned int b = arg[i + 4];
-                  unsigned int a = 0xff;
-
-                  idx = map_rgb24_color (r, g, b, a);
-
+                  idx = map_rgb24_color (arg[i + 2], arg[i + 3], arg[i + 4], 0xff);
                   i += 4;
-
-                  scr_color (idx, fgbg);
                 }
+
+              if (idx < 0)
+                break;
+
+              if (which == 58)
+                scr_underline_color (idx);
+              else
+                scr_color (idx, which == 38 ? Color_fg : Color_bg);
             }
+            break;
+          case 59: // default underline color
+            scr_underline_color (-1);
             break;
 
           //case 50: // not variable spacing

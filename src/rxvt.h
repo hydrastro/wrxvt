@@ -395,8 +395,21 @@ enum {
 #define RS_Overline             ((rend_t)1 << 34)   // SGR 53
 #define RS_Conceal              ((rend_t)1 << 35)   // SGR 8: invisible
 
+// underline style (SGR 4:N), meaningful with RS_Uline
+#define RS_ulStyleShift         36
+#define RS_ulStyleMask          ((rend_t)7 << RS_ulStyleShift)
+enum { UL_single, UL_double, UL_curly, UL_dotted, UL_dashed };
+#define GET_ULSTYLE(x)          ((int)(((x) & RS_ulStyleMask) >> RS_ulStyleShift))
+
+// underline colour (SGR 58): a colour index like fg and bg, valid if RS_ulColor
+#define RS_ulColor              ((rend_t)1 << 39)
+#define RS_ulColorShift         40
+#define RS_ulColorMask          ((rend_t)RS_colorMask << RS_ulColorShift)
+#define GET_ULCOLOR(x)          ((int)(((x) & RS_ulColorMask) >> RS_ulColorShift))
+
 #define RS_baseattrMask         (RS_Italic | RS_Bold | RS_Blink | RS_RVid | RS_Uline \
-                                 | RS_Faint | RS_Strike | RS_Overline | RS_Conceal)
+                                 | RS_Faint | RS_Strike | RS_Overline | RS_Conceal \
+                                 | RS_ulStyleMask | RS_ulColor | RS_ulColorMask)
 #define RS_attrMask             (RS_baseattrMask | RS_fontMask)
 
 #define DEFAULT_RSTYLE  (RS_None | (Color_fg    << RS_fgShift) | (Color_bg     << RS_bgShift))
@@ -1546,6 +1559,9 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void scr_change_screen (int scrn);
   void scr_color (unsigned int color, int fgbg) noexcept;
   void scr_rendition (int set, rend_t style) noexcept;
+  void scr_underline (int style) noexcept;
+  void scr_underline_color (int color) noexcept;
+  void draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend);
   void scr_add_lines (const wchar_t *str, int len, int minlines = 0) noexcept;
   void scr_backspace () noexcept;
   void scr_tab (int count, bool ht = false) noexcept;
