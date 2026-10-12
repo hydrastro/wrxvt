@@ -2050,6 +2050,15 @@ Unlike XTerm, coordinates larger than 2015 will work fine.
 
 =end table
 
+=item B<< C<Pm = 1016> >> (X11 XTerm SGR-Pixels mouse mode) (Compile frills)
+
+=begin table
+
+	B<< C<h> >>	Enable SGR mouse reporting in pixels.
+	B<< C<l> >>	Disable SGR mouse reporting in pixels.
+
+=end table
+
 =item B<< C<Pm = 1021> >> (B<rxvt>)
 
 =begin table
@@ -2345,6 +2354,13 @@ the event type (press/motion or release).
 Example: Shift-Button-1 press at top row, column 80.
 
    ESC [ < 4 ; 80 ; 1 M
+
+=head2 Mode 1016
+
+Like mode 1006, but C<x> and C<y> are the position in pixels from the
+top left corner of the text area, starting at 1. Programs can draw
+finer than the cell grid (sliders, images, plots) and use it together
+with the cell size from C<ESC ] 776 ; ? ST>.
 
 =head2 Mode 1015
 

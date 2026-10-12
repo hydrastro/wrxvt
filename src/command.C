@@ -1357,8 +1357,20 @@ rxvt_term::mouse_report (XButtonEvent &ev)
   int x, y;
   bool release = ev.type == ButtonRelease;
 
-  x = 1 + clamp (Pixel2Col (ev.x), 0, ncol - 1);
-  y = 1 + clamp (Pixel2Row (ev.y), 0, nrow - 1);
+#if ENABLE_FRILLS
+  if (priv_modes & PrivMode_ExtMousePixels)
+    {
+      // SGR-Pixels: the position in pixels from the top left of the text
+      // area, starting at 1 like cells
+      x = 1 + clamp (ev.x, 0, Width2Pixel (ncol) - 1);
+      y = 1 + clamp (ev.y, 0, Height2Pixel (nrow) - 1);
+    }
+  else
+#endif
+    {
+      x = 1 + clamp (Pixel2Col (ev.x), 0, ncol - 1);
+      y = 1 + clamp (Pixel2Row (ev.y), 0, nrow - 1);
+    }
 
   if (ev.type == MotionNotify)
     {
@@ -1428,7 +1440,7 @@ rxvt_term::mouse_report (XButtonEvent &ev)
 #endif
 
 #if ENABLE_FRILLS
-  if (priv_modes & PrivMode_ExtMouseSGR)
+  if (priv_modes & (PrivMode_ExtMouseSGR | PrivMode_ExtMousePixels))
     tt_printf ("\033[<%d;%d;%d%c",
               button_number + state,
               x,
@@ -3012,7 +3024,7 @@ rxvt_term::process_csi_seq ()
                 scr_soft_reset ();
 
                 static const int pm_h[] = { 7, 25 };
-                static const int pm_l[] = { 1, 3, 4, 5, 6, 9, 66, 1000, 1001, 1005, 1006, 1015, 1049 };
+                static const int pm_l[] = { 1, 3, 4, 5, 6, 9, 66, 1000, 1001, 1005, 1006, 1015, 1016, 1049 };
 
                 process_terminal_mode ('h', 0, ecb_array_length (pm_h), pm_h);
                 process_terminal_mode ('l', 0, ecb_array_length (pm_l), pm_l);
@@ -4374,6 +4386,7 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                   { 1004, PrivMode_FocusEvent },
                   { 1005, PrivMode_ExtMouseUTF8 },
                   { 1006, PrivMode_ExtMouseSGR },
+                  { 1016, PrivMode_ExtMousePixels },
 #endif
                   { 1010, PrivMode_TtyOutputInh }, // rxvt extension
                   { 1011, PrivMode_Keypress }, // rxvt extension

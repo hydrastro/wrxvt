@@ -621,6 +621,7 @@ enum {
 #define PrivMode_ExtMouseSGR    (1UL<<27)
 #define PrivMode_SyncOutput     (1UL<<28) // mode 2026: hold the screen until the update is complete
 #define PrivMode_ColorScheme    (1UL<<29) // mode 2031: report dark/light changes
+#define PrivMode_ExtMousePixels (1UL<<30) // mode 1016: SGR mouse reports in pixels
 
 #define PrivMode_mouse_report   (PrivMode_MouseX10|PrivMode_MouseX11|PrivMode_MouseBtnEvent|PrivMode_MouseAnyEvent)
 
