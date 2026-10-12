@@ -957,6 +957,13 @@ rxvt_term::flush ()
 {
   flush_ev.stop ();
 
+  if (priv_modes & PrivMode_SyncOutput)
+    {
+      // a synchronized update is in progress: draw it when it's complete
+      display->flush ();
+      return;
+    }
+
 #ifdef HAVE_IMG
   if (bg_flags & BG_NEEDS_REFRESH)
     {
@@ -1019,10 +1026,43 @@ rxvt_term::flush ()
 void
 rxvt_term::refresh_check ()
 {
-  if (want_refresh && !flush_ev.is_active ())
+  if (want_refresh && !flush_ev.is_active () && !(priv_modes & PrivMode_SyncOutput))
     flush_ev.start ();
 
   display->flush ();
+}
+
+/*
+ * Synchronized output (mode 2026): while it's set, changes to the screen
+ * are not drawn, so a program can redraw everything and have it appear
+ * at once, without flicker or half-drawn frames. A program that never
+ * resets it doesn't freeze the terminal: it ends by itself after
+ * SYNC_OUTPUT_TIMEOUT seconds.
+ */
+void
+rxvt_term::sync_output (bool on)
+{
+  if (on)
+    {
+      // a second "begin" doesn't extend the time limit
+      if (!sync_ev.is_active ())
+        sync_ev.start (SYNC_OUTPUT_TIMEOUT);
+      priv_modes |= PrivMode_SyncOutput;
+    }
+  else
+    {
+      priv_modes &= ~PrivMode_SyncOutput;
+      sync_ev.stop ();
+      refresh_check ();
+    }
+}
+
+void
+rxvt_term::sync_cb (ev::timer &w, int revents)
+{
+  make_current ();
+
+  sync_output (false);
 }
 
 void
@@ -4055,6 +4095,7 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
 #if ENABLE_FRILLS
                   { 2004, PrivMode_BracketPaste },
 #endif
+                  { 2026, PrivMode_SyncOutput },
                 };
 
   if (nargs == 0)
@@ -4213,6 +4254,9 @@ rxvt_term::process_terminal_mode (int mode, int priv ecb_unused, unsigned int na
                   scr_erase_screen (2);
                 else
                   scr_cursor (RESTORE);
+              break;
+            case 2026:		/* synchronized output */
+              sync_output (state);
               break;
             default:
               break;

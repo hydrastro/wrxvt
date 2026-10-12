@@ -2090,6 +2090,19 @@ Unlike XTerm, coordinates larger than 2015 will work fine.
 
 =end table
 
+=item B<< C<Pm = 2026> >> (Synchronized output)
+
+=begin table
+
+	B<< C<h> >>	Begin an update: changes to the screen are not drawn yet
+	B<< C<l> >>	End the update: draw everything at once
+
+=end table
+
+So that a program that never ends an update can't freeze the window, the
+update also ends by itself half a second after it began. C<CSI ? 2026 $ p>
+(DECRQM) tells whether the mode is supported and set.
+
 =back
 
 X<DCS>

@@ -188,6 +188,7 @@ rxvt_term::rxvt_term ()
 #endif
   child_ev.set            <rxvt_term, &rxvt_term::child_cb>   (this);
   flush_ev.set            <rxvt_term, &rxvt_term::flush_cb>   (this);
+  sync_ev.set             <rxvt_term, &rxvt_term::sync_cb>    (this);
   destroy_ev.set          <rxvt_term, &rxvt_term::destroy_cb> (this);
   pty_ev.set              <rxvt_term, &rxvt_term::pty_cb>     (this);
   termwin_ev.set          <rxvt_term, &rxvt_term::x_cb>       (this);
@@ -335,6 +336,7 @@ rxvt_term::destroy ()
     }
 
   flush_ev.stop ();
+  sync_ev.stop ();
   pty_ev.stop ();
 #ifdef CURSOR_BLINK
   cursor_blink_ev.stop ();

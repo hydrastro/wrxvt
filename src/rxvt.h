@@ -618,6 +618,7 @@ enum {
 #define PrivMode_BlinkingCursor (1UL<<25)
 #define PrivMode_FocusEvent     (1UL<<26)
 #define PrivMode_ExtMouseSGR    (1UL<<27)
+#define PrivMode_SyncOutput     (1UL<<28) // mode 2026: hold the screen until the update is complete
 
 #define PrivMode_mouse_report   (PrivMode_MouseX10|PrivMode_MouseX11|PrivMode_MouseBtnEvent|PrivMode_MouseAnyEvent)
 
@@ -630,6 +631,7 @@ enum {
 // do not change these constants lightly, there are many interdependencies
 #define IMBUFSIZ               128     // input modifier buffer sizes
 #define KBUFSZ                 512     // size of keyboard mapping buffer
+#define SYNC_OUTPUT_TIMEOUT    0.5     // seconds a synchronized update (mode 2026) may hold the screen
 #define CBUFSIZ                32768   // size of command buffer (longest command sequence possible)
 #define CBUFCNT                8       // never call pty_fill/cmd_parse more than this often in a row
 #define UBUFSIZ                2048    // character buffer
@@ -1340,6 +1342,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void refresh_check ();
   void flush ();
   void flush_cb (ev::timer &w, int revents); ev::timer flush_ev;
+  void sync_cb (ev::timer &w, int revents); ev::timer sync_ev;
+  void sync_output (bool on);
   void cmdbuf_reify ();
   void cmdbuf_append (const char *str, size_t count);
   bool pty_fill ();
