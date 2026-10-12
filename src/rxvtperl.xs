@@ -117,20 +117,59 @@ parse_rgba (SV *sv, rxvt_screen *s = 0)
 /////////////////////////////////////////////////////////////////////////////
 #endif
 
+/*
+ * Text between the screen and perl. Composed characters (combining
+ * sequences, emoji, grapheme clusters: codes from 0x110000, see
+ * IS_COMPOSE) go to perl as those codes, which perl's strings can hold
+ * (special_decode expands them); plain UTF-8 can't, so they need their
+ * own conversion. They used to arrive as "?".
+ */
 static wchar_t *
 sv2wcs (SV *sv)
 {
   STRLEN len;
-  char *str = SvPVutf8 (sv, len);
-  return rxvt_utf8towcs (str, len);
+  const U8 *s = (const U8 *)SvPVutf8 (sv, len);
+  const U8 *e = s + len;
+
+  wchar_t *r = (wchar_t *)rxvt_malloc ((len + 1) * sizeof (wchar_t)), *p = r;
+
+  while (s < e)
+    {
+      STRLEN clen;
+      UV c = utf8n_to_uvchr (s, e - s, &clen, UTF8_ALLOW_ANY);
+
+      if (!clen)
+        {
+          c = 0xfffd;
+          clen = 1;
+        }
+
+      *p++ = c <= UNICODE_MASK ? (wchar_t)c : 0xfffd;
+      s += clen;
+    }
+
+  *p = 0;
+  return r;
 }
 
 static SV *
 wcs2sv (wchar_t *wstr, int len = -1)
 {
-  char *str = rxvt_wcstoutf8 (wstr, len);
+  if (len < 0)
+    len = wcslen (wstr);
 
-  SV *sv = newSVpv (str, 0);
+  // the longest perl encoding of a code below 0x200000 is 4 bytes
+  U8 *str = (U8 *)rxvt_malloc (len * 4 + 1), *p = str;
+
+  for (int i = 0; i < len; i++)
+    {
+      UV w = wstr[i] & UNICODE_MASK;
+      p = uvchr_to_utf8_flags (p, w, 0); // (above Unicode is allowed by default)
+    }
+
+  *p = 0;
+
+  SV *sv = newSVpvn ((char *)str, p - str);
   SvUTF8_on (sv);
   free (str);
 
