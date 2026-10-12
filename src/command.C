@@ -5089,23 +5089,21 @@ rxvt_term::process_osc_seq ()
     }
 }
 
-static unsigned int
-colorcube_index (unsigned int idx_r,
-                 unsigned int idx_g,
-                 unsigned int idx_b)
-{
-  assert (idx_r < Red_levels);
-  assert (idx_g < Green_levels);
-  assert (idx_b < Blue_levels);
-
-  return idx_r * Blue_levels * Green_levels +
-         idx_g * Blue_levels +
-         idx_b;
-}
-
 /*
- * Find the nearest color slot in the hidden color cube,
- * adapt its value to the 32bit RGBA color.
+ * A colour slot for a 24-bit colour (SGR 38:2, 48:2...). Cells name their
+ * colours by slot, so a slot's colour must not change while cells use it:
+ * rxvt-unicode recycled the oldest slot near the colour, and text already
+ * on the screen (or in the scrollback) took the new colour.
+ *
+ * Here, in this order:
+ *  - a slot that has the colour already;
+ *  - a slot never used;
+ *  - a slot no cell uses any more: a scan of the screen, the scrollback
+ *    and the other screen finds those when the free ones run out (if it
+ *    finds none, again only after the screen or the scrollback was
+ *    erased, or half a second later);
+ *  - otherwise, with every slot in use, the slot of the nearest colour:
+ *    the new text gets a close colour, and nothing already there changes.
  */
 unsigned int
 rxvt_term::map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsigned int a)
@@ -5116,80 +5114,157 @@ rxvt_term::map_rgb24_color (unsigned int r, unsigned int g, unsigned int b, unsi
   a &= 0xff;
 
   uint32_t color = (a << 24) | (r << 16) | (g << 8) | b;
+  int idx = -1;
 
-  /* we allow one of the 6 closest neighbouring colours */
-  /* to replace the current color, if they not used recently */
-  #if 0
-  static const unsigned char dxyz[][3] = {
-    0, 0, 0,
-    0, 0, 4,
-    0, 4, 4,
-    4, 4, 0,
-    4, 0, 4,
-    0, 4, 0,
-    4, 0, 0,
-  };
-  #else
-  // silly compressed verlapping triplets version of above
-  static const unsigned char dxyz[] = {
-    0, 0, 0, 4, 4, 0, 4, 0, 0,
-  };
-  #endif
+  // the slots by colour: a hash table, chained through rgb24_next (both
+  // hold slot + 1, 0 ends a chain)
+  uint8_t &bucket = rgb24_bucket[(color * 2654435761u) >> 24];
 
-  static const unsigned char color_level[8][32] = {
-    // neighbour index
-    {0, 0, 1, 0, 0, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-    {0, 1, 0, 1, 1, 2, 1, 1, 2, 2, 3, 3, 2, 2, 2, 3, 3, 3, 4, 4, 4, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4},
-    {0, 0, 1, 2, 1, 1, 2, 3, 3, 2, 2, 3, 3, 4, 4, 3, 3, 3, 4, 4, 5, 5, 5, 4, 4, 4, 5, 5, 5, 5, 5, 5},
-    {0, 0, 2, 1, 2, 3, 2, 2, 3, 4, 4, 3, 3, 4, 4, 5, 5, 4, 4, 5, 5, 5, 6, 6, 5, 5, 5, 6, 6, 6, 6, 6},
-    // Red_levels/Green_levels/Blue_levels index
-    {0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-    {0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
-    {0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5},
-    {0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6},
-  };
+  for (int i = bucket; i; i = rgb24_next[i - 1])
+    if (rgb24_color[i - 1] == color)
+      {
+        if (rgb24_seqno[i - 1] == 2)
+          rgb24_unused--;
+        rgb24_seqno[i - 1] = 1; // (in use again, if a scan had found it unused)
+        return i - 1 + minTermCOLOR24;
+      }
 
-  unsigned int idx;
+  // slots are first taken in order
+  if (rgb24_fresh < RGB24_CUBE_SIZE)
+    idx = rgb24_fresh++;
 
-  for (int n = 0; n < ecb_array_length (dxyz) - 2; ++n)
+  if (idx < 0)
+    idx = rgb24_unused_slot ();
+
+  if (idx < 0)
     {
-      unsigned int idx_r = color_level[  Red_levels - dxyz[n + 0]][r / 8];
-      unsigned int idx_g = color_level[Green_levels - dxyz[n + 1]][g / 8];
-      unsigned int idx_b = color_level[ Blue_levels - dxyz[n + 2]][b / 8];
-      unsigned int index = colorcube_index (idx_r, idx_g, idx_b);
-
-      if (n == 0)
-        idx = index;
-
-      if (rgb24_color[index] == color)
+      // all in use: the slot nearest to the colour, from a table made
+      // when the scan found them all in use (8 levels a channel)
+      if (!rgb24_near_valid)
         {
-          rgb24_seqno[index] = ++rgb24_sequence;
-          return index + minTermCOLOR24;
+          for (int n = 0; n < 512; n++)
+            {
+              long nr = (n >> 6) * 32 + 16, ng = (n >> 3 & 7) * 32 + 16, nb = (n & 7) * 32 + 16;
+              unsigned long best = ~0UL;
+
+              for (int i = 0; i < RGB24_CUBE_SIZE; i++)
+                {
+                  uint32_t c = rgb24_color[i];
+                  long dr = (long)(c >> 16 & 0xff) - nr, dg = (long)(c >> 8 & 0xff) - ng,
+                       db = (long)(c & 0xff) - nb;
+                  unsigned long d = 3 * dr * dr + 4 * dg * dg + 2 * db * db;
+
+                  if (d < best)
+                    best = d, rgb24_near[n] = i;
+                }
+            }
+
+          rgb24_near_valid = true;
         }
 
-      // minor issue: could update index 0 few more times
-      if ((rgb24_seqno[index] | rgb24_color[index]) == 0)
-        {
-          idx = index;
-          goto update;
-        }
-
-      // like (rgb24_seqno[idx] > rgb24_seqno[index])
-      // but also handles wrap around values well enough
-      if ((uint16_t)(rgb24_seqno[idx] - rgb24_seqno[index]) < 0x8000)
-        idx = index;
+      return rgb24_near[(r >> 5) << 6 | (g >> 5) << 3 | b >> 5] + minTermCOLOR24;
     }
 
-update:
+  // out of the chain of its old colour, into the new one's
+  if (rgb24_seqno[idx])
+    for (uint8_t *p = &rgb24_bucket[(rgb24_color[idx] * 2654435761u) >> 24]; *p; p = &rgb24_next[*p - 1])
+      if (*p == idx + 1)
+        {
+          *p = rgb24_next[idx];
+          break;
+        }
+
+  rgb24_next[idx] = bucket;
+  bucket = idx + 1;
+
   rgb24_color[idx] = color;
-  rgb24_seqno[idx] = ++rgb24_sequence;
+  rgb24_seqno[idx] = 1; // in use
+  rgb24_near_valid = false;
 
-  idx += minTermCOLOR24;
-  pix_colors_focused [idx].free (this);
-  pix_colors_focused [idx].set (this, rgba (r * 0x0101, g * 0x0101, b * 0x0101, a * 0x0101));
-  update_fade_color (idx, false);
+  int slot = idx + minTermCOLOR24;
+  pix_colors_focused [slot].free (this);
+  pix_colors_focused [slot].set (this, rgba (r * 0x0101, g * 0x0101, b * 0x0101, a * 0x0101));
+  update_fade_color (slot, false);
 
-  return idx;
+  return slot;
+}
+
+// a slot no cell uses, or -1
+int
+rxvt_term::rgb24_unused_slot ()
+{
+  // slots found unused by the last scan, not taken since
+  if (rgb24_unused)
+    for (int i = 0; i < RGB24_CUBE_SIZE; i++)
+      if (rgb24_seqno[i] == 2)
+        {
+          rgb24_unused--;
+          return i;
+        }
+
+  // all were in use: look again only when the screen or the scrollback
+  // was erased since, or after half a second
+  if (erased == rgb24_full_erased && ev::now () - rgb24_full_scan < .5)
+    return -1;
+
+  bool used[RGB24_CUBE_SIZE] = { };
+
+  auto mark = [&] (rend_t r)
+  {
+    unsigned int c;
+
+    c = GET_BASEFG (r) - minTermCOLOR24;
+    if (c < RGB24_CUBE_SIZE) used[c] = true;
+    c = GET_BASEBG (r) - minTermCOLOR24;
+    if (c < RGB24_CUBE_SIZE) used[c] = true;
+    if (r & RS_ulColor)
+      {
+        c = GET_ULCOLOR (r) - minTermCOLOR24;
+        if (c < RGB24_CUBE_SIZE) used[c] = true;
+      }
+  };
+
+  auto mark_line = [&] (line_t &l)
+  {
+    if (!l.valid () || !l.r)
+      return;
+
+    rend_t last = ~(rend_t)0;
+    for (int col = 0; col < ncol; col++)
+      if (l.r[col] != last)
+        mark (last = l.r[col]);
+  };
+
+  for (int row = top_row; row < nrow; row++)
+    mark_line (ROW (row));
+
+  if (swap_buf)
+    for (int row = 0; row < nrow; row++)
+      mark_line (swap_buf[row]);
+
+  mark (rstyle);
+  mark (screen.s_rstyle);
+  mark (swap.s_rstyle);
+
+  int found = -1;
+  rgb24_unused = 0;
+  for (int i = RGB24_CUBE_SIZE; i--; )
+    if (!used[i] && rgb24_seqno[i])
+      {
+        rgb24_seqno[i] = 2; // free to take
+        rgb24_unused++;
+        found = i;
+      }
+
+  if (found < 0)
+    {
+      rgb24_full_scan = ev::now ();
+      rgb24_full_erased = erased;
+    }
+  else
+    rgb24_unused--; // (this one)
+
+  return found;
 }
 
 void

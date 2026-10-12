@@ -1667,6 +1667,7 @@ rxvt_term::scr_erase_line (int mode) noexcept
 void
 rxvt_term::scr_erase_screen (int mode) noexcept
 {
+  erased++; // (24-bit colour slots may be free again)
   int num;
   int32_t row;
   rend_t ren;
@@ -1747,6 +1748,7 @@ rxvt_term::scr_erase_screen (int mode) noexcept
 void
 rxvt_term::scr_erase_savelines () noexcept
 {
+  erased++;
   want_refresh = 1;
   ZERO_SCROLLBACK ();
 

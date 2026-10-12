@@ -299,7 +299,7 @@ struct mouse_event
 # define Blue_levels     4
 #endif
 
-#define RGB24_CUBE_SIZE (Red_levels * Green_levels * Blue_levels)
+#define RGB24_CUBE_SIZE (Red_levels * Green_levels * Blue_levels) // < 255
 
 #if defined (NO_MOUSE_REPORT) && !defined (NO_MOUSE_REPORT_SCROLLBAR)
 # define NO_MOUSE_REPORT_SCROLLBAR 1
@@ -1384,8 +1384,17 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   size_t          chunk_size;
 
   uint32_t        rgb24_color[RGB24_CUBE_SIZE];   // the 24-bit color value
-  uint16_t        rgb24_seqno[RGB24_CUBE_SIZE];   // which one is older?
-  uint16_t        rgb24_sequence;
+  uint8_t         rgb24_seqno[RGB24_CUBE_SIZE];   // 0 never used, 1 in use, 2 found unused
+  int             rgb24_fresh;                    // slots ever used (they are taken in order)
+  int             rgb24_unused;                   // slots marked 2 (found unused)
+  uint8_t         rgb24_bucket[256];              // the slots by colour (a hash table)
+  uint8_t         rgb24_next[RGB24_CUBE_SIZE];
+  uint8_t         rgb24_near[512];                // the nearest slot, by 3-bit r, g, b
+  bool            rgb24_near_valid;
+  ev_tstamp       rgb24_full_scan;                // when a scan last found every slot in use
+  unsigned int    rgb24_full_erased;              // and the value of erased then
+  unsigned int    erased;                         // screen or scrollback erases, ever
+  int rgb24_unused_slot ();
 
   static vector<rxvt_term *> termlist; // a vector of all running rxvt_term's
 

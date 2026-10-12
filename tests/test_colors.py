@@ -84,5 +84,42 @@ class FollowResources(TerminalTest):
         self.assertEqual(image.pixel(image.width - 3, image.height - 3), (0x10, 0x20, 0x30))
 
 
+class TrueColour(TerminalTest):
+    """24-bit colours: text keeps its colour, however many come after."""
+    geometry = '40x12'
+
+    @staticmethod
+    def colour(i):
+        return ((i * 37) % 256, (i * 91) % 256, (i * 53 + 17) % 256)
+
+    def cells(self, image, n, first=0):
+        cw, ch = image.width // 40, image.height // 12
+        out = []
+        for i in range(n):
+            row, col = divmod(i, 40)
+            out.append(image.pixel(col * cw + cw // 2, row * ch + ch // 2))
+        return out
+
+    def test_colours_stay(self):
+        colours = [self.colour(i) for i in range(400)]
+        run = self.run_in_terminal(r"""
+            colours = """ + repr(colours) + r"""
+            write('\x1b[H' + ''.join('\x1b[48;2;%d;%d;%dm ' % c for c in colours) + '\x1b[m')
+            shot('many')
+            # the screen cleared (and the scrollback): the slots are free again
+            write('\x1b[m\x1b[2J\x1b[3J\x1b[H')
+            write(''.join('\x1b[48;2;%d;%d;%dm ' % c for c in reversed(colours[200:])) + '\x1b[m')
+            shot('again')
+        """)
+        many = self.cells(run.shots['many'], 400)
+        # the first ones exactly, even after hundreds more
+        self.assertEqual(many[:200], colours[:200])
+        # the rest at least close
+        for got, want in zip(many, colours):
+            self.assertLess(sum((a - b) ** 2 for a, b in zip(got, want)), 3 * 60 ** 2)
+        again = self.cells(run.shots['again'], 200)
+        self.assertEqual(again, list(reversed(colours[200:])))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -18,6 +18,9 @@ Drawing:
   dotted, dashed), `21`, and `58`/`59` colours. Used for diagnostics in
   Neovim, Helix and Emacs.
 - **Faint, crossed-out, overline and invisible text** (`SGR 2, 9, 53, 8`).
+- **24-bit colours that stay put**: rxvt-unicode recycled colour slots,
+  so text already on the screen could change colour when new colours
+  came; now slots are only reused once nothing shows their colour.
 - **Colon sub-parameters** in SGR (`38:2::R:G:B`, `4:3`), and renditions
   widened to 64 bits to make room for all of the above.
 - **Emoji sequences** (flags, skin tones, ZWJ families) drawn as one
