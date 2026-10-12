@@ -165,6 +165,9 @@ optList[] = {
               RSTRG (Rs_color + minBrightCOLOR + 5, "color13", "color"),
               RSTRG (Rs_color + minBrightCOLOR + 6, "color14", "color"),
               RSTRG (Rs_color + minBrightCOLOR + 7, "color15", "color"),
+#if !ENABLE_MINIMAL
+# include "colorres.h"
+#endif
 #ifndef NO_BOLD_UNDERLINE_REVERSE
               RSTRG (Rs_color + Color_BD, "colorBD", "color"),
               RSTRG (Rs_color + Color_IT, "colorIT", "color"),
@@ -464,10 +467,24 @@ rxvt_term::rxvt_usage (int type)
 
         for (i = 0; i < ecb_array_length (optList); i++)
           if (optList[i].kw != NULL)
+            {
+              // color16 to color255: one line
+              if (!strncmp (optList[i].kw, "color", 5) && atoi (optList[i].kw + 5) >= 16)
+                {
+                  if (atoi (optList[i].kw + 5) == 16)
+                    {
+                      char kw[32];
+                      snprintf (kw, sizeof (kw), "color16 .. color%d", maxTermCOLOR - minCOLOR);
+                      rxvt_log ("  %s: %*scolor\n", kw, (int)(INDENT + 2 - strlen (kw)), "");
+                    }
+                  continue;
+                }
+
             rxvt_log ("  %s: %*s%s\n",
                     optList[i].kw,
                     (INDENT + 2 - strlen (optList[i].kw)), "", /* XXX */
                     (optList_isBool (i) ? "boolean" : optList[i].arg));
+            }
 
 #if ENABLE_PERL
         rxvt_perl.init (this);

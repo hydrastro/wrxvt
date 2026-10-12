@@ -86,6 +86,7 @@ src/scrollbar.C
 src/scrollbar.h
 src/version.h
 src/xdefaults.C
+src/colorres.h
 src/emman.h
 src/emman.c
 

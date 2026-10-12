@@ -631,11 +631,13 @@ colours. The canonical names are as follows: 0=black, 1=red, 2=green,
 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white, but the actual colour
 names used are listed in the B<COLOURS AND GRAPHICS> section.
 
-Colours higher than 15 cannot be set using resources (yet), but can be
-changed using an escape command (see @@RXVT_NAME@@(7)).
+Colours 16 and up can be set the same way (B<color16> to B<color255>,
+or B<color87> in an 88-colour build), and changed with an escape
+sequence (see @@RXVT_NAME@@(7)).
 
-Colours 16-79 form a standard 4x4x4 colour cube (the same as xterm with
-88 colour support). Colours 80-87 are evenly spaces grey steps.
+With 256 colours, colours 16-231 form a 6x6x6 colour cube and 232-255
+are grey steps (as in xterm). With 88 colours, 16-79 form a 4x4x4 cube
+and 80-87 are grey steps.
 
 =item B<colorBD:> I<colour>
 

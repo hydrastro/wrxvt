@@ -250,7 +250,7 @@ scrollbar.o: rxvtperl.h hookinc.h rsinc.h optinc.h
 xdefaults.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
 xdefaults.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h ../config.h
 xdefaults.o: ../libev/ev++.h ../libev/ev.h callback.h rxvtimg.h scrollbar.h
-xdefaults.o: rxvtperl.h hookinc.h rsinc.h optinc.h version.h keyboard.h
+xdefaults.o: rxvtperl.h hookinc.h rsinc.h optinc.h version.h keyboard.h colorres.h
 rxvtperl.o: ../config.h ev_cpp.h ../config.h ../libev/ev++.h ../libev/ev.h
 rxvtperl.o: rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h emman.h
 rxvtperl.o: rxvtfont.h rxvttoolkit.h callback.h rxvtimg.h scrollbar.h
