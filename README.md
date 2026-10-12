@@ -177,6 +177,8 @@ tests whose tools are missing are skipped.
 ```sh
 make check
 cd tests && WRXVT=../src/rxvt WRXVT_LIBDIR=../src python3 -m unittest test_sgr -v
+make bench                       # MB/s for plain text, colours, Unicode, scrolling
+make bench COMPARE=urxvt         # and the same files in another terminal
 ```
 
 Every feature commit adds tests that fail without it. `test_robustness`

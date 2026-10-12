@@ -62,6 +62,13 @@ check: all
 	  WRXVT="$(CURDIR)/src/rxvt" WRXVT_LIBDIR="$$(cd ../src && pwd)" \
 	  python3 -m unittest discover -v
 
+# Throughput of a few kinds of output (tests/bench.py); COMPARE=urxvt to
+# time another terminal on the same files.
+bench: all
+	cd $(srcdir)/tests && \
+	  WRXVT_LIBDIR="$$(cd ../src && pwd)" \
+	  python3 bench.py --wrxvt "$(CURDIR)/src/rxvt" $${COMPARE:+--compare "$$COMPARE"}
+
 Makefiles:
 	$(SHELL) config.status
 
