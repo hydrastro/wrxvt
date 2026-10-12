@@ -1442,6 +1442,7 @@ rxvt_font_xft::load (const rxvt_fontprop &prop, bool force_prop)
     return false;
 
   int ftheight = 0;
+  int attempts = 0;
   bool success = true;
 
   for (;;)
@@ -1530,6 +1531,11 @@ rxvt_font_xft::load (const rxvt_fontprop &prop, bool force_prop)
         }
       else
         ftheight = prop.height - 1;
+
+      // it doesn't get smaller (a cell of a pixel or two): keep this size,
+      // rather than asking for the same one forever
+      if (ftheight < 1 || ++attempts > 32)
+        break;
 
       XftFontClose (disp, f);
       FcPatternDel (match, FC_PIXEL_SIZE);

@@ -49,5 +49,19 @@ class FontSize(TerminalTest):
         self.assertIn('pixelsize=19', run.result['font'])
 
 
+class TinyFonts(TerminalTest):
+    def test_fallback_fonts_in_a_one_pixel_cell(self):
+        # Fitting a fallback font into a cell of one pixel used to ask
+        # fontconfig for the same size forever (100% CPU, no more output).
+        run = self.run_in_terminal(r"""
+            write('\x1b]710;xft:DejaVu Sans Mono:pixelsize=1\x07')
+            # Hebrew, Thai, Glagolitic, Vai, Tibetan: some font other than
+            # the first has them
+            write('abc א ก Ⰰ ꔀ ཀ\r\n')
+            result['answer'] = query('\x1b[5n', r'\x1b\[0n', 10)
+        """, timeout=30)
+        self.assertEqual(run.result['answer'], '\x1b[0n')
+
+
 if __name__ == '__main__':
     unittest.main()
