@@ -1381,6 +1381,22 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   bool builtin_action (const char *name, const char *arg);
   void change_font_size (int delta);
   int default_cursor_style;
+
+  // the kitty keyboard protocol: the flags of each screen, and the
+  // flags pushed before them
+  enum {
+    KBD_DISAMBIGUATE = 1,
+    KBD_EVENT_TYPES  = 2,
+    KBD_ALTERNATES   = 4,
+    KBD_ALL_KEYS     = 8,
+    KBD_TEXT         = 16,
+    KBD_STACK        = 16,
+  };
+  unsigned char kbd_flags[2], kbd_stack[2][KBD_STACK], kbd_depth[2];
+  unsigned char kbd_down[32]; // keycodes held, to tell repeats
+  bool kbd_detectable_repeat;
+  void process_kbd_seq (unicode_t priv, unsigned int nargs, const int *arg);
+  bool kitty_key (XKeyEvent &ev, KeySym keysym, bool release);
   const char *initial_colors[NRS_COLORS]; // the colours as configured
   void reset_color (int idx);
   char *font_orig[4];   // the fonts before font-size changes

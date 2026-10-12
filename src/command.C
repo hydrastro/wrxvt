@@ -58,6 +58,7 @@
 
 #include <signal.h>
 #include <fcntl.h>
+#include <X11/XKBlib.h>
 #include <sys/wait.h>
 
 #if LINUX_YIELD_HACK
@@ -849,7 +850,8 @@ rxvt_term::key_press (XKeyEvent &ev)
               iso14755buf = 0;
             }
         }
-      else if (option (Opt_iso14755) &&
+      // (not when a program asked for every key with the kitty protocol)
+      else if (option (Opt_iso14755) && !kbd_flags[current_screen] &&
                ((ctrl && (keysym == XK_Shift_L || keysym == XK_Shift_R))
                 || (shft && (keysym == XK_Control_L || keysym == XK_Control_R))))
         if (!(iso14755buf & ISO_14755_STARTED))
@@ -871,10 +873,318 @@ rxvt_term::key_press (XKeyEvent &ev)
 #endif
     }
 
+  if (keysym != NoSymbol && kbd_flags[current_screen] && kitty_key (ev, keysym, false))
+    return;
+
   if (len <= 0)
     return;			/* not mapped */
 
   tt_write_user_input (kbuf, (unsigned int)len);
+}
+
+/*
+ * The kitty keyboard protocol (https://sw.kovidgoyal.net/kitty/keyboard-protocol/):
+ *
+ *   CSI ? u              query the flags: CSI ? flags u
+ *   CSI > flags u        push the current flags and set new ones
+ *   CSI < n u            pop n entries (1 if missing)
+ *   CSI = flags ; mode u set (1), add (2) or remove (3) flags
+ *
+ * Each screen has its own flags and stack.
+ */
+void
+rxvt_term::process_kbd_seq (unicode_t priv, unsigned int nargs, const int *arg)
+{
+  int scr = current_screen;
+  unsigned char &flags = kbd_flags[scr];
+  int value = nargs ? arg[0] & 31 : 0;
+
+  switch (priv)
+    {
+      case '?':
+        tt_printf ("\033[?%du", flags);
+        break;
+
+      case '>':
+        if (kbd_depth[scr] == KBD_STACK)
+          {
+            // full: forget the oldest
+            memmove (kbd_stack[scr], kbd_stack[scr] + 1, KBD_STACK - 1);
+            kbd_depth[scr]--;
+          }
+
+        kbd_stack[scr][kbd_depth[scr]++] = flags;
+        flags = value;
+        break;
+
+      case '<':
+        for (int n = max (1, nargs ? arg[0] : 1); n--; )
+          flags = kbd_depth[scr] ? kbd_stack[scr][--kbd_depth[scr]] : 0;
+        break;
+
+      case '=':
+        {
+          int mode = nargs > 1 && arg[1] ? arg[1] : 1;
+
+          if (mode == 1)
+            flags = value;
+          else if (mode == 2)
+            flags |= value;
+          else if (mode == 3)
+            flags &= ~value;
+        }
+        break;
+    }
+
+  // telling repeats from new presses needs the X server to send the
+  // release only when the key is let go
+  if (flags & KBD_EVENT_TYPES && !kbd_detectable_repeat)
+    {
+      Bool supported;
+      XkbSetDetectableAutoRepeat (dpy, True, &supported);
+      kbd_detectable_repeat = true;
+    }
+}
+
+// keys that don't produce text, and their numbers and final characters
+static const struct
+{
+  KeySym sym;
+  unsigned short number;
+  char final;
+} kitty_functional_keys[] = {
+  { XK_Escape,           27, 'u' },
+  { XK_Return,           13, 'u' },
+  { XK_Tab,               9, 'u' },
+  { XK_ISO_Left_Tab,      9, 'u' },
+  { XK_BackSpace,       127, 'u' },
+  { XK_Insert,            2, '~' },
+  { XK_Delete,            3, '~' },
+  { XK_Left,              1, 'D' },
+  { XK_Right,             1, 'C' },
+  { XK_Up,                1, 'A' },
+  { XK_Down,              1, 'B' },
+  { XK_Prior,             5, '~' },
+  { XK_Next,              6, '~' },
+  { XK_Home,              1, 'H' },
+  { XK_End,               1, 'F' },
+  { XK_Caps_Lock,     57358, 'u' },
+  { XK_Scroll_Lock,   57359, 'u' },
+  { XK_Num_Lock,      57360, 'u' },
+  { XK_Print,         57361, 'u' },
+  { XK_Pause,         57362, 'u' },
+  { XK_Menu,          57363, 'u' },
+  { XK_F1,                1, 'P' },
+  { XK_F2,                1, 'Q' },
+  { XK_F3,               13, '~' },
+  { XK_F4,                1, 'S' },
+  { XK_F5,               15, '~' },
+  { XK_F6,               17, '~' },
+  { XK_F7,               18, '~' },
+  { XK_F8,               19, '~' },
+  { XK_F9,               20, '~' },
+  { XK_F10,              21, '~' },
+  { XK_F11,              23, '~' },
+  { XK_F12,              24, '~' },
+  { XK_KP_Decimal,    57409, 'u' },
+  { XK_KP_Divide,     57410, 'u' },
+  { XK_KP_Multiply,   57411, 'u' },
+  { XK_KP_Subtract,   57412, 'u' },
+  { XK_KP_Add,        57413, 'u' },
+  { XK_KP_Enter,      57414, 'u' },
+  { XK_KP_Equal,      57415, 'u' },
+  { XK_KP_Separator,  57416, 'u' },
+  { XK_KP_Left,       57417, 'u' },
+  { XK_KP_Right,      57418, 'u' },
+  { XK_KP_Up,         57419, 'u' },
+  { XK_KP_Down,       57420, 'u' },
+  { XK_KP_Prior,      57421, 'u' },
+  { XK_KP_Next,       57422, 'u' },
+  { XK_KP_Home,       57423, 'u' },
+  { XK_KP_End,        57424, 'u' },
+  { XK_KP_Insert,     57425, 'u' },
+  { XK_KP_Delete,     57426, 'u' },
+  { XK_KP_Begin,      57427, 'u' },
+  { XK_Shift_L,       57441, 'u' },
+  { XK_Control_L,     57442, 'u' },
+  { XK_Alt_L,         57443, 'u' },
+  { XK_Super_L,       57444, 'u' },
+  { XK_Hyper_L,       57445, 'u' },
+  { XK_Meta_L,        57446, 'u' },
+  { XK_Shift_R,       57447, 'u' },
+  { XK_Control_R,     57448, 'u' },
+  { XK_Alt_R,         57449, 'u' },
+  { XK_Super_R,       57450, 'u' },
+  { XK_Hyper_R,       57451, 'u' },
+  { XK_Meta_R,        57452, 'u' },
+  { XK_ISO_Level3_Shift, 57453, 'u' },
+  { XK_ISO_Level5_Shift, 57454, 'u' },
+};
+
+// the one character a key lookup produced, or 0
+static unicode_t
+single_char (const char *buf, int len)
+{
+  if (len <= 0)
+    return 0;
+
+  wchar_t w[4];
+  mbstate_t mbs = { };
+  const char *src = buf;
+  size_t n = mbsrtowcs (w, &src, 4, &mbs);
+
+  return n == 1 && w[0] >= 0x20 && w[0] != 0x7f ? w[0] : 0;
+}
+
+/*
+ * The key event in the kitty keyboard protocol, written to the pty, when
+ * the flags ask for an escape sequence; false leaves the key to the usual
+ * (legacy) encoding.
+ */
+bool
+rxvt_term::kitty_key (XKeyEvent &ev, KeySym keysym, bool release)
+{
+  int flags = kbd_flags[current_screen];
+  bool all = flags & KBD_ALL_KEYS;
+
+  int type = 1; // press
+  if (release)
+    type = 3;
+  else
+    {
+      bool down = kbd_down[ev.keycode >> 3] & (1 << (ev.keycode & 7));
+      kbd_down[ev.keycode >> 3] |= 1 << (ev.keycode & 7);
+
+      if (down)
+        type = 2; // repeat
+    }
+
+  if (!(flags & KBD_EVENT_TYPES))
+    type = 1;
+
+  int mods = 0;
+  if (ev.state & ShiftMask)      mods |= 1;
+  if (ev.state & ModMetaMask)    mods |= 2;
+  if (ev.state & ControlMask)    mods |= 4;
+  if (ev.state & Mod4Mask && Mod4Mask != ModMetaMask) mods |= 8; // super
+  if (ev.state & LockMask)       mods |= 64;
+  if (ev.state & ModNumLockMask) mods |= 128;
+
+  // a modifier key's own event has the state before it: report the state after
+  int own = 0;
+  switch (keysym)
+    {
+      case XK_Shift_L: case XK_Shift_R:     own = 1; break;
+      case XK_Alt_L: case XK_Alt_R:
+      case XK_Meta_L: case XK_Meta_R:       own = 2; break;
+      case XK_Control_L: case XK_Control_R: own = 4; break;
+      case XK_Super_L: case XK_Super_R:     own = 8; break;
+      case XK_Caps_Lock:                    own = 64; break;
+      case XK_Num_Lock:                     own = 128; break;
+    }
+
+  if (own && own < 64)
+    mods = release ? mods & ~own : mods | own;
+
+  // lock keys only count with "report all keys"
+  if (!all)
+    mods &= ~(64 | 128);
+
+  bool modified = mods & (2 | 4 | 8); // modifiers that change what a key means
+
+  int number = 0;
+  char final = 'u';
+
+  for (auto &k : kitty_functional_keys)
+    if (k.sym == keysym)
+      {
+        number = k.number;
+        final = k.final;
+        break;
+      }
+
+  if (IN_RANGE_INC (keysym, XK_F13, XK_F35))
+    number = 57376 + keysym - XK_F13;
+  else if (IN_RANGE_INC (keysym, XK_KP_0, XK_KP_9))
+    number = 57399 + keysym - XK_KP_0;
+
+  char seq[128];
+  int n;
+
+  if (number)
+    {
+      bool plain_control = keysym == XK_Return || keysym == XK_Tab || keysym == XK_BackSpace
+                           || keysym == XK_KP_Enter;
+      // keypad keys that type text: digits, operators
+      bool keypad_text = IN_RANGE_INC (number, 57399, 57416) && number != 57414;
+      bool modifier = number >= 57441;
+
+      if (!all)
+        {
+          // Enter, Tab and Backspace stay plain (so a shell is usable after
+          // a program left the mode on), keypad keys type their text, and
+          // lone modifiers are not keys: none of them has release events
+          bool plain = plain_control ? !(mods & (1 | 2 | 4 | 8))
+                     : keypad_text ? !modified
+                     : modifier;
+
+          if (plain)
+            return release;
+        }
+
+      if (final == 'u' || final == '~')
+        n = snprintf (seq, sizeof (seq), "\033[%d", number);
+      else
+        n = snprintf (seq, sizeof (seq), "\033[%s", mods || type != 1 ? "1" : "");
+
+      if (mods || type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, ";%d", mods + 1);
+      if (type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, ":%d", type);
+
+      seq[n++] = final;
+    }
+  else
+    {
+      // a text key: its code is the character without shift
+      XKeyEvent plain = ev;
+      char buf[32];
+      KeySym sym;
+
+      plain.state &= ~(ControlMask | ModMetaMask | Mod4Mask);
+      unicode_t text = single_char (buf, XLookupString (&plain, buf, sizeof (buf) - 1, &sym, 0));
+
+      plain.state &= ~(ShiftMask | LockMask);
+      unicode_t code = single_char (buf, XLookupString (&plain, buf, sizeof (buf) - 1, &sym, 0));
+
+      if (!code)
+        return false;
+
+      // text is sent as text, without events, unless all keys are asked for
+      if (!all && !modified)
+        return release;
+
+      n = snprintf (seq, sizeof (seq), "\033[%u", code);
+
+      if (flags & KBD_ALTERNATES && mods & 1 && text && text != code)
+        n += snprintf (seq + n, sizeof (seq) - n, ":%u", text);
+
+      bool with_text = flags & KBD_TEXT && all && text && !modified && type != 3;
+
+      if (mods || type != 1 || with_text)
+        seq[n++] = ';';
+      if (mods || type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, "%d", mods + 1);
+      if (type != 1)
+        n += snprintf (seq + n, sizeof (seq) - n, ":%d", type);
+      if (with_text)
+        n += snprintf (seq + n, sizeof (seq) - n, ";%u", text);
+
+      seq[n++] = 'u';
+    }
+
+  tt_write_user_input (seq, n);
+  return true;
 }
 
 void ecb_cold
@@ -952,6 +1262,18 @@ rxvt_term::key_release (XKeyEvent &ev)
   else if (keysym == XK_Control_L || keysym == XK_Control_R)
     mouse_slip_wheel_speed = 0;
 #endif
+
+  kbd_down[ev.keycode >> 3] &= ~(1 << (ev.keycode & 7));
+
+  if (kbd_flags[current_screen] & KBD_EVENT_TYPES)
+    {
+      char buf[16];
+      KeySym sym = NoSymbol;
+      XLookupString (&ev, buf, sizeof (buf), &sym, 0);
+
+      if (sym != NoSymbol)
+        kitty_key (ev, sym, true);
+    }
 }
 
 void
@@ -2876,6 +3198,8 @@ rxvt_term::process_escape_seq ()
         /* 8.3.106: RESET TO INITIAL STATE (RIS) */
       case 'c':
         mbstate.reset ();
+        memset (kbd_flags, 0, sizeof (kbd_flags));
+        memset (kbd_depth, 0, sizeof (kbd_depth));
         scr_poweron ();
         scrollBar.show (1);
         break;
@@ -3013,9 +3337,19 @@ rxvt_term::process_csi_seq ()
               }
             else if (ch == 'q' && arg[0] == 0) /* XTVERSION: name and version */
               tt_printf ("\033P>|wrxvt(" VERSION ")\033\\");
+            else if (ch == 'u')
+              process_kbd_seq (priv, nargs, arg);
+            break;
+
+          case '<':
+          case '=':
+            if (ch == 'u')
+              process_kbd_seq (priv, nargs, arg);
             break;
 
           case '?':
+            if (ch == 'u')
+              process_kbd_seq (priv, nargs, arg);
             if (ch == 'h' || ch == 'l' || ch == 'r' || ch == 's' || ch == 't')
               process_terminal_mode (ch, priv, nargs, arg);
             if (prev_ch == '$' && ch == 'p')

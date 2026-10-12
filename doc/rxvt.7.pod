@@ -2242,6 +2242,44 @@ this requires insecure mode to be enabled for most of these.
 
 X<Mouse>
 
+=head1 Keyboard: the kitty keyboard protocol
+
+Programs can ask for unambiguous key reports with the progressive
+enhancements of kitty's keyboard protocol
+(L<https://sw.kovidgoyal.net/kitty/keyboard-protocol/>). The flags are:
+1 disambiguate escape codes, 2 report event types (press, repeat,
+release), 4 report alternate keys (the shifted key), 8 report all keys
+as escape codes, 16 report associated text. Each screen (normal and
+alternate) has its own flags and a stack of saved ones.
+
+=over
+
+=item B<< C<ESC [ ? u> >>
+
+Report the current flags: B<< C<ESC [ ? flags u> >>.
+
+=item B<< C<< ESC [ > flags u >> >>
+
+Save the current flags on the stack and set new ones.
+
+=item B<< C<< ESC [ < n u >> >>
+
+Restore the flags saved last, n times (once if n is missing).
+
+=item B<< C<ESC [ = flags ; mode u> >>
+
+Set (mode 1, the default), add (2) or remove (3) flags.
+
+=back
+
+Keys are reported as B<< C<ESC [ key ; modifiers u> >> (or the C<~>,
+C<A>-C<D>, C<H>, C<F>, C<P>, C<Q>, C<S> forms for function and cursor
+keys), with the key's Unicode code point without shift, and 1 + the
+modifier bits (shift 1, alt 2, control 4, super 8, caps lock 64, num lock
+128). Text without control or alt is still sent as text, and Enter, Tab
+and Backspace unmodified as the usual bytes, unless all keys are asked
+for. While any flag is set, Control-Shift doesn't start ISO 14755 input.
+
 =head1 Mouse Reporting
 
 When mouse reporting is enabled and none of the extended mouse modes
