@@ -222,6 +222,62 @@ class Share(TerminalTest):
         self.assertEqual(r['typed'], 'hé\x1bOA\x1b[1;5D\x1b[3~\r')
         self.assertEqual(r['pasted'], '\x1b[200~pasted text\x1b[201~')
 
+    def test_mouse(self):
+        run = self.share(r'''
+            view, control = links()
+            ws = WS(control)
+            ws.login()
+            # a program that wants the mouse gets clicks and the wheel
+            write('\x1b[?1000h\x1b[?1006h')
+            settle()
+            ws.send({'type': 'mouse', 'button': 1, 'row': 2, 'col': 3})
+            ws.send({'type': 'mouse', 'button': 5, 'row': 0, 'col': 0})
+            ws.send({'type': 'mouse', 'button': 4, 'row': 99, 'col': -5})   # clamped
+            result['reported'] = read_until('64;1;8M', 2)
+            # one that doesn't, on the alternate screen: the wheel is arrow keys
+            write('\x1b[?1000l\x1b[?1006l\x1b[?1049h')
+            settle()
+            ws.send({'type': 'mouse', 'button': 5, 'row': 1, 'col': 1})
+            ws.send({'type': 'mouse', 'button': 1, 'row': 1, 'col': 1})   # nothing
+            result['scrolled'] = read_until('BBB', 2)
+            # and on the normal screen, nothing (the page has no scrollback)
+            write('\x1b[?1049l')
+            settle()
+            ws.send({'type': 'mouse', 'button': 4, 'row': 1, 'col': 1})
+            result['primary'] = read_until('never', 0.5)
+            # a watcher's mouse does nothing
+            write('\x1b[?1000h\x1b[?1006h')
+            settle()
+            watcher = WS(view)
+            watcher.login()
+            watcher.send({'type': 'mouse', 'button': 1, 'row': 1, 'col': 1})
+            result['watcher'] = read_until('never', 0.5)
+        ''')
+        r = run.result
+        self.assertEqual(r['reported'], '\x1b[<0;4;3M\x1b[<0;4;3m\x1b[<65;1;1M\x1b[<64;1;8M')
+        self.assertEqual(r['scrolled'], '\x1b[B\x1b[B\x1b[B')
+        self.assertEqual(r['primary'], '')
+        self.assertEqual(r['watcher'], '')
+
+    def test_control_action_starts_sharing(self):
+        run = self.run_in_terminal(CLIENT + textwrap.dedent(r'''
+            import subprocess
+            settle()
+            window = os.environ['WINDOWID']
+            result['before'] = subprocess.run(['xprop', '-id', window, '_WRXVT_SHARE'],
+                                              capture_output=True, text=True).stdout
+            subprocess.run(['xdotool', 'mousemove', '--window', window, '5', '5',
+                            'windowfocus', window, 'key', 'F9'], check=True, capture_output=True)
+            settle()
+            view, control = links()
+            result['control'] = control
+            result['clipboard'] = subprocess.run(['xclip', '-o', '-selection', 'clipboard'],
+                                                 capture_output=True, text=True, timeout=5).stdout
+        '''), args=['-keysym.F9', 'share:control', '-xrm', 'URxvt.notifyCommand:'])
+        r = run.result
+        self.assertIn('not found', r['before'])
+        self.assertEqual(r['clipboard'], r['control'])
+
     def test_wrong_key_and_foreign_pages(self):
         run = self.share(r'''
             write('\x1b]2;t\x07')

@@ -63,9 +63,12 @@ Talking to programs:
 Sharing:
 
 - **Share the terminal on a web page** (`share:start`, `-share`): a
-  link to watch and a link that can also type, each with its own random
-  key, for pair programming, teaching or demos. Local by default; the
-  title says when someone is watching.
+  link to watch and a link that can also type (`share:control`), each
+  with its own random key, for pair programming, teaching, demos, or
+  your own phone. The typing page takes any keyboard (input methods and
+  phone keyboards included), has a bar with Esc, Tab, Ctrl, Alt and the
+  arrows, and passes clicks and the wheel to programs that use the mouse.
+  Local by default; the title says when someone is watching.
 - **The scrollback in a pager** (`scrollback:pager`): everything, with
   its colours, in `less` in a new window.
 - **Recording** (`record:toggle`, `-record FILE`): asciinema files of

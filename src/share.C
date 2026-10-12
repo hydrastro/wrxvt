@@ -244,6 +244,26 @@ json_get_bool (const char *json, const char *name)
   return !strncmp (p, "true", 4);
 }
 
+// a small whole number, or def when it's missing
+static int
+json_get_int (const char *json, const char *name, int def)
+{
+  rxvt_buf key;
+  key.printf ("\"%s\"", name);
+
+  const char *p = strstr (json, key.data);
+  if (!p)
+    return def;
+
+  p += key.len;
+  while (*p == ' ' || *p == ':') p++;
+
+  char *end;
+  long n = strtol (p, &end, 10);
+
+  return end == p || n < -100000 || n > 100000 ? def : (int)n;
+}
+
 /*----------------------------------------------------------------------*/
 
 struct share_server;
@@ -314,6 +334,7 @@ struct share_server
   void encode_row (rxvt_buf &b, int row);
   const char *color (int idx, char buf[8]);
   void send_key (const char *name, bool shift, bool ctrl, bool alt);
+  void send_mouse (int button, int row, int col);
 };
 
 /*----------------------------------------------------------------------*/
@@ -741,6 +762,9 @@ share_client::handle_message (const char *json)
               free (name);
             }
         }
+      else if (!strcmp (type, "mouse"))
+        server->send_mouse (json_get_int (json, "button", -1), json_get_int (json, "row", 0),
+                            json_get_int (json, "col", 0));
     }
 
   // what a watcher sends is ignored
@@ -1234,6 +1258,56 @@ share_server::send_key (const char *name, bool shift, bool ctrl, bool alt)
     term->tt_write_user_input (s.data, s.len);
 }
 
+/*
+ * A click (button 1-3) or a turn of the wheel (4 up, 5 down) on the page,
+ * at a cell. Programs that asked for the mouse (htop, mc, vim with
+ * mouse=a...) get it as from the window; otherwise the wheel scrolls
+ * full-screen programs (less, man) with the arrow keys, as rxvt's
+ * secondaryWheel does, and clicks do nothing.
+ */
+void
+share_server::send_mouse (int button, int row, int col)
+{
+  if (button < 1 || button > 5)
+    return;
+
+  row = clamp (row, 0, term->nrow - 1);
+  col = clamp (col, 0, term->ncol - 1);
+
+  if (term->priv_modes & PrivMode_mouse_report)
+    {
+      XButtonEvent ev = { };
+      ev.x = col * term->fwidth;
+      ev.y = row * term->fheight;
+
+      int saved_button = term->MEvent.button;
+      unsigned int saved_state = term->MEvent.state;
+      term->MEvent.button = Button1 + button - 1;
+      term->MEvent.state = 0;
+
+      ev.type = ButtonPress;
+      term->mouse_report (ev);
+
+      // the wheel only presses
+      if (button <= 3)
+        {
+          ev.type = ButtonRelease;
+          term->mouse_report (ev);
+        }
+
+      term->MEvent.button = saved_button;
+      term->MEvent.state = saved_state;
+    }
+  else if (button >= 4 && term->current_screen != PRIMARY)
+    {
+      const char *seq = button == 4
+                        ? (term->priv_modes & PrivMode_aplCUR ? "\033OA" : "\033[A")
+                        : (term->priv_modes & PrivMode_aplCUR ? "\033OB" : "\033[B");
+      for (int i = 0; i < 3; i++)
+        term->tt_write_user_input (seq, strlen (seq));
+    }
+}
+
 /*----------------------------------------------------------------------*/
 // the terminal's side
 
@@ -1243,12 +1317,13 @@ rxvt_term::share_notify (const char *text)
   notify_as ("wrxvt: sharing", text);
 }
 
+// control: copy the link that can type instead of the one to watch
 void
-rxvt_term::share_start ()
+rxvt_term::share_start (bool control)
 {
   if (share)
     {
-      share_copy_link (false);
+      share_copy_link (control);
       return;
     }
 
@@ -1275,7 +1350,7 @@ rxvt_term::share_start ()
   free (both);
 
   update_title ();
-  share_copy_link (false);
+  share_copy_link (control);
 }
 
 void

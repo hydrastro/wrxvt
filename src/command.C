@@ -5025,7 +5025,7 @@ rxvt_term::builtin_action (const char *name, const char *arg)
       else if (!strcmp (arg, "toggle"))
         share ? share_stop () : share_start ();
       else if (!strcmp (arg, "control"))
-        share ? share_copy_link (true) : (void)0;
+        share_start (true); // sharing if it isn't yet, and the link that can type
       else
         return false;
 

@@ -1576,7 +1576,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
 #if ENABLE_SHARE
   // sharing the terminal on a web page (share.C)
   share_server *share;
-  void share_start ();
+  void share_start (bool control = false);
   void share_stop ();
   void share_copy_link (bool control);
   void share_changed ();

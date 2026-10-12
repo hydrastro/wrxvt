@@ -1401,7 +1401,7 @@ the last two.
 Start or stop sharing the terminal on a web page (see L<SHARING ON THE
 WEB>). B<share:start> copies the link to watch to the clipboard (again,
 when already sharing); B<share:control> copies the link that can also
-type. For example:
+type (and starts sharing first if needed). For example:
 
    URxvt.keysym.C-S-F12: share:toggle
    URxvt.keysym.C-S-F11: share:control
@@ -1577,9 +1577,29 @@ the clipboard;
 
 =item the link to type
 
-shows it and sends the keys typed on the page (and pastes) to the
-terminal, as if typed here. B<share:control> copies it. Give it only to
-someone you would let use your keyboard.
+shows it and sends what is typed on the page to the terminal, as if
+typed here. B<share:control> copies it (starting to share if needed).
+Give it only to someone you would let use your keyboard.
+
+=back
+
+On the page of the link to type:
+
+=over
+
+=item * any keyboard works, with its dead keys and input methods; on a
+phone or tablet, tap the screen for the on-screen keyboard.
+
+=item * a bar under the screen has the keys phones lack: Esc, Tab, Ctrl
+and Alt (they hold for the next key: Ctrl, then C is ^C), the arrows,
+Home, End, Page Up and Down, ^C, ^D and ^Z.
+
+=item * pastes (Ctrl+Shift+V or the browser's menu) are pasted as here,
+bracketed if the program asked for it.
+
+=item * clicks and the wheel go to programs that use the mouse (htop,
+mc, vim with C<mouse=a>); for other full-screen programs (less, man) the
+wheel scrolls with the arrow keys. Dragging selects text to copy.
 
 =back
 
