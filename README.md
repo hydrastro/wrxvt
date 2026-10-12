@@ -58,6 +58,8 @@ Sharing:
   link to watch and a link that can also type, each with its own random
   key, for pair programming, teaching or demos. Local by default; the
   title says when someone is watching.
+- **The scrollback in a pager** (`scrollback:pager`): everything, with
+  its colours, in `less` in a new window.
 - **Recording** (`record:toggle`, `-record FILE`): asciinema files of
   what is shown (not what is typed), for `asciinema play`, the web player
   or agg.

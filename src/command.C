@@ -4812,6 +4812,12 @@ rxvt_term::builtin_action (const char *name, const char *arg)
 
       return true;
     }
+
+  if (!strcmp (name, "scrollback") && !strcmp (arg, "pager"))
+    {
+      scrollback_pager ();
+      return true;
+    }
 #endif
 
   if (!strcmp (name, "prompt"))

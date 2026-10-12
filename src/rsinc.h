@@ -11,6 +11,7 @@
   def (sharePort)
   def (record)
   def (recordDirectory)
+  def (scrollbackCommand)
   def (color)
   reserve (color, TOTAL_COLORS)
   def (font)

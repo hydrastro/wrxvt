@@ -807,6 +807,11 @@ sub invoke {
 
                my $ext = $1;
 
+               # actions wrxvt does itself (prompt:next, share:start...)
+               # need no extension, unless there is one of that name
+               next if $ext =~ /^(?:prompt|share|record|scrollback|hints)$/
+                       && !defined $TERM->extension_path ($ext);
+
                $ext_arg{$ext} = [];
             }
 

@@ -989,6 +989,12 @@ which.
 Where B<record:start> puts recordings, as
 F<wrxvt-YYYYMMDD-HHMMSS.cast>; the default is your home directory.
 
+=item B<scrollbackCommand:> I<command>
+
+What B<scrollback:pager> runs, with F</bin/sh> and the file as one more
+argument. The default opens it with C<less -R +G> in a new window and
+removes the file when C<less> ends.
+
 =item B<termName:> I<termname>
 
 Specifies the terminal type name to be set in the B<TERM> environment
@@ -1386,6 +1392,16 @@ you. Play it with C<asciinema play>, publish it with asciinema-player,
 or make a GIF with agg. For example:
 
    URxvt.keysym.C-S-F10: record:toggle
+
+=item scrollback:pager
+
+Open the whole scrollback and screen, with their colours, in a pager:
+by default C<less> in a new window, at the end, to search (C</>, C<?>)
+and copy with its keys. Lines the window wrapped are one line there.
+The text goes through a file only you can read, removed when the pager
+ends (see B<scrollbackCommand>).
+
+   URxvt.keysym.C-S-Prior: scrollback:pager
 
 =item EXTENSION:STRING
 

@@ -1503,6 +1503,7 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen
   void record_stop (bool quiet = false);
   void record_output (const char *data, size_t len);
   void record_resize ();
+  void scrollback_pager ();
 #endif
   char *get_title (bool icon);
   char *app_title;      // the title as programs set it, without marks like [shared]
