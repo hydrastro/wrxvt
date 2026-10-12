@@ -8,7 +8,17 @@ from harness import TerminalTest
 # runs inside the terminal: a small HTTP and WebSocket client, and the
 # links read from the window (xprop _WRXVT_SHARE)
 CLIENT = r'''
-import base64, hashlib, json, os, socket, struct, subprocess, time
+import base64, hashlib, json, os, socket, ssl, struct, subprocess, time
+
+def connect(url, host, port):
+    s = socket.create_connection((host, port), 5)
+    if url.startswith('https://'):
+        # a self-signed certificate: the test checks its fingerprint itself
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        s = ctx.wrap_socket(s, server_hostname=host)
+    return s
 
 def links():
     deadline = time.monotonic() + 5
@@ -28,14 +38,14 @@ def title():
     return out.split('"', 1)[1].rsplit('"', 1)[0] if '"' in out else out
 
 def split(url):
-    rest = url[len('http://'):]
+    rest = url.split('://', 1)[1]
     hostport, key = rest.split('/#')
     host, port = hostport.rsplit(':', 1)
     return host, int(port), key
 
 def http(url, path, headers=''):
     host, port, _ = split(url)
-    s = socket.create_connection((host, port), 5)
+    s = connect(url, host, port)
     s.sendall(f'GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\n{headers}\r\n'.encode())
     data = b''
     while True:
@@ -50,9 +60,10 @@ def http(url, path, headers=''):
 class WS:
     def __init__(self, url, origin=True):
         host, port, self.key = split(url)
-        self.s = socket.create_connection((host, port), 5)
+        self.s = connect(url, host, port)
         nonce = base64.b64encode(os.urandom(16)).decode()
-        extra = f'Origin: http://{host}:{port}\r\n' if origin is True else (origin or '')
+        scheme = url.split('://')[0]
+        extra = f'Origin: {scheme}://{host}:{port}\r\n' if origin is True else (origin or '')
         self.s.sendall((f'GET /ws HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\n'
                         f'Connection: Upgrade\r\nSec-WebSocket-Key: {nonce}\r\n'
                         f'Sec-WebSocket-Version: 13\r\n{extra}\r\n').encode())
@@ -135,13 +146,25 @@ class WS:
 '''
 
 
+def built_with(feature):
+    from harness import binary
+    import subprocess
+    if not binary():
+        return False
+    out = subprocess.run([binary(), '-h'], capture_output=True, text=True).stderr
+    return feature in out.split('options:', 1)[-1].split('\n', 1)[0].split(',')
+
+
+TLS = built_with('share-tls')
+
+
 @unittest.skipUnless(shutil.which('xprop'), 'xprop not installed')
 class Share(TerminalTest):
     geometry = '40x8'
 
-    def share(self, code, args=()):
+    def share(self, code, args=(), env=None):
         return self.run_in_terminal(CLIENT + textwrap.dedent(code), args=['-share', '-xrm', 'URxvt.notifyCommand:',
-                                                         *args])
+                                                         *args], env=env)
 
     def test_the_page(self):
         run = self.share(r'''
@@ -324,6 +347,58 @@ class Share(TerminalTest):
         self.assertIn('not found', r['after'])
         self.assertEqual(r['title'], 't')
         self.assertFalse(r['still'])
+
+    @unittest.skipUnless(TLS, 'built without --enable-share-tls')
+    def test_https_with_a_certificate_made_here(self):
+        import os, tempfile
+        state = tempfile.mkdtemp()
+        env = {'XDG_STATE_HOME': state}
+        code = r'''
+            import ssl
+            view, control = links()
+            result['view'] = view
+            head, body = http(view, '/')
+            result['head'] = head.split('\r\n')[0]
+            ws = WS(control)
+            result['handshake'] = ws.ok
+            result['role'] = ws.login()['role']
+            write('\x1b]2;tls\x07over tls')
+            result['row0'] = ws.screen('over tls')[0]
+            ws.send({'type': 'text', 'data': 'typed'})
+            result['typed'] = read_until('typed', 2)
+            # the certificate the server shows
+            host, port, _ = split(view)
+            raw = socket.create_connection((host, port), 5)
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with ctx.wrap_socket(raw, server_hostname=host) as t:
+                result['fingerprint'] = hashlib.sha256(t.getpeercert(True)).hexdigest()
+            # plain HTTP to the HTTPS port gets nowhere
+            plain = socket.create_connection((host, port), 5)
+            plain.sendall(b'GET / HTTP/1.1\r\nHost: x\r\n\r\n')
+            plain.settimeout(3)
+            try:
+                result['plain'] = plain.recv(100).decode('latin-1')
+            except OSError:
+                result['plain'] = ''
+        '''
+        args = ['-xrm', 'URxvt.shareCertificate: auto', '-xrm', 'URxvt.shareAddress: 0.0.0.0']
+        first = self.share(code, args=args, env=env)
+        r = first.result
+        # (the network's address; in a sandbox without one, the host name)
+        self.assertRegex(r['view'], r'^https://[^/:]+:\d+/#[0-9a-f]{32}$')
+        self.assertIn('200 OK', r['head'])
+        self.assertTrue(r['handshake'])
+        self.assertEqual(r['role'], 'control')
+        self.assertIn('over tls', r['row0'])
+        self.assertEqual(r['typed'], 'typed')
+        self.assertFalse(r['plain'].startswith('HTTP/1.1 200'))
+        pem = os.path.join(state, 'wrxvt', 'share.pem')
+        self.assertEqual(os.stat(pem).st_mode & 0o777, 0o600)
+        # the next time, the same certificate (the browser's exception holds)
+        second = self.share(code, args=args, env=env)
+        self.assertEqual(second.result['fingerprint'], r['fingerprint'])
 
     def test_only_local_addresses_without_insecure(self):
         run = self.run_in_terminal(r'''

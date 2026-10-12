@@ -975,14 +975,31 @@ empty value ignores notifications.
 
 The IP address the web server of a shared terminal listens on (see
 L<SHARING ON THE WEB>). The default, C<127.0.0.1>, lets only this
-computer connect. Any other address needs the B<insecure> option, since
-the connection is not encrypted: C<0.0.0.0> means every network the
-computer is on.
+computer connect. Any other address needs HTTPS (B<shareCertificate>)
+or the B<insecure> option, since the connection would not be encrypted:
+C<0.0.0.0> means every network the computer is on (the links then use
+the computer's address on its network).
 
 =item B<sharePort:> I<number>
 
 Its TCP port; the default, C<0>, takes any free port. The links say
 which.
+
+=item B<shareCertificate:> I<file>|C<auto>
+
+Serve the shared terminal over HTTPS (in a build with
+B<--enable-share-tls>): I<file> is the certificate chain (PEM), or
+C<auto> to make a self-signed certificate once and keep it in
+F<$XDG_STATE_HOME/wrxvt/share.pem> (made again when it expires, or when
+the computer's address changes). Browsers warn about a self-signed
+certificate once; the notification gives its SHA-256 fingerprint to
+compare. With HTTPS, B<shareAddress> may be any address without
+B<insecure>.
+
+=item B<shareKey:> I<file>
+
+The private key of B<shareCertificate> (PEM); by default the certificate
+file holds it too.
 
 =item B<recordDirectory:> I<directory>
 
@@ -1618,15 +1635,22 @@ requests, and the page removes it from the address bar once open. The
 server only answers its own page (other web sites can't connect), and
 drops connections that don't give a key within 10 seconds.
 
-The connection itself is plain HTTP. That is fine on C<127.0.0.1>, the
-default B<shareAddress>; to share with another computer either let it
-reach this one through ssh:
+The connection is plain HTTP unless B<shareCertificate> is set. That is
+fine on C<127.0.0.1>, the default B<shareAddress>; to share with another
+computer or your phone, use HTTPS:
+
+   URxvt.shareAddress:     0.0.0.0
+   URxvt.shareCertificate: auto
+
+(a certificate made here: the browser warns once, then remembers), or
+your own certificate (from your own CA, or mkcert), or let the other
+computer reach this one through ssh:
 
    ssh -L 8080:127.0.0.1:PORT you@this-computer   # then open
    http://127.0.0.1:8080/#KEY                    # on the other one
 
-or put a TLS proxy (Caddy, nginx) in front, or, on a network you trust,
-set B<shareAddress> and start with B<-insecure>.
+or put a TLS proxy (Caddy, nginx, tailscale serve) in front, or, on a
+network you trust, set B<shareAddress> and start with B<-insecure>.
 
 The page shows the text, colours and attributes, not pictures (sixel and
 other images appear as blank cells). The terminal keeps its own size:

@@ -13,8 +13,9 @@
  *    request (nor in Referer headers); the page sends it over the
  *    WebSocket, and takes it out of the address bar.
  *  - It listens on 127.0.0.1 unless shareAddress says otherwise; anything
- *    but a local address needs -insecure, since the connection is not
- *    encrypted (put it behind ssh -L or a TLS proxy instead).
+ *    but a local address needs either TLS (shareCertificate, in a build
+ *    with --enable-share-tls: HTTPS with your certificate, or one made
+ *    here) or -insecure, since the connection would not be encrypted.
  *  - The window title says the terminal is shared and how many people are
  *    watching, and a notification tells when someone opens a link.
  *
@@ -35,14 +36,25 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+
+#if HAVE_OPENSSL
+# include <openssl/ssl.h>
+# include <openssl/err.h>
+# include <openssl/rand.h>
+# include <openssl/x509v3.h>
+#endif
 
 #include "rxvtbuf.h"
 #include "share-page.h"
@@ -286,8 +298,18 @@ struct share_client
 
   rxvt_buf in, out, message;  // message: a fragmented WebSocket message
 
+#if HAVE_OPENSSL
+  SSL *ssl;                    // with TLS
+  bool tls_want_write;         // TLS must write before it can read on
+#endif
+
   share_client (share_server *server, int fd);
   ~share_client ();
+
+  // the socket, through TLS when the server has it: > 0 bytes, 0 at the
+  // end, -1 with errno (EAGAIN: later)
+  ssize_t sock_read (char *buf, size_t len);
+  ssize_t sock_write (const char *buf, size_t len);
 
   void io_cb (ev::io &w, int revents);
   void update_events ();
@@ -312,9 +334,21 @@ struct share_server
   share_client *clients[SHARE_MAX_CLIENTS];
   int nclients;
 
+#if HAVE_OPENSSL
+  SSL_CTX *tls;                // HTTPS, or 0 for HTTP
+  bool self_signed;            // with the certificate made here
+  char fingerprint[96];        // its SHA-256, as AB:CD:...
+  bool tls_setup (const char *host, const char *&error);
+#endif
+
   share_server (rxvt_term *term) : term (term), fd (-1), nclients (0)
   {
     url[0] = url[1] = 0;
+#if HAVE_OPENSSL
+    tls = 0;
+    self_signed = false;
+    fingerprint[0] = 0;
+#endif
     accept_ev.set<share_server, &share_server::accept_cb> (this);
     update_ev.set<share_server, &share_server::update_cb> (this);
     housekeeping_ev.set<share_server, &share_server::housekeeping_cb> (this);
@@ -345,6 +379,15 @@ share_client::share_client (share_server *server, int fd)
 {
   opened = ev::now ();
   cursor[0] = cursor[1] = cursor[2] = -1;
+#if HAVE_OPENSSL
+  ssl = 0;
+  tls_want_write = false;
+  if (server->tls && (ssl = SSL_new (server->tls)))
+    {
+      SSL_set_fd (ssl, fd);
+      SSL_set_accept_state (ssl); // the handshake happens in the first reads
+    }
+#endif
   io_ev.set<share_client, &share_client::io_cb> (this);
   io_ev.start (fd, ev::READ);
 }
@@ -352,23 +395,97 @@ share_client::share_client (share_server *server, int fd)
 share_client::~share_client ()
 {
   io_ev.stop ();
+#if HAVE_OPENSSL
+  if (ssl)
+    SSL_free (ssl);
+#endif
   close (fd);
   free (hashes);
   free (title);
 }
 
+ssize_t
+share_client::sock_read (char *buf, size_t len)
+{
+#if HAVE_OPENSSL
+  if (ssl)
+    {
+      ERR_clear_error ();
+      int n = SSL_read (ssl, buf, (int)min (len, (size_t)INT_MAX));
+      if (n > 0)
+        return n;
+
+      switch (SSL_get_error (ssl, n))
+        {
+          case SSL_ERROR_ZERO_RETURN:
+            return 0;
+          case SSL_ERROR_WANT_WRITE:
+            tls_want_write = true;
+            // fall through
+          case SSL_ERROR_WANT_READ:
+            errno = EAGAIN;
+            return -1;
+          default:
+            errno = EPROTO; // not TLS, a bad certificate on the other side...
+            return -1;
+        }
+    }
+#endif
+  return read (fd, buf, len);
+}
+
+ssize_t
+share_client::sock_write (const char *buf, size_t len)
+{
+#if HAVE_OPENSSL
+  if (ssl)
+    {
+      if (!len)
+        return 0;
+
+      ERR_clear_error ();
+      int n = SSL_write (ssl, buf, (int)min (len, (size_t)INT_MAX));
+      if (n > 0)
+        return n;
+
+      switch (SSL_get_error (ssl, n))
+        {
+          case SSL_ERROR_WANT_READ:
+          case SSL_ERROR_WANT_WRITE:
+            errno = EAGAIN;
+            return -1;
+          default:
+            errno = EPROTO;
+            return -1;
+        }
+    }
+#endif
+  return write (fd, buf, len);
+}
+
 void
 share_client::update_events ()
 {
-  io_ev.set (fd, out.len ? ev::READ | ev::WRITE : ev::READ);
+  bool want_write = out.len;
+#if HAVE_OPENSSL
+  want_write = want_write || tls_want_write;
+#endif
+  io_ev.set (fd, want_write ? ev::READ | ev::WRITE : ev::READ);
 }
 
 void
 share_client::io_cb (ev::io &w, int revents)
 {
+#if HAVE_OPENSSL
+  // the handshake (or a read) that waited for the socket to take data
+  if (tls_want_write && (revents & ev::WRITE))
+    revents |= ev::READ;
+  tls_want_write = false;
+#endif
+
   if (revents & ev::WRITE)
     {
-      ssize_t n = write (fd, out.data, out.len);
+      ssize_t n = sock_write (out.data, out.len);
 
       if (n < 0 && errno != EAGAIN && errno != EINTR)
         return server->remove (this);
@@ -385,21 +502,29 @@ share_client::io_cb (ev::io &w, int revents)
     }
 
   if (revents & ev::READ)
-    {
-      char buf[16384];
-      ssize_t n = read (fd, buf, sizeof (buf));
+    for (;;)
+      {
+        char buf[16384];
+        ssize_t n = sock_read (buf, sizeof (buf));
 
-      if (n == 0 || (n < 0 && errno != EAGAIN && errno != EINTR))
-        return server->remove (this);
+        if (n == 0 || (n < 0 && errno != EAGAIN && errno != EINTR))
+          return server->remove (this);
 
-      if (n > 0 && !close_after_write)
-        {
-          in.add (buf, n);
+        if (n > 0 && !close_after_write)
+          {
+            in.add (buf, n);
 
-          if (!(state == HTTP ? process_http () : process_frames ()))
-            return server->remove (this);
-        }
-    }
+            if (!(state == HTTP ? process_http () : process_frames ()))
+              return server->remove (this);
+          }
+
+#if HAVE_OPENSSL
+        // TLS may hold decrypted data the socket no longer signals
+        if (n > 0 && ssl && SSL_pending (ssl) > 0)
+          continue;
+#endif
+        break;
+      }
 
   if (out.len > SHARE_MAX_BACKLOG)
     return server->remove (this);
@@ -792,7 +917,7 @@ share_server::~share_server ()
           b.add ("{\"type\":\"bye\",\"message\":\"The terminal stopped sharing.\"}");
           c->send_text (b);
           c->send_close (1001, "sharing stopped");
-          ssize_t ignored = write (c->fd, c->out.data, c->out.len);
+          ssize_t ignored = c->sock_write (c->out.data, c->out.len);
           (void)ignored;
         }
 
@@ -801,6 +926,11 @@ share_server::~share_server ()
 
   if (fd >= 0)
     close (fd);
+
+#if HAVE_OPENSSL
+  if (tls)
+    SSL_CTX_free (tls);
+#endif
 
   free (url[0]);
   free (url[1]);
@@ -851,6 +981,264 @@ loopback (const sockaddr *sa)
   return false;
 }
 
+// this computer's address on its network, for links: the first IPv4
+// address of an interface that is up and not the loopback one, else such
+// an IPv6 address (not a link-local one), in brackets; false if there's
+// no network
+static bool
+network_address (char *buf, size_t len)
+{
+  ifaddrs *list;
+  if (getifaddrs (&list) < 0)
+    return false;
+
+  bool found = false;
+
+  static const int families[] = { AF_INET, AF_INET6 };
+
+  for (int family : families)
+    for (ifaddrs *i = list; i && !found; i = i->ifa_next)
+      {
+        if (!i->ifa_addr || i->ifa_addr->sa_family != family
+            || !(i->ifa_flags & IFF_UP) || (i->ifa_flags & IFF_LOOPBACK))
+          continue;
+
+        if (family == AF_INET)
+          found = inet_ntop (AF_INET, &((sockaddr_in *)i->ifa_addr)->sin_addr, buf, len);
+        else
+          {
+            in6_addr *a = &((sockaddr_in6 *)i->ifa_addr)->sin6_addr;
+            char ip[INET6_ADDRSTRLEN];
+            if (!IN6_IS_ADDR_LINKLOCAL (a) && inet_ntop (AF_INET6, a, ip, sizeof (ip)))
+              found = snprintf (buf, len, "[%s]", ip) < (int)len;
+          }
+      }
+
+  freeifaddrs (list);
+  return found;
+}
+
+#if HAVE_OPENSSL
+/*
+ * shareCertificate: auto: a self-signed certificate, made once and kept in
+ * $XDG_STATE_HOME/wrxvt/share.pem (key and certificate, readable only by
+ * you), made again when it expires or doesn't name the address the links
+ * use. Browsers warn about it once; the notification gives its SHA-256 to
+ * compare with what the browser shows.
+ */
+static bool
+make_certificate (const char *path, const char *host)
+{
+  bool ok = false;
+  EVP_PKEY *pkey = 0;
+  X509 *x = 0;
+  FILE *f = 0;
+  char *tmp = 0;
+
+  EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id (EVP_PKEY_EC, 0);
+  if (!pctx || EVP_PKEY_keygen_init (pctx) <= 0
+      || EVP_PKEY_CTX_set_ec_paramgen_curve_nid (pctx, NID_X9_62_prime256v1) <= 0
+      || EVP_PKEY_keygen (pctx, &pkey) <= 0)
+    goto done;
+
+  {
+    x = X509_new ();
+    unsigned char serial[16];
+    if (!x || RAND_bytes (serial, sizeof (serial)) != 1)
+      goto done;
+    serial[0] &= 0x7f; // positive
+
+    BIGNUM *bn = BN_bin2bn (serial, sizeof (serial), 0);
+    BN_to_ASN1_INTEGER (bn, X509_get_serialNumber (x));
+    BN_free (bn);
+
+    X509_set_version (x, 2);
+    X509_gmtime_adj (X509_getm_notBefore (x), -3600);
+    X509_gmtime_adj (X509_getm_notAfter (x), 397L * 24 * 3600); // what browsers accept
+    X509_set_pubkey (x, pkey);
+
+    char name[300];
+    char hostname[256] = "localhost";
+    gethostname (hostname, sizeof (hostname) - 1);
+    snprintf (name, sizeof (name), "wrxvt on %s", hostname);
+
+    X509_NAME *subject = X509_get_subject_name (x);
+    X509_NAME_add_entry_by_txt (subject, "CN", MBSTRING_UTF8, (const unsigned char *)name, -1, -1, 0);
+    X509_set_issuer_name (x, subject);
+
+    // the names browsers check: the address of the links, this computer
+    rxvt_buf san;
+    unsigned char ip[16];
+    bool is_ip = inet_pton (AF_INET, host, ip) == 1 || inet_pton (AF_INET6, host, ip) == 1;
+    san.printf ("%s:%s,DNS:%s,DNS:localhost,IP:127.0.0.1", is_ip ? "IP" : "DNS", host, hostname);
+
+    X509V3_CTX ctx;
+    X509V3_set_ctx (&ctx, x, x, 0, 0, 0);
+    static const struct { int nid; const char *value; } exts[] = {
+      { NID_basic_constraints, "critical,CA:FALSE" },
+      { NID_key_usage, "critical,digitalSignature" },
+      { NID_ext_key_usage, "serverAuth" },
+      { NID_subject_alt_name, 0 },
+    };
+    for (unsigned int i = 0; i < ecb_array_length (exts); i++)
+      {
+        X509_EXTENSION *ext = X509V3_EXT_conf_nid (0, &ctx, exts[i].nid,
+                                                   exts[i].value ? exts[i].value : san.data);
+        if (!ext)
+          goto done;
+        X509_add_ext (x, ext, -1);
+        X509_EXTENSION_free (ext);
+      }
+
+    if (!X509_sign (x, pkey, EVP_sha256 ()))
+      goto done;
+  }
+
+  // written aside, then renamed: never a half-written file
+  tmp = (char *)rxvt_malloc (strlen (path) + 8);
+  sprintf (tmp, "%s.new", path);
+  {
+    int fd = open (tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (fd < 0 || !(f = fdopen (fd, "w")))
+      {
+        if (fd >= 0)
+          close (fd);
+        goto done;
+      }
+  }
+
+  ok = PEM_write_PrivateKey (f, pkey, 0, 0, 0, 0, 0) && PEM_write_X509 (f, x);
+  ok = fclose (f) == 0 && ok;
+  f = 0;
+  ok = ok && rename (tmp, path) == 0;
+  if (!ok)
+    unlink (tmp);
+
+done:
+  free (tmp);
+  X509_free (x);
+  EVP_PKEY_free (pkey);
+  EVP_PKEY_CTX_free (pctx);
+  return ok;
+}
+
+// does the certificate in path still do for host?
+static bool
+certificate_fits (const char *path, const char *host)
+{
+  FILE *f = fopen (path, "r");
+  if (!f)
+    return false;
+
+  // (the key comes first: PEM_read_X509 skips it)
+  X509 *x = PEM_read_X509 (f, 0, 0, 0);
+  fclose (f);
+  ERR_clear_error ();
+
+  if (!x)
+    return false;
+
+  unsigned char ip[16];
+  bool is_ip = inet_pton (AF_INET, host, ip) == 1 || inet_pton (AF_INET6, host, ip) == 1;
+  time_t soon = time (0) + 24 * 3600; // not about to expire
+  bool ok = X509_cmp_time (X509_get0_notAfter (x), &soon) > 0
+            && (is_ip ? X509_check_ip_asc (x, host, 0) == 1 : X509_check_host (x, host, 0, 0, 0) == 1);
+
+  X509_free (x);
+  return ok;
+}
+
+bool
+share_server::tls_setup (const char *link_host, const char *&error)
+{
+  // an IPv6 address without the brackets of the links
+  char host[256];
+  snprintf (host, sizeof (host), "%s", link_host + (*link_host == '['));
+  if (char *end = strchr (host, ']'))
+    *end = 0;
+
+  const char *cert = term->rs[Rs_shareCertificate];
+  const char *key = term->rs[Rs_shareKey];
+  static char path[PATH_MAX];
+
+  if (!strcmp (cert, "auto"))
+    {
+      const char *state = getenv ("XDG_STATE_HOME");
+      const char *home = getenv ("HOME");
+      char dir[PATH_MAX];
+
+      if (state && *state)
+        snprintf (dir, sizeof (dir), "%s/wrxvt", state);
+      else if (home)
+        snprintf (dir, sizeof (dir), "%s/.local/state/wrxvt", home);
+      else
+        {
+          error = "shareCertificate auto needs $HOME or $XDG_STATE_HOME, to keep the certificate.";
+          return false;
+        }
+
+      // mkdir -p, the last one private
+      for (char *p = dir + 1; *p; p++)
+        if (*p == '/')
+          {
+            *p = 0;
+            mkdir (dir, 0755);
+            *p = '/';
+          }
+      mkdir (dir, 0700);
+
+      snprintf (path, sizeof (path), "%s/share.pem", dir);
+
+      if (!certificate_fits (path, host) && !make_certificate (path, host))
+        {
+          error = "can't make a certificate for HTTPS (shareCertificate: auto).";
+          return false;
+        }
+
+      cert = key = path;
+      self_signed = true;
+    }
+
+  if (!key || !*key)
+    key = cert; // one file with both
+
+  tls = SSL_CTX_new (TLS_server_method ());
+  if (!tls)
+    {
+      error = "can't start TLS.";
+      return false;
+    }
+
+  SSL_CTX_set_min_proto_version (tls, TLS1_2_VERSION);
+  SSL_CTX_set_options (tls, SSL_OP_NO_RENEGOTIATION | SSL_OP_CIPHER_SERVER_PREFERENCE);
+  // out moves as it is consumed; partial writes are fine
+  SSL_CTX_set_mode (tls, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+
+  if (SSL_CTX_use_certificate_chain_file (tls, cert) != 1
+      || SSL_CTX_use_PrivateKey_file (tls, key, SSL_FILETYPE_PEM) != 1
+      || SSL_CTX_check_private_key (tls) != 1)
+    {
+      ERR_clear_error ();
+      error = "can't read shareCertificate and shareKey (PEM files: the certificate chain, "
+              "and its key).";
+      return false;
+    }
+
+  // its fingerprint, to compare with the browser's
+  unsigned char md[EVP_MAX_MD_SIZE];
+  unsigned int len = 0;
+  if (X509 *x = SSL_CTX_get0_certificate (tls))
+    X509_digest (x, EVP_sha256 (), md, &len);
+
+  char *p = fingerprint;
+  *p = 0;
+  for (unsigned int i = 0; i < len && p + 4 < fingerprint + sizeof (fingerprint); i++)
+    p += sprintf (p, "%s%02X", i ? ":" : "", md[i]);
+
+  return true;
+}
+#endif
+
 bool
 share_server::start (const char *&error)
 {
@@ -881,11 +1269,21 @@ share_server::start (const char *&error)
       return false;
     }
 
-  if (!loopback ((sockaddr *)&ss) && !term->option (Opt_insecure))
+  bool encrypted = term->rs[Rs_shareCertificate] && *term->rs[Rs_shareCertificate];
+#if !HAVE_OPENSSL
+  if (encrypted)
+    {
+      error = "this wrxvt was built without TLS (--enable-share-tls): shareCertificate can't be used.";
+      return false;
+    }
+#endif
+
+  if (!loopback ((sockaddr *)&ss) && !encrypted && !term->option (Opt_insecure))
     {
       error = "shareAddress is not a local address: anyone on the network could read "
-              "the unencrypted connection. Start wrxvt with -insecure to allow it, or "
-              "share on 127.0.0.1 through ssh -L or a TLS proxy.";
+              "the unencrypted connection. Set shareCertificate (HTTPS; auto makes one), "
+              "start wrxvt with -insecure to allow it anyway, or share on 127.0.0.1 "
+              "through ssh -L or a TLS proxy.";
       return false;
     }
 
@@ -919,25 +1317,35 @@ share_server::start (const char *&error)
   getsockname (fd, (sockaddr *)&ss, &sslen);
   port = ntohs (ss.ss_family == AF_INET ? sin->sin_port : sin6->sin6_port);
 
-  // the host part of the links
+  // the host part of the links: listening everywhere, this computer's
+  // address on its network (a phone can't look up its name)
   char host[256];
   bool any = ss.ss_family == AF_INET ? sin->sin_addr.s_addr == htonl (INADDR_ANY)
                                      : IN6_IS_ADDR_UNSPECIFIED (&sin6->sin6_addr);
   if (any)
     {
-      if (gethostname (host, sizeof (host) - 1) < 0)
-        strcpy (host, "localhost");
-      host[sizeof (host) - 1] = 0;
+      // no network: only this computer can connect anyway
+      if (!network_address (host, sizeof (host)))
+        strcpy (host, ss.ss_family == AF_INET6 ? "[::1]" : "127.0.0.1");
     }
   else if (ss.ss_family == AF_INET6)
     snprintf (host, sizeof (host), "[%s]", address);
   else
     snprintf (host, sizeof (host), "%s", address);
 
+#if HAVE_OPENSSL
+  if (encrypted && !tls_setup (host, error))
+    {
+      close (fd);
+      fd = -1;
+      return false;
+    }
+#endif
+
   for (int k = 0; k < 2; k++)
     {
       rxvt_buf u;
-      u.printf ("http://%s:%d/#%s", host, port, key[k]);
+      u.printf ("%s://%s:%d/#%s", encrypted ? "https" : "http", host, port, key[k]);
       url[k] = strdup (u.data);
     }
 
@@ -1383,6 +1791,11 @@ rxvt_term::share_copy_link (bool control)
               ? "Link to watch AND TYPE copied (give it only to someone you trust): %s"
               : "Link to watch copied: %s\nshare:control copies the link that can type.",
               url);
+#if HAVE_OPENSSL
+  if (share->self_signed)
+    msg.printf ("\nHTTPS with a certificate made here: the browser warns about it once. "
+                "Its SHA-256 fingerprint: %s", share->fingerprint);
+#endif
   share_notify (msg.data);
 }
 

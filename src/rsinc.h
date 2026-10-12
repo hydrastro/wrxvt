@@ -9,6 +9,8 @@
   def (notifyCommand)
   def (shareAddress)
   def (sharePort)
+  def (shareCertificate)
+  def (shareKey)
   def (record)
   def (recordDirectory)
   def (scrollbackCommand)

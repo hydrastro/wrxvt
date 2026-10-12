@@ -236,6 +236,13 @@ AC_ARG_ENABLE(emoji-sequences,
     support_emoji_sequences=$enableval
   fi])
 
+AC_ARG_ENABLE(share-tls,
+  [AS_HELP_STRING([--enable-share-tls],
+     [serve shared terminals over HTTPS too (needs OpenSSL)])],
+  [if test x$enableval = xyes -o x$enableval = xno; then
+    support_share_tls=$enableval
+  fi])
+
 AC_ARG_ENABLE(pixbuf,
   [AS_HELP_STRING([--enable-pixbuf],
      [enable integration with gdk-pixbuf for background images])],
@@ -680,6 +687,22 @@ if test x$support_emoji_sequences = xyes; then
     AC_DEFINE(HAVE_HARFBUZZ, 1, Define to draw emoji sequences with harfbuzz)
   ], [
     AC_MSG_ERROR([--enable-emoji-sequences needs harfbuzz and freetype2 >= 2.11])
+  ])
+fi
+
+if test x$support_share_tls = xyes; then
+  if test x$support_frills != xyes; then
+    AC_MSG_ERROR([--enable-share-tls needs --enable-frills (sharing)])
+  fi
+  if ! "$PKG_CONFIG" --atleast-version=1.1.1 openssl; then
+    AC_MSG_ERROR([--enable-share-tls needs OpenSSL 1.1.1 or later (libssl and libcrypto)])
+  fi
+  RXVT_CHECK_MODULES([OPENSSL], [openssl], [
+    LIBS="$LIBS $OPENSSL_LIBS"
+    CPPFLAGS="$CPPFLAGS $OPENSSL_CFLAGS"
+    AC_DEFINE(HAVE_OPENSSL, 1, Define to serve shared terminals over HTTPS)
+  ], [
+    AC_MSG_ERROR([--enable-share-tls needs OpenSSL (libssl and libcrypto, 1.1.1 or later)])
   ])
 fi
 

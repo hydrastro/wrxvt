@@ -75,7 +75,9 @@ Sharing:
   your own phone. The typing page takes any keyboard (input methods and
   phone keyboards included), has a bar with Esc, Tab, Ctrl, Alt and the
   arrows, and passes clicks and the wheel to programs that use the mouse.
-  Local by default; the title says when someone is watching.
+  Local by default; HTTPS for the network (`shareCertificate: auto` makes
+  a certificate, `--enable-share-tls`); the title says when someone is
+  watching.
 - **The scrollback in a pager** (`scrollback:pager`): everything, with
   its colours, in `less` in a new window.
 - **Recording** (`record:toggle`, `-record FILE`): asciinema files of
@@ -137,8 +139,6 @@ Planned at some point, and why not now:
   ligatures: each a project of its own; XRender stays, and is fast.
 - **Unicode placeholders for kitty pictures, text sizing (OSC 66), file
   transfer**: few programs send them.
-- **Encryption for sharing**: share on 127.0.0.1 through `ssh -L` or a
-  TLS proxy.
 
 The [terminfo entry](doc/etc/rxvt-unicode.terminfo) describes the new
 features as extended capabilities (`tic -x`).
@@ -199,9 +199,13 @@ module (any libev 4.33 source works):
 
 ```sh
 cvs -z3 -d :pserver:anonymous@cvs.schmorp.de/schmorpforge co libev
-./configure --enable-everything --enable-256-color --enable-emoji-sequences
+./configure --enable-everything --enable-256-color --enable-emoji-sequences --enable-share-tls
 make
 ```
+
+`--enable-emoji-sequences` needs HarfBuzz and FreeType 2.11, and
+`--enable-share-tls` (HTTPS for sharing) OpenSSL 1.1.1 or later; both
+are optional and not part of `--enable-everything`.
 
 ## Tests
 
