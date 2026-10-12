@@ -27,7 +27,7 @@
 #include <X11/Xlib.h>
 
 #if XFT
-# include <X11/Xft/Xft.h>
+#include <X11/Xft/Xft.h>
 #endif
 
 #include "ev_cpp.h"
@@ -85,14 +85,14 @@ enum {
   XA_WM_COLORMAP_WINDOWS,
   XA_WM_STATE,
   XA_cursor,
-# if USE_XIM
+#if USE_XIM
   // various selection targets used by XIM
   XA_TRANSPORT,
   XA_LOCALES,
   XA__XIM_PROTOCOL,
   XA__XIM_XCONNECT,
   XA__XIM_MOREDATA,
-# endif
+#endif
 #endif
   NUM_XA
 };
@@ -103,59 +103,48 @@ struct rxvt_display;
 struct im_watcher;
 struct xevent_watcher;
 
-template<class watcher>
-struct event_vec : vector<watcher *>
-{
-  void erase_unordered (unsigned int pos)
-  {
-    watcher *w = (*this)[this->size () - 1];
-    this->pop_back ();
+template <class watcher> struct event_vec : vector<watcher *> {
+  void erase_unordered(unsigned int pos) {
+    watcher *w = (*this)[this->size() - 1];
+    this->pop_back();
 
-    if (!this->empty ())
+    if (!this->empty())
       if (((*this)[pos] = w)) // '=' is correct!
         w->active = pos + 1;
   }
 };
 
-struct rxvt_watcher
-{
+struct rxvt_watcher {
   int active; /* 0 == inactive, else index into respective vector */
 
-  bool is_active () { return active; }
+  bool is_active() { return active; }
 
-  rxvt_watcher () : active (0) { }
+  rxvt_watcher() : active(0) {}
 };
 
-struct refcounted
-{
+struct refcounted {
   int referenced;
   char *id;
 
-  refcounted (const char *id);
-  bool ref_init () { return false; }
-  void ref_next () { }
-  ~refcounted ();
+  refcounted(const char *id);
+  bool ref_init() { return false; }
+  void ref_next() {}
+  ~refcounted();
 };
 
-template<class T>
-struct refcache : vector<T *>
-{
-  T *get (const char *id);
-  void put (T *obj);
-  void clear ();
+template <class T> struct refcache : vector<T *> {
+  T *get(const char *id);
+  void put(T *obj);
+  void clear();
 
-  ~refcache ()
-  {
-    clear ();
-  }
+  ~refcache() { clear(); }
 };
 
 /////////////////////////////////////////////////////////////////////////////
 
 struct rxvt_screen;
 
-struct rxvt_drawable
-{
+struct rxvt_drawable {
   rxvt_screen *screen;
   Drawable drawable;
   operator Drawable() { return drawable; }
@@ -165,38 +154,36 @@ struct rxvt_drawable
   operator XftDraw *();
 #endif
 
-  rxvt_drawable (rxvt_screen *screen, Drawable drawable)
-  : screen(screen),
+  rxvt_drawable(rxvt_screen *screen, Drawable drawable)
+      : screen(screen),
 #if XFT
-    xftdrawable(0),
+        xftdrawable(0),
 #endif
-    drawable(drawable)
-  { }
+        drawable(drawable) {
+  }
 
 #if XFT
-  ~rxvt_drawable ();
+  ~rxvt_drawable();
 #endif
 };
 
 /////////////////////////////////////////////////////////////////////////////
 
 #if USE_XIM
-struct rxvt_xim : refcounted
-{
-  void destroy ();
+struct rxvt_xim : refcounted {
+  void destroy();
   rxvt_display *display;
 
-//public
+  // public
   XIM xim;
 
-  rxvt_xim (const char *id) : refcounted (id) { }
-  bool ref_init ();
-  ~rxvt_xim ();
+  rxvt_xim(const char *id) : refcounted(id) {}
+  bool ref_init();
+  ~rxvt_xim();
 };
 #endif
 
-struct rxvt_screen
-{
+struct rxvt_screen {
   rxvt_display *display;
   Display *dpy;
   int depth;
@@ -208,107 +195,92 @@ struct rxvt_screen
   rxvt_drawable *scratch_area;
   int scratch_w, scratch_h;
 
-  rxvt_drawable &scratch_drawable (int w, int h);
+  rxvt_drawable &scratch_drawable(int w, int h);
 
-  rxvt_screen ();
+  rxvt_screen();
 #endif
 
-  void set (rxvt_display *disp);
-  void select_visual (int id);
-  void select_depth (int bitdepth); // select visual by depth
-  void clear ();
+  void set(rxvt_display *disp);
+  void select_visual(int id);
+  void select_depth(int bitdepth); // select visual by depth
+  void clear();
 };
 
-enum
-{
-  DISPLAY_HAS_RENDER      = 1 << 0,
+enum {
+  DISPLAY_HAS_RENDER = 1 << 0,
   DISPLAY_HAS_RENDER_CONV = 1 << 1,
 };
 
-struct rxvt_display : refcounted
-{
+struct rxvt_display : refcounted {
   event_vec<xevent_watcher> xw;
 
-  ev::prepare flush_ev; void flush_cb (ev::prepare &w, int revents);
-  ev::io      x_ev    ; void x_cb     (ev::io      &w, int revents);
+  ev::prepare flush_ev;
+  void flush_cb(ev::prepare &w, int revents);
+  ev::io x_ev;
+  void x_cb(ev::io &w, int revents);
 
 #if USE_XIM
   refcache<rxvt_xim> xims;
   vector<im_watcher *> imw;
 
-  void im_change_cb ();
-  void im_change_check ();
+  void im_change_cb();
+  void im_change_check();
 #endif
 
-//public
-  Display   *dpy;
-  int       screen;
-  Window    root;
+  // public
+  Display *dpy;
+  int screen;
+  Window root;
   rxvt_term *selection_owner;
   rxvt_term *clipboard_owner;
-  Atom      xa[NUM_XA];
-  bool      is_local;
+  Atom xa[NUM_XA];
+  bool is_local;
 #ifdef POINTER_BLANK
-  Cursor    blank_cursor;
+  Cursor blank_cursor;
 #endif
-  uint8_t   flags;
+  uint8_t flags;
 
-  rxvt_display (const char *id);
-  XrmDatabase get_resources (bool refresh);
-  bool ref_init ();
-  void ref_next ();
-  ~rxvt_display ();
+  rxvt_display(const char *id);
+  XrmDatabase get_resources(bool refresh);
+  bool ref_init();
+  void ref_next();
+  ~rxvt_display();
 
-  void flush ()
-  {
-    flush_ev.start ();
-  }
+  void flush() { flush_ev.start(); }
 
-  Atom atom (const char *name);
-  Pixmap get_pixmap_property (Atom property);
-  void set_selection_owner (rxvt_term *owner, bool clipboard);
+  Atom atom(const char *name);
+  Pixmap get_pixmap_property(Atom property);
+  void set_selection_owner(rxvt_term *owner, bool clipboard);
 
-  void reg (xevent_watcher *w);
-  void unreg (xevent_watcher *w);
+  void reg(xevent_watcher *w);
+  void unreg(xevent_watcher *w);
 
 #if USE_XIM
-  void reg (im_watcher *w);
-  void unreg (im_watcher *w);
+  void reg(im_watcher *w);
+  void unreg(im_watcher *w);
 
-  rxvt_xim *get_xim (const char *locale, const char *modifiers);
-  void put_xim (rxvt_xim *xim);
+  rxvt_xim *get_xim(const char *locale, const char *modifiers);
+  void put_xim(rxvt_xim *xim);
 #endif
 };
 
 #if USE_XIM
-struct im_watcher : rxvt_watcher, callback<void (void)>
-{
-  void start (rxvt_display *display)
-  {
-    display->reg (this);
-  }
+struct im_watcher : rxvt_watcher, callback<void(void)> {
+  void start(rxvt_display *display) { display->reg(this); }
 
-  void stop (rxvt_display *display)
-  {
-    display->unreg (this);
-  }
+  void stop(rxvt_display *display) { display->unreg(this); }
 };
 #endif
 
-struct xevent_watcher : rxvt_watcher, callback<void (XEvent &)>
-{
+struct xevent_watcher : rxvt_watcher, callback<void(XEvent &)> {
   Window window;
 
-  void start (rxvt_display *display, Window window)
-  {
+  void start(rxvt_display *display, Window window) {
     this->window = window;
-    display->reg (this);
+    display->reg(this);
   }
 
-  void stop (rxvt_display *display)
-  {
-    display->unreg (this);
-  }
+  void stop(rxvt_display *display) { display->unreg(this); }
 };
 
 extern refcache<rxvt_display> displays;
@@ -317,35 +289,34 @@ extern refcache<rxvt_display> displays;
 
 typedef unsigned long Pixel;
 
-struct rgba
-{
+struct rgba {
   uint16_t r, g, b, a;
 
-  enum { MIN_CC = 0x0000, MAX_CC  = 0xffff };
+  enum { MIN_CC = 0x0000, MAX_CC = 0xffff };
 
-  rgba ()
-  { }
+  rgba() {}
 
-  rgba (uint16_t r, uint16_t g, uint16_t b, uint16_t a = MAX_CC)
-  : r(r), g(g), b(b), a(a)
-  { }
+  rgba(uint16_t r, uint16_t g, uint16_t b, uint16_t a = MAX_CC)
+      : r(r), g(g), b(b), a(a) {}
 };
 
-struct rxvt_color
-{
+struct rxvt_color {
 #if XFT
   XftColor c;
 #else
   XColor c;
 #endif
 
-  operator Pixel () const { return c.pixel; }
+  operator Pixel() const { return c.pixel; }
 
-  bool operator == (const rxvt_color &b) const { return Pixel (*this) == Pixel (b); }
-  bool operator != (const rxvt_color &b) const { return Pixel (*this) != Pixel (b); }
+  bool operator==(const rxvt_color &b) const {
+    return Pixel(*this) == Pixel(b);
+  }
+  bool operator!=(const rxvt_color &b) const {
+    return Pixel(*this) != Pixel(b);
+  }
 
-  bool is_opaque () const
-  {
+  bool is_opaque() const {
 #if XFT
     return c.color.alpha == rgba::MAX_CC;
 #else
@@ -353,42 +324,43 @@ struct rxvt_color
 #endif
   }
 
-  bool alloc (rxvt_screen *screen, const rgba &color);
-  void free (rxvt_screen *screen);
+  bool alloc(rxvt_screen *screen, const rgba &color);
+  void free(rxvt_screen *screen);
 
-  operator rgba () const
-  {
+  operator rgba() const {
     rgba c;
-    get (c);
+    get(c);
     return c;
   }
-  void get (rgba &color) const;
-  void get (XColor &color) const;
+  void get(rgba &color) const;
+  void get(XColor &color) const;
 
-  bool set (rxvt_screen *screen, const char *name);
-  bool set (rxvt_screen *screen, const rgba &color);
+  bool set(rxvt_screen *screen, const char *name);
+  bool set(rxvt_screen *screen, const rgba &color);
 
-  void fade (rxvt_screen *screen, int percent, rxvt_color &result, const rgba &to = rgba (0, 0, 0));
+  void fade(rxvt_screen *screen, int percent, rxvt_color &result,
+            const rgba &to = rgba(0, 0, 0));
 };
 
-#define Sel_normal              0x01    /* normal selection */
-#define Sel_incr                0x02    /* incremental selection */
-#define Sel_Primary             0x01
-#define Sel_Secondary           0x02
-#define Sel_Clipboard           0x03
-#define Sel_whereMask           0x0f
-#define Sel_CompoundText        0x10    /* last request was COMPOUND_TEXT */
-#define Sel_UTF8String          0x20    /* last request was UTF8_STRING */
+#define Sel_normal 0x01 /* normal selection */
+#define Sel_incr 0x02   /* incremental selection */
+#define Sel_Primary 0x01
+#define Sel_Secondary 0x02
+#define Sel_Clipboard 0x03
+#define Sel_whereMask 0x0f
+#define Sel_CompoundText 0x10 /* last request was COMPOUND_TEXT */
+#define Sel_UTF8String 0x20   /* last request was UTF8_STRING */
 
-struct rxvt_selection
-{
-  rxvt_selection (rxvt_display *disp, int selnum, Time tm, Window win, Atom prop, rxvt_term *term);
-  void run ();
-  ~rxvt_selection ();
+struct rxvt_selection {
+  rxvt_selection(rxvt_display *disp, int selnum, Time tm, Window win, Atom prop,
+                 rxvt_term *term);
+  void run();
+  ~rxvt_selection();
 
   rxvt_term *term; // terminal to paste to, may be 0
-  char report;     // if set, report the text with OSC 52 for this target instead of pasting it
-  void *cb_sv;     // managed by perl
+  char report; // if set, report the text with OSC 52 for this target instead of
+               // pasting it
+  void *cb_sv; // managed by perl
 
   rxvt_display *display;
   Time request_time;
@@ -402,14 +374,15 @@ private:
   char *incr_buf;
   size_t incr_buf_size, incr_buf_fill;
 
-  void timer_cb (ev::timer &w, int revents); ev::timer timer_ev;
-  void x_cb (XEvent &xev); xevent_watcher x_ev;
+  void timer_cb(ev::timer &w, int revents);
+  ev::timer timer_ev;
+  void x_cb(XEvent &xev);
+  xevent_watcher x_ev;
 
-  void finish (char *data = 0, unsigned int len = 0);
-  void stop ();
-  bool request (Atom target, int selnum);
-  void handle_selection (Window win, Atom prop, bool delete_prop);
+  void finish(char *data = 0, unsigned int len = 0);
+  void stop();
+  bool request(Atom target, int selnum);
+  void handle_selection(Window win, Atom prop, bool delete_prop);
 };
 
 #endif
-

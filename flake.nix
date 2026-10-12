@@ -158,13 +158,14 @@
               pkgs.xprop
               pkgs.xrdb
               pkgs.gdb
+              pkgs.libev
             ];
             FONTCONFIG_FILE = testFonts pkgs;
             shellHook = ''
-              if [ ! -e libev/ev++.h ]; then
-                echo "unpacking libev into ./libev (a separate CVS module)"
-                tar -xzf ${pkgs.libev.src} && mv libev-${pkgs.libev.version} libev
-              fi
+              #if [ ! -e libev/ev++.h ]; then
+              #  echo "unpacking libev into ./libev (a separate CVS module)"
+              #  tar -xzf ${pkgs.libev.src} && mv libev-${pkgs.libev.version} libev
+              #fi
               echo "build: ./configure --enable-everything --enable-256-color --enable-emoji-sequences --enable-share-tls && make"
               echo "test:  make check"
             '';

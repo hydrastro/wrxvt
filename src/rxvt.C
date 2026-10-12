@@ -26,22 +26,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-int
-main (int argc, char *argv[])
-try
-  {
-    ptytty::init ();
-    rxvt_init ();
+int main(int argc, char *argv[]) try {
+  ptytty::init();
+  rxvt_init();
 
-    rxvt_term *t = new rxvt_term;
-    t->init (argc, argv, environ);
-    ev_run ();
+  rxvt_term *t = new rxvt_term;
+  t->init(argc, argv, environ);
+  ev_run();
 
-    return EXIT_SUCCESS;
-  }
-catch (const std::exception &e)
-  {
-    fputs (e.what (), stderr);
-    return EXIT_FAILURE;
-  }
-
+  return EXIT_SUCCESS;
+} catch (const std::exception &e) {
+  fputs(e.what(), stderr);
+  return EXIT_FAILURE;
+}

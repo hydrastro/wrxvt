@@ -28,40 +28,30 @@
 // inclusion of any header.
 #include "emman.c"
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
 
 #include "rxvtutil.h"
 
-void *
-zero_initialized::operator new (size_t s)
-{
-  void *p = malloc (s);
+void *zero_initialized::operator new(size_t s) {
+  void *p = malloc(s);
 
-  memset (p, 0, s);
+  memset(p, 0, s);
   return p;
 }
 
-void
-zero_initialized::operator delete (void *p, size_t s)
-{
-  free (p);
-}
+void zero_initialized::operator delete(void *p, size_t s) { free(p); }
 
 static void *temp_buf;
 static uint32_t temp_len;
 
-void *
-rxvt_temp_buf (int len)
-{
-  if (len > temp_len)
-    {
-      free (temp_buf);
-      temp_buf = malloc (len);
-      temp_len = len;
-    }
+void *rxvt_temp_buf(int len) {
+  if (len > temp_len) {
+    free(temp_buf);
+    temp_buf = malloc(len);
+    temp_len = len;
+  }
 
   return temp_buf;
 }
-

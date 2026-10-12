@@ -24,14 +24,14 @@
 #define FEATURE_H
 
 #ifndef X11USRLIBDIR
-# define X11USRLIBDIR		"/usr/lib"
+#define X11USRLIBDIR "/usr/lib"
 #endif
 #ifndef X11LIBDIR
-# define X11LIBDIR		X11USRLIBDIR "/X11"
+#define X11LIBDIR X11USRLIBDIR "/X11"
 #endif
 #ifndef XAPPLOADDIR
-# define XAPPLOADDIR		X11LIBDIR "/app-defaults"
-# define XAPPLOADDIRLOCALE	X11LIBDIR "/%s/app-defaults"
+#define XAPPLOADDIR X11LIBDIR "/app-defaults"
+#define XAPPLOADDIRLOCALE X11LIBDIR "/%s/app-defaults"
 #endif
 
 /*-----------------------SCREEN OPTIONS AND COLOURS---------------------*/
@@ -73,13 +73,13 @@
 /*
  * Define maximum possible columns and rows
  */
-#define MAX_COLS	10000
-#define MAX_ROWS	10000
+#define MAX_COLS 10000
+#define MAX_ROWS 10000
 
 /*
  * Define maximum possible savelines
  */
-#define MAX_SAVELINES   10000000
+#define MAX_SAVELINES 10000000
 
 /*
  * Define to remove support for XCopyArea () support.  XCopyArea () is useful
@@ -100,7 +100,7 @@
  * Required by perl.
  */
 #if ENABLE_FRILLS || ENABLE_PERL
-# define KEYSYM_RESOURCE
+#define KEYSYM_RESOURCE
 #endif
 
 /*
@@ -160,7 +160,7 @@
  * Time factor to slow down a `jumpy' mouse.  Motion isn't recognised until
  * this long after the last mouse click [default: 50 milliseconds]
  */
-#define MOUSE_THRESHOLD		50
+#define MOUSE_THRESHOLD 50
 
 /*
  * Set delay periods for continuous scrolling with scrollbar buttons
@@ -214,8 +214,8 @@
 /*
  * Minimum and maximum widths of the scrollbar (all styles)
  */
-#define SB_WIDTH_MINIMUM 	5
-#define SB_WIDTH_MAXIMUM 	100
+#define SB_WIDTH_MINIMUM 5
+#define SB_WIDTH_MAXIMUM 100
 
 /*
  * rxvt scrollbar shadow width in pixels, must be 1 or 2
@@ -289,7 +289,7 @@
  * See command.C for details.
  */
 #if __linux__
-# define LINUX_YIELD_HACK 0
+#define LINUX_YIELD_HACK 0
 #endif
 
 /* DEFAULT RESOURCES VALUES */
@@ -316,10 +316,10 @@
  *   White		(#FFFFFF)
  */
 /* These colours MUST be defined */
-#define COLOR_FOREGROUND	"rgb:00/00/00"
-#define COLOR_BACKGROUND	"rgb:ff/ff/ff"
-#define COLOR_SCROLLBAR		"rgb:b2/b2/b2"	/* scrollColor match Netscape */
-#define COLOR_SCROLLTROUGH	"rgb:96/96/96"
+#define COLOR_FOREGROUND "rgb:00/00/00"
+#define COLOR_BACKGROUND "rgb:ff/ff/ff"
+#define COLOR_SCROLLBAR "rgb:b2/b2/b2" /* scrollColor match Netscape */
+#define COLOR_SCROLLTROUGH "rgb:96/96/96"
 
 /*
  * The cursor colours are special.  Be very careful about setting these:
@@ -327,51 +327,50 @@
  * prior to this allocation.  Also, they are not valid if NO_CURSORCOLOR is
  * defined
  */
-#define COLOR_CURSOR_FOREGROUND	NULL	/* if NULL, use background colour */
-#define COLOR_CURSOR_BACKGROUND	NULL	/* if NULL, use foreground colour */
+#define COLOR_CURSOR_FOREGROUND NULL /* if NULL, use background colour */
+#define COLOR_CURSOR_BACKGROUND NULL /* if NULL, use foreground colour */
 
 /*
  * Printer pipe which will be used for emulation of attached vt100 printer
  */
-#define PRINTPIPE	"lpr"
+#define PRINTPIPE "lpr"
 
 /*
  * Define defaults for backspace and delete keys - unless they have been
  * configured out with --disable-backspace-key / --disable-delete-key
  */
-#define DEFAULT_BACKSPACE	"DEC"		/* SPECIAL */
-#define DEFAULT_DELETE		"\033[3~"
+#define DEFAULT_BACKSPACE "DEC" /* SPECIAL */
+#define DEFAULT_DELETE "\033[3~"
 
 /*
  * Default separating chars for multiple-click selection
  * Space and tab are separate separating characters and are not settable
  */
-#define CUTCHARS	"\"&'()*,;<=>?@[\\]^`{|}"
+#define CUTCHARS "\"&'()*,;<=>?@[\\]^`{|}"
 
 /*
  * Width of the term internal border
  */
-#define INTERNALBORDERWIDTH	2
+#define INTERNALBORDERWIDTH 2
 
 /*
  * Width of the term external border
  */
-#define EXTERNALBORDERWIDTH	0
+#define EXTERNALBORDERWIDTH 0
 
 /*
  * Default number of extra dots between lines
  */
-#define LINESPACE	0
+#define LINESPACE 0
 
 /*
  * Default number of extra dots between columns
  */
-#define LETTERSPACE	0
+#define LETTERSPACE 0
 
 /*
  * Default number of lines in the scrollback buffer
  */
-#define SAVELINES	1000
+#define SAVELINES 1000
 
 #endif
-

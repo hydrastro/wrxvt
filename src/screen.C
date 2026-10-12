@@ -25,125 +25,113 @@
  * This file handles _all_ screen updates and selections
  */
 
-#include "../config.h"          /* NECESSARY */
-#include "rxvt.h"               /* NECESSARY */
-#include "rxvtperl.h"           /* NECESSARY */
+#include "../config.h" /* NECESSARY */
+#include "rxvt.h"      /* NECESSARY */
+#include "rxvtperl.h"  /* NECESSARY */
 
 #include <inttypes.h>
 
-static inline void
-fill_text (text_t *start, text_t value, int len)
-{
+static inline void fill_text(text_t *start, text_t value, int len) {
   while (len--)
     *start++ = value;
 }
 
 /* ------------------------------------------------------------------------- */
-#define TABSIZE                 8       /* default tab size */
+#define TABSIZE 8 /* default tab size */
 
 /* ------------------------------------------------------------------------- *
  *             GENERAL SCREEN AND SELECTION UPDATE ROUTINES                  *
  * ------------------------------------------------------------------------- */
-#define ZERO_SCROLLBACK()                                              \
-    if (option (Opt_scrollTtyOutput))                                  \
-        view_start = 0
-#define CLEAR_SELECTION()                                              \
-    selection.beg.row = selection.beg.col                              \
-        = selection.end.row = selection.end.col = 0
-#define CLEAR_ALL_SELECTION()                                          \
-    selection.beg.row = selection.beg.col                              \
-        = selection.mark.row = selection.mark.col                      \
-        = selection.end.row = selection.end.col = 0
+#define ZERO_SCROLLBACK()                                                      \
+  if (option(Opt_scrollTtyOutput))                                             \
+  view_start = 0
+#define CLEAR_SELECTION()                                                      \
+  selection.beg.row = selection.beg.col = selection.end.row =                  \
+      selection.end.col = 0
+#define CLEAR_ALL_SELECTION()                                                  \
+  selection.beg.row = selection.beg.col = selection.mark.row =                 \
+      selection.mark.col = selection.end.row = selection.end.col = 0
 
-#define ROW_AND_COL_IS_AFTER(A, B, C, D)                               \
-    (((A) > (C)) || (((A) == (C)) && ((B) > (D))))
-#define ROW_AND_COL_IS_BEFORE(A, B, C, D)                              \
-    (((A) < (C)) || (((A) == (C)) && ((B) < (D))))
-#define ROW_AND_COL_IN_ROW_AFTER(A, B, C, D)                           \
-    (((A) == (C)) && ((B) > (D)))
-#define ROW_AND_COL_IN_ROW_AT_OR_AFTER(A, B, C, D)                     \
-    (((A) == (C)) && ((B) >= (D)))
-#define ROW_AND_COL_IN_ROW_BEFORE(A, B, C, D)                          \
-    (((A) == (C)) && ((B) < (D)))
-#define ROW_AND_COL_IN_ROW_AT_OR_BEFORE(A, B, C, D)                    \
-    (((A) == (C)) && ((B) <= (D)))
+#define ROW_AND_COL_IS_AFTER(A, B, C, D)                                       \
+  (((A) > (C)) || (((A) == (C)) && ((B) > (D))))
+#define ROW_AND_COL_IS_BEFORE(A, B, C, D)                                      \
+  (((A) < (C)) || (((A) == (C)) && ((B) < (D))))
+#define ROW_AND_COL_IN_ROW_AFTER(A, B, C, D) (((A) == (C)) && ((B) > (D)))
+#define ROW_AND_COL_IN_ROW_AT_OR_AFTER(A, B, C, D)                             \
+  (((A) == (C)) && ((B) >= (D)))
+#define ROW_AND_COL_IN_ROW_BEFORE(A, B, C, D) (((A) == (C)) && ((B) < (D)))
+#define ROW_AND_COL_IN_ROW_AT_OR_BEFORE(A, B, C, D)                            \
+  (((A) == (C)) && ((B) <= (D)))
 
 /* these must be row_col_t */
-#define ROWCOL_IS_AFTER(X, Y)                                          \
-    ROW_AND_COL_IS_AFTER ((X).row, (X).col, (Y).row, (Y).col)
-#define ROWCOL_IS_BEFORE(X, Y)                                         \
-    ROW_AND_COL_IS_BEFORE ((X).row, (X).col, (Y).row, (Y).col)
-#define ROWCOL_IN_ROW_AFTER(X, Y)                                      \
-    ROW_AND_COL_IN_ROW_AFTER ((X).row, (X).col, (Y).row, (Y).col)
-#define ROWCOL_IN_ROW_BEFORE(X, Y)                                     \
-    ROW_AND_COL_IN_ROW_BEFORE ((X).row, (X).col, (Y).row, (Y).col)
-#define ROWCOL_IN_ROW_AT_OR_AFTER(X, Y)                                \
-    ROW_AND_COL_IN_ROW_AT_OR_AFTER ((X).row, (X).col, (Y).row, (Y).col)
-#define ROWCOL_IN_ROW_AT_OR_BEFORE(X, Y)                               \
-    ROW_AND_COL_IN_ROW_AT_OR_BEFORE ((X).row, (X).col, (Y).row, (Y).col)
+#define ROWCOL_IS_AFTER(X, Y)                                                  \
+  ROW_AND_COL_IS_AFTER((X).row, (X).col, (Y).row, (Y).col)
+#define ROWCOL_IS_BEFORE(X, Y)                                                 \
+  ROW_AND_COL_IS_BEFORE((X).row, (X).col, (Y).row, (Y).col)
+#define ROWCOL_IN_ROW_AFTER(X, Y)                                              \
+  ROW_AND_COL_IN_ROW_AFTER((X).row, (X).col, (Y).row, (Y).col)
+#define ROWCOL_IN_ROW_BEFORE(X, Y)                                             \
+  ROW_AND_COL_IN_ROW_BEFORE((X).row, (X).col, (Y).row, (Y).col)
+#define ROWCOL_IN_ROW_AT_OR_AFTER(X, Y)                                        \
+  ROW_AND_COL_IN_ROW_AT_OR_AFTER((X).row, (X).col, (Y).row, (Y).col)
+#define ROWCOL_IN_ROW_AT_OR_BEFORE(X, Y)                                       \
+  ROW_AND_COL_IN_ROW_AT_OR_BEFORE((X).row, (X).col, (Y).row, (Y).col)
 
 /*
  * CLEAR_CHARS: clear <num> chars starting from pixel position <x,y>
  */
-#define CLEAR_CHARS(x, y, num)                                         \
-    if (mapped)                                                        \
-        XClearArea (dpy, vt, x, y,                                     \
-                    (unsigned int)Width2Pixel (num),                   \
-                    (unsigned int)Height2Pixel (1), False)
+#define CLEAR_CHARS(x, y, num)                                                 \
+  if (mapped)                                                                  \
+  XClearArea(dpy, vt, x, y, (unsigned int)Width2Pixel(num),                    \
+             (unsigned int)Height2Pixel(1), False)
 
 /* ------------------------------------------------------------------------- *
  *                        SCREEN `COMMON' ROUTINES                           *
  * ------------------------------------------------------------------------- */
 
 /* Fill part/all of a line with blanks. */
-void
-rxvt_term::scr_blank_line (line_t &l, unsigned int col, unsigned int width, rend_t efs) const noexcept
-{
-  if (!l.valid ())
-    {
-      l.alloc ();
-      col = 0;
-      width = ncol;
-    }
+void rxvt_term::scr_blank_line(line_t &l, unsigned int col, unsigned int width,
+                               rend_t efs) const noexcept {
+  if (!l.valid()) {
+    l.alloc();
+    col = 0;
+    width = ncol;
+  }
 
-  l.touch ();
+  l.touch();
 
-  efs &= ~(RS_baseattrMask | RS_linkMask); // remove italic etc. fontstyles, and links
-  efs = SET_FONT (efs, FONTSET (efs)->find_space_font ());
+  efs &= ~(RS_baseattrMask |
+           RS_linkMask); // remove italic etc. fontstyles, and links
+  efs = SET_FONT(efs, FONTSET(efs)->find_space_font());
 
   text_t *et = l.t + col;
   rend_t *er = l.r + col;
 
-  while (width--)
-    {
-      *et++ = ' ';
-      *er++ = efs;
-    }
+  while (width--) {
+    *et++ = ' ';
+    *er++ = efs;
+  }
 }
 
 /* ------------------------------------------------------------------------- */
 /* Fill a full line with blanks - make sure it is allocated first */
-void
-rxvt_term::scr_blank_screen_mem (line_t &l, rend_t efs) const noexcept
-{
-  scr_blank_line (l, 0, ncol, efs);
+void rxvt_term::scr_blank_screen_mem(line_t &l, rend_t efs) const noexcept {
+  scr_blank_line(l, 0, ncol, efs);
 
   l.l = 0;
   l.f = 0;
 }
 
 // nuke a single wide character at the given column
-void
-rxvt_term::scr_kill_char (line_t &l, int col) const noexcept
-{
+void rxvt_term::scr_kill_char(line_t &l, int col) const noexcept {
   // find begin
   while (col > 0 && l.t[col] == NOCHAR)
     col--;
 
   rend_t rend = l.r[col] & ~(RS_baseattrMask | RS_linkMask);
-  rend = SET_FONT (rend, FONTSET (rend)->find_space_font ());
+  rend = SET_FONT(rend, FONTSET(rend)->find_space_font());
 
-  l.touch ();
+  l.touch();
 
   // found start, nuke
   do {
@@ -154,9 +142,7 @@ rxvt_term::scr_kill_char (line_t &l, int col) const noexcept
 }
 
 // set the rendition of a single wide character beginning at the given column
-void
-rxvt_term::scr_set_char_rend (line_t &l, int col, rend_t rend)
-{
+void rxvt_term::scr_set_char_rend(line_t &l, int col, rend_t rend) {
   do {
     l.r[col] = rend;
     col++;
@@ -167,64 +153,59 @@ rxvt_term::scr_set_char_rend (line_t &l, int col, rend_t rend)
  *                          SCREEN INITIALISATION                            *
  * ------------------------------------------------------------------------- */
 
-void
-rxvt_term::scr_alloc () noexcept
-{
-  int tsize = sizeof (text_t) * ncol;
-  int rsize = sizeof (rend_t) * ncol;
+void rxvt_term::scr_alloc() noexcept {
+  int tsize = sizeof(text_t) * ncol;
+  int rsize = sizeof(rend_t) * ncol;
 
   // we assume that rend_t size is a sufficient alignment
   // factor for text_t and line_t values, and we only
   // need to adjust tsize.
-  tsize = (tsize + sizeof (rend_t) - 1);
-  tsize -= tsize % sizeof (rend_t);
+  tsize = (tsize + sizeof(rend_t) - 1);
+  tsize -= tsize % sizeof(rend_t);
 
   int all_rows = total_rows + nrow + nrow;
 
-  chunk_size = (sizeof (line_t) + rsize + tsize) * all_rows;
-  chunk = chunk_alloc (chunk_size, 0);
+  chunk_size = (sizeof(line_t) + rsize + tsize) * all_rows;
+  chunk = chunk_alloc(chunk_size, 0);
 
-  char *base = (char *)chunk + sizeof (line_t) * all_rows;
+  char *base = (char *)chunk + sizeof(line_t) * all_rows;
 
-  for (int row = 0; row < all_rows; ++row)
-    {
-      line_t &l = ((line_t *)chunk) [row];
+  for (int row = 0; row < all_rows; ++row) {
+    line_t &l = ((line_t *)chunk)[row];
 
-      l.t = (text_t *)base; base += tsize;
-      l.r = (rend_t *)base; base += rsize;
-      l.l = -1;
-      l.f = 0;
-    }
+    l.t = (text_t *)base;
+    base += tsize;
+    l.r = (rend_t *)base;
+    base += rsize;
+    l.l = -1;
+    l.f = 0;
+  }
 
   drawn_buf = (line_t *)chunk;
-  swap_buf  = drawn_buf + nrow;
-  row_buf   = swap_buf  + nrow;
+  swap_buf = drawn_buf + nrow;
+  row_buf = swap_buf + nrow;
 }
 
-void
-rxvt_term::copy_line (line_t &dst, line_t &src)
-{
-  scr_blank_screen_mem (dst, DEFAULT_RSTYLE);
-  dst.l = min (src.l, ncol);
-  memcpy (dst.t, src.t, sizeof (text_t) * dst.l);
-  memcpy (dst.r, src.r, sizeof (rend_t) * dst.l);
+void rxvt_term::copy_line(line_t &dst, line_t &src) {
+  scr_blank_screen_mem(dst, DEFAULT_RSTYLE);
+  dst.l = min(src.l, ncol);
+  memcpy(dst.t, src.t, sizeof(text_t) * dst.l);
+  memcpy(dst.r, src.r, sizeof(rend_t) * dst.l);
   dst.f = src.f;
 }
 
-void ecb_cold
-rxvt_term::scr_reset ()
-{
+void ecb_cold rxvt_term::scr_reset() {
 #if ENABLE_OVERLAY
-  scr_overlay_off ();
+  scr_overlay_off();
 #endif
 
 #if ENABLE_SHARE
-  share_changed (); // a new size for the viewers
+  share_changed(); // a new size for the viewers
 #endif
 
 #if ENABLE_HINTS
   if (hints)
-    hints_end (); // they were for the old size
+    hints_end(); // they were for the old size
 #endif
 
   view_start = 0;
@@ -240,13 +221,12 @@ rxvt_term::scr_reset ()
     return;
 
   // we need at least two lines for wrapping to work correctly
-  while (nrow + saveLines < 2)
-    {
-      //TODO//FIXME
-      saveLines++;
-      prev_nrow--;
-      top_row--;
-    }
+  while (nrow + saveLines < 2) {
+    // TODO//FIXME
+    saveLines++;
+    prev_nrow--;
+    top_row--;
+  }
 
   want_refresh = 1;
 
@@ -259,242 +239,233 @@ rxvt_term::scr_reset ()
   void *prev_chunk = chunk;
   size_t prev_chunk_size = chunk_size;
   line_t *prev_drawn_buf = drawn_buf;
-  line_t *prev_swap_buf  = swap_buf;
-  line_t *prev_row_buf   = row_buf;
+  line_t *prev_swap_buf = swap_buf;
+  line_t *prev_row_buf = row_buf;
 
-  scr_alloc ();
+  scr_alloc();
 
-  if (!prev_row_buf)
-    {
-      top_row    = 0;
-      term_start = 0;
+  if (!prev_row_buf) {
+    top_row = 0;
+    term_start = 0;
 
-      memset (charsets, 'B', sizeof (charsets));
-      rstyle = DEFAULT_RSTYLE;
-      screen.flags = Screen_DefaultFlags;
-      screen.cur.row = screen.cur.col = 0;
-      screen.charset = 0;
-      current_screen = PRIMARY;
-      scr_cursor (SAVE);
+    memset(charsets, 'B', sizeof(charsets));
+    rstyle = DEFAULT_RSTYLE;
+    screen.flags = Screen_DefaultFlags;
+    screen.cur.row = screen.cur.col = 0;
+    screen.charset = 0;
+    current_screen = PRIMARY;
+    scr_cursor(SAVE);
 
 #if NSCREENS
-      swap.flags = Screen_DefaultFlags;
-      swap.cur.row = swap.cur.col = 0;
-      swap.charset = 0;
-      current_screen = SECONDARY;
-      scr_cursor (SAVE);
-      current_screen = PRIMARY;
+    swap.flags = Screen_DefaultFlags;
+    swap.cur.row = swap.cur.col = 0;
+    swap.charset = 0;
+    current_screen = SECONDARY;
+    scr_cursor(SAVE);
+    current_screen = PRIMARY;
 #endif
 
-      selection.text = NULL;
-      selection.len = 0;
-      selection.op = SELECTION_CLEAR;
-      selection.screen = PRIMARY;
-      selection.clicks = 0;
-      selection.clip_text = NULL;
-      selection.clip_len = 0;
+    selection.text = NULL;
+    selection.len = 0;
+    selection.op = SELECTION_CLEAR;
+    selection.screen = PRIMARY;
+    selection.clicks = 0;
+    selection.clip_text = NULL;
+    selection.clip_len = 0;
+  } else {
+    /*
+     * add or delete rows as appropriate
+     */
+
+    int common_col = min(prev_ncol, ncol);
+
+    // resize swap_buf, blank drawn_buf
+    for (int row = min(nrow, prev_nrow); row--;) {
+      scr_blank_screen_mem(drawn_buf[row], DEFAULT_RSTYLE);
+      memcpy(drawn_buf[row].t, prev_drawn_buf[row].t,
+             sizeof(text_t) * common_col);
+      memcpy(drawn_buf[row].r, prev_drawn_buf[row].r,
+             sizeof(rend_t) * common_col);
+
+      copy_line(swap_buf[row], prev_swap_buf[row]);
     }
-  else
-    {
-      /*
-       * add or delete rows as appropriate
-       */
 
-      int common_col = min (prev_ncol, ncol);
+    int p = MOD(term_start + prev_nrow, prev_total_rows); // previous row
+    int pend = MOD(term_start + top_row, prev_total_rows);
+    int q = total_rows; // rewrapped row
 
-      // resize swap_buf, blank drawn_buf
-      for (int row = min (nrow, prev_nrow); row--; )
-        {
-          scr_blank_screen_mem (drawn_buf [row], DEFAULT_RSTYLE);
-          memcpy (drawn_buf [row].t, prev_drawn_buf [row].t, sizeof (text_t) * common_col);
-          memcpy (drawn_buf [row].r, prev_drawn_buf [row].r, sizeof (rend_t) * common_col);
+    // When the terminal gets shorter, first drop the empty lines below
+    // the cursor, and only then push lines off the top into the
+    // scrollback: otherwise the lines just above the prompt would
+    // disappear although there was room for them.
+    int drop = 0;
 
-          copy_line (swap_buf [row], prev_swap_buf [row]);
-        }
+    while (drop < prev_nrow - nrow && prev_nrow - 1 - drop > screen.cur.row &&
+           prev_row_buf[MOD(term_start + prev_nrow - 1 - drop, prev_total_rows)]
+                   .l <= 0) {
+      line_t &candidate =
+          prev_row_buf[MOD(term_start + prev_nrow - 1 - drop, prev_total_rows)];
+      int col = 0;
+      // A logically empty line can still contain a coloured background
+      // or underline. Drop only visually default, blank rows.
+      while (col < prev_ncol && candidate.t[col] == ' ' &&
+             !((candidate.r[col] ^ DEFAULT_RSTYLE) & ~RS_fontMask))
+        ++col;
+      if (col != prev_ncol)
+        break;
+      ++drop;
+    }
 
-      int p    = MOD (term_start + prev_nrow, prev_total_rows);  // previous row
-      int pend = MOD (term_start + top_row  , prev_total_rows);
-      int q    = total_rows; // rewrapped row
-
-      // When the terminal gets shorter, first drop the empty lines below
-      // the cursor, and only then push lines off the top into the
-      // scrollback: otherwise the lines just above the prompt would
-      // disappear although there was room for them.
-      int drop = 0;
-
-      while (drop < prev_nrow - nrow
-             && prev_nrow - 1 - drop > screen.cur.row
-             && prev_row_buf [MOD (term_start + prev_nrow - 1 - drop, prev_total_rows)].l <= 0)
-        {
-          line_t &candidate = prev_row_buf [MOD (term_start + prev_nrow - 1 - drop, prev_total_rows)];
-          int col = 0;
-          // A logically empty line can still contain a coloured background
-          // or underline. Drop only visually default, blank rows.
-          while (col < prev_ncol && candidate.t[col] == ' '
-                 && !((candidate.r[col] ^ DEFAULT_RSTYLE) & ~RS_fontMask))
-            ++col;
-          if (col != prev_ncol) break;
-          ++drop;
-        }
-
-      p = MOD (p - drop, prev_total_rows);
+    p = MOD(p - drop, prev_total_rows);
 
 #if ENABLE_FRILLS
-      if ((rewrap_always || top_row) && !rewrap_never)
-        {
-          // Re-wrap lines. This is rather ugly, possibly because I am too dumb
-          // to come up with a lean and mean algorithm.
-          // TODO: maybe optimise when width didn't change
+    if ((rewrap_always || top_row) && !rewrap_never) {
+      // Re-wrap lines. This is rather ugly, possibly because I am too dumb
+      // to come up with a lean and mean algorithm.
+      // TODO: maybe optimise when width didn't change
 
-          row_col_t ocur = screen.cur;
-          ocur.row = MOD (term_start + ocur.row, prev_total_rows);
+      row_col_t ocur = screen.cur;
+      ocur.row = MOD(term_start + ocur.row, prev_total_rows);
 
-          do
-            {
-              p = MOD (p - 1, prev_total_rows);
-              assert (prev_row_buf [MOD (p, prev_total_rows)].t);
-              int plines = 1;
-              int llen = prev_row_buf [MOD (p, prev_total_rows)].l;
+      do {
+        p = MOD(p - 1, prev_total_rows);
+        assert(prev_row_buf[MOD(p, prev_total_rows)].t);
+        int plines = 1;
+        int llen = prev_row_buf[MOD(p, prev_total_rows)].l;
 
-              while (p != pend && prev_row_buf [MOD (p - 1, prev_total_rows)].is_longer ())
-                {
-                  p = MOD (p - 1, prev_total_rows);
+        while (p != pend &&
+               prev_row_buf[MOD(p - 1, prev_total_rows)].is_longer()) {
+          p = MOD(p - 1, prev_total_rows);
 
-                  plines++;
-                  llen += prev_ncol;
-                }
-
-              int qlines = max (0, (llen - 1) / ncol) + 1;
-
-              // drop partial lines completely
-              if (q < qlines)
-                break;
-
-              q -= qlines;
-
-              int lofs = 0;
-              line_t *qline;
-
-              // re-assemble the full line by destination lines
-              for (int qrow = q; qlines--; qrow++)
-                {
-                  qline = row_buf + qrow;
-                  qline->alloc (); // redundant with next line
-                  qline->l = ncol;
-                  qline->f = qrow == q ? prev_row_buf [p].f & (LINE_PROMPT | LINE_OUTPUT) : 0;
-                  qline->is_longer (1);
-
-                  int qcol = 0;
-
-                  // see below for cursor adjustment rationale
-                  if (p == ocur.row)
-                    screen.cur.row = q - (total_rows - nrow);
-
-                  // fill a single destination line
-                  while (lofs < llen && qcol < ncol)
-                    {
-                      int prow = lofs / prev_ncol;
-                      int pcol = lofs % prev_ncol;
-
-                      prow = MOD (p + prow, prev_total_rows);
-
-                      // we only adjust the cursor _row_ and put it into
-                      // the topmost line of "long line" it was in, as
-                      // this seems to upset applications/shells/readline
-                      // least.
-                      if (prow == ocur.row)
-                        screen.cur.row = q - (total_rows - nrow);
-
-                      line_t &pline = prev_row_buf [prow];
-
-                      int len = min (min (prev_ncol - pcol, ncol - qcol), llen - lofs);
-
-                      memcpy (qline->t + qcol, pline.t + pcol, len * sizeof (text_t));
-                      memcpy (qline->r + qcol, pline.r + pcol, len * sizeof (rend_t));
-
-                      lofs += len;
-                      qcol += len;
-                    }
-                }
-
-              qline->l = llen ? MOD (llen - 1, ncol) + 1 : 0;
-              qline->is_longer (0);
-              scr_blank_line (*qline, qline->l, ncol - qline->l, DEFAULT_RSTYLE);
-            }
-          while (p != pend && q > 0);
+          plines++;
+          llen += prev_ncol;
         }
-      else
+
+        int qlines = max(0, (llen - 1) / ncol) + 1;
+
+        // drop partial lines completely
+        if (q < qlines)
+          break;
+
+        q -= qlines;
+
+        int lofs = 0;
+        line_t *qline;
+
+        // re-assemble the full line by destination lines
+        for (int qrow = q; qlines--; qrow++) {
+          qline = row_buf + qrow;
+          qline->alloc(); // redundant with next line
+          qline->l = ncol;
+          qline->f =
+              qrow == q ? prev_row_buf[p].f & (LINE_PROMPT | LINE_OUTPUT) : 0;
+          qline->is_longer(1);
+
+          int qcol = 0;
+
+          // see below for cursor adjustment rationale
+          if (p == ocur.row)
+            screen.cur.row = q - (total_rows - nrow);
+
+          // fill a single destination line
+          while (lofs < llen && qcol < ncol) {
+            int prow = lofs / prev_ncol;
+            int pcol = lofs % prev_ncol;
+
+            prow = MOD(p + prow, prev_total_rows);
+
+            // we only adjust the cursor _row_ and put it into
+            // the topmost line of "long line" it was in, as
+            // this seems to upset applications/shells/readline
+            // least.
+            if (prow == ocur.row)
+              screen.cur.row = q - (total_rows - nrow);
+
+            line_t &pline = prev_row_buf[prow];
+
+            int len = min(min(prev_ncol - pcol, ncol - qcol), llen - lofs);
+
+            memcpy(qline->t + qcol, pline.t + pcol, len * sizeof(text_t));
+            memcpy(qline->r + qcol, pline.r + pcol, len * sizeof(rend_t));
+
+            lofs += len;
+            qcol += len;
+          }
+        }
+
+        qline->l = llen ? MOD(llen - 1, ncol) + 1 : 0;
+        qline->is_longer(0);
+        scr_blank_line(*qline, qline->l, ncol - qline->l, DEFAULT_RSTYLE);
+      } while (p != pend && q > 0);
+    } else
 #endif
-        {
-          // wing, instead of wrap
-          screen.cur.row += nrow - prev_nrow + drop;
+    {
+      // wing, instead of wrap
+      screen.cur.row += nrow - prev_nrow + drop;
 
-          do
-            {
-              p = MOD (p - 1, prev_total_rows);
-              q--;
+      do {
+        p = MOD(p - 1, prev_total_rows);
+        q--;
 
-              copy_line (row_buf [q], prev_row_buf [p]);
-            }
-          while (p != pend && q > 0);
-        }
-
-      term_start = total_rows - nrow;
-      top_row = q - term_start;
-
-      // When the terminal gets taller but there are not enough lines
-      // (scrollback) to fill it from the top, keep the text at the top and
-      // add the new lines at the bottom, as xterm does: the content, and
-      // the cursor with it, would otherwise move down, leaving empty lines
-      // above it (e.g. the first prompt of a terminal that a tiling window
-      // manager enlarges right after it starts).
-      if (top_row > 0)
-        {
-          for (int row = q; row < total_rows; row++)
-            ::swap (row_buf [row - top_row], row_buf [row]);
-
-          screen.cur.row -= top_row;
-          top_row = 0;
-        }
-
-      clamp_it (screen.cur.row, 0, nrow - 1);
-      clamp_it (screen.cur.col, 0, ncol - 1);
+        copy_line(row_buf[q], prev_row_buf[p]);
+      } while (p != pend && q > 0);
     }
+
+    term_start = total_rows - nrow;
+    top_row = q - term_start;
+
+    // When the terminal gets taller but there are not enough lines
+    // (scrollback) to fill it from the top, keep the text at the top and
+    // add the new lines at the bottom, as xterm does: the content, and
+    // the cursor with it, would otherwise move down, leaving empty lines
+    // above it (e.g. the first prompt of a terminal that a tiling window
+    // manager enlarges right after it starts).
+    if (top_row > 0) {
+      for (int row = q; row < total_rows; row++)
+        ::swap(row_buf[row - top_row], row_buf[row]);
+
+      screen.cur.row -= top_row;
+      top_row = 0;
+    }
+
+    clamp_it(screen.cur.row, 0, nrow - 1);
+    clamp_it(screen.cur.col, 0, ncol - 1);
+  }
 
   // ensure drawn_buf, swap_buf and terminal rows are all initialized
-  for (int row = nrow; row--; )
-    {
-      if (!ROW       (row).valid ()) scr_blank_screen_mem (ROW       (row), DEFAULT_RSTYLE);
-      if (!swap_buf  [row].valid ()) scr_blank_screen_mem (swap_buf  [row], DEFAULT_RSTYLE);
-      if (!drawn_buf [row].valid ()) scr_blank_screen_mem (drawn_buf [row], DEFAULT_RSTYLE);
-    }
+  for (int row = nrow; row--;) {
+    if (!ROW(row).valid())
+      scr_blank_screen_mem(ROW(row), DEFAULT_RSTYLE);
+    if (!swap_buf[row].valid())
+      scr_blank_screen_mem(swap_buf[row], DEFAULT_RSTYLE);
+    if (!drawn_buf[row].valid())
+      scr_blank_screen_mem(drawn_buf[row], DEFAULT_RSTYLE);
+  }
 
-  chunk_free (prev_chunk, prev_chunk_size);
+  chunk_free(prev_chunk, prev_chunk_size);
 
-  free (tabs);
-  tabs = (char *)rxvt_malloc (ncol);
+  free(tabs);
+  tabs = (char *)rxvt_malloc(ncol);
 
-  for (int col = ncol; col--; )
-    tabs [col] = col % TABSIZE == 0;
+  for (int col = ncol; col--;)
+    tabs[col] = col % TABSIZE == 0;
 
-  CLEAR_ALL_SELECTION ();
+  CLEAR_ALL_SELECTION();
 
   prev_nrow = nrow;
   prev_ncol = ncol;
 
-  tt_winch ();
+  tt_winch();
 
-  HOOK_INVOKE ((this, HOOK_RESET, DT_END));
+  HOOK_INVOKE((this, HOOK_RESET, DT_END));
 }
 
-void ecb_cold
-rxvt_term::scr_release () noexcept
-{
-  chunk_free (chunk, chunk_size);
+void ecb_cold rxvt_term::scr_release() noexcept {
+  chunk_free(chunk, chunk_size);
   chunk = 0;
   row_buf = 0;
 
-  free (tabs);
+  free(tabs);
   tabs = 0;
 }
 
@@ -502,34 +473,30 @@ rxvt_term::scr_release () noexcept
 /*
  * Hard/Soft reset
  */
-void ecb_cold
-rxvt_term::scr_poweron ()
-{
-  scr_release ();
+void ecb_cold rxvt_term::scr_poweron() {
+  scr_release();
 
   prev_nrow = prev_ncol = 0;
   rvideo_mode = false;
-  scr_soft_reset ();
-  scr_reset ();
+  scr_soft_reset();
+  scr_reset();
 
-  scr_clear (true);
-  scr_refresh ();
+  scr_clear(true);
+  scr_refresh();
 }
 
-void ecb_cold
-rxvt_term::scr_soft_reset () noexcept
-{
+void ecb_cold rxvt_term::scr_soft_reset() noexcept {
   /* only affects modes, nothing drastic such as clearing the screen */
 #if ENABLE_OVERLAY
-  scr_overlay_off ();
+  scr_overlay_off();
 #endif
 
   if (current_screen != PRIMARY)
-    scr_swap_screen ();
+    scr_swap_screen();
 
-  scr_scroll_region (0, MAX_ROWS - 1);
-  scr_rendition (0, ~RS_None);
-  scr_insert_mode (0);
+  scr_scroll_region(0, MAX_ROWS - 1);
+  scr_rendition(0, ~RS_None);
+  scr_insert_mode(0);
 }
 
 /* ------------------------------------------------------------------------- *
@@ -540,9 +507,7 @@ rxvt_term::scr_soft_reset () noexcept
  * XTERM_SEQ: Save cursor   : ESC 7
  * XTERM_SEQ: Restore cursor: ESC 8
  */
-void
-rxvt_term::scr_cursor (cursor_mode mode) noexcept
-{
+void rxvt_term::scr_cursor(cursor_mode mode) noexcept {
   screen_t *s;
 
 #if NSCREENS && !defined(NO_SECONDARY_SCREEN_CURSOR)
@@ -552,48 +517,45 @@ rxvt_term::scr_cursor (cursor_mode mode) noexcept
 #endif
     s = &screen;
 
-  switch (mode)
-    {
-      case SAVE:
-        s->s_cur.row = screen.cur.row;
-        s->s_cur.col = screen.cur.col;
-        s->s_rstyle = rstyle;
-        s->s_charset = screen.charset;
-        s->s_charset_char = charsets[screen.charset];
-        break;
+  switch (mode) {
+  case SAVE:
+    s->s_cur.row = screen.cur.row;
+    s->s_cur.col = screen.cur.col;
+    s->s_rstyle = rstyle;
+    s->s_charset = screen.charset;
+    s->s_charset_char = charsets[screen.charset];
+    break;
 
-      case RESTORE:
-        want_refresh = 1;
-        screen.cur.row = s->s_cur.row;
-        screen.cur.col = s->s_cur.col;
-        screen.flags &= ~Screen_WrapNext;
-        rstyle = s->s_rstyle;
-        screen.charset = s->s_charset;
-        charsets[screen.charset] = s->s_charset_char;
-        set_font_style ();
-        break;
-    }
+  case RESTORE:
+    want_refresh = 1;
+    screen.cur.row = s->s_cur.row;
+    screen.cur.col = s->s_cur.col;
+    screen.flags &= ~Screen_WrapNext;
+    rstyle = s->s_rstyle;
+    screen.charset = s->s_charset;
+    charsets[screen.charset] = s->s_charset_char;
+    set_font_style();
+    break;
+  }
 
   /* boundary check in case screen size changed between SAVE and RESTORE */
-  min_it (s->cur.row, nrow - 1);
-  min_it (s->cur.col, ncol - 1);
-  assert (s->cur.row >= 0);
-  assert (s->cur.col >= 0);
+  min_it(s->cur.row, nrow - 1);
+  min_it(s->cur.col, ncol - 1);
+  assert(s->cur.row >= 0);
+  assert(s->cur.col >= 0);
 }
 
-void
-rxvt_term::scr_swap_screen () noexcept
-{
-  if (!option (Opt_secondaryScreen))
+void rxvt_term::scr_swap_screen() noexcept {
+  if (!option(Opt_secondaryScreen))
     return;
 
-  for (int i = prev_nrow; i--; )
-    ::swap (ROW(i), swap_buf [i]);
+  for (int i = prev_nrow; i--;)
+    ::swap(ROW(i), swap_buf[i]);
 
-  ::swap (screen.cur, swap.cur);
+  ::swap(screen.cur, swap.cur);
 
-  screen.cur.row = clamp (screen.cur.row, 0, prev_nrow - 1);
-  screen.cur.col = clamp (screen.cur.col, 0, prev_ncol - 1);
+  screen.cur.row = clamp(screen.cur.row, 0, prev_nrow - 1);
+  screen.cur.col = clamp(screen.cur.col, 0, prev_ncol - 1);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -602,9 +564,7 @@ rxvt_term::scr_swap_screen () noexcept
  * XTERM_SEQ: Primary screen  : ESC [ ? 4 7 h
  * XTERM_SEQ: Secondary screen: ESC [ ? 4 7 l
  */
-void
-rxvt_term::scr_change_screen (int scrn)
-{
+void rxvt_term::scr_change_screen(int scrn) {
   if (scrn == current_screen)
     return;
 
@@ -614,34 +574,30 @@ rxvt_term::scr_change_screen (int scrn)
   /* check for boundary cross */
   row_col_t pos;
   pos.row = pos.col = 0;
-  if (ROWCOL_IS_BEFORE (selection.beg, pos)
-      && ROWCOL_IS_AFTER (selection.end, pos))
-    CLEAR_SELECTION ();
+  if (ROWCOL_IS_BEFORE(selection.beg, pos) &&
+      ROWCOL_IS_AFTER(selection.end, pos))
+    CLEAR_SELECTION();
 
   current_screen = scrn;
 
 #if NSCREENS
-  if (option (Opt_secondaryScreen))
-    {
-      num_scr = 0;
+  if (option(Opt_secondaryScreen)) {
+    num_scr = 0;
 
-      scr_swap_screen ();
+    scr_swap_screen();
 
-      ::swap (screen.charset, swap.charset);
-      ::swap (screen.flags,   swap.flags);
-      screen.flags |= Screen_VisibleCursor;
-      swap.flags   |= Screen_VisibleCursor;
-    }
-  else
+    ::swap(screen.charset, swap.charset);
+    ::swap(screen.flags, swap.flags);
+    screen.flags |= Screen_VisibleCursor;
+    swap.flags |= Screen_VisibleCursor;
+  } else
 #endif
-    if (option (Opt_secondaryScroll))
-      scr_scroll_text (0, prev_nrow - 1, prev_nrow);
+      if (option(Opt_secondaryScroll))
+    scr_scroll_text(0, prev_nrow - 1, prev_nrow);
 }
 
 // clear WrapNext indicator, solidifying position on next line
-void
-rxvt_term::scr_do_wrap () noexcept
-{
+void rxvt_term::scr_do_wrap() noexcept {
   if (!(screen.flags & Screen_WrapNext))
     return;
 
@@ -650,7 +606,7 @@ rxvt_term::scr_do_wrap () noexcept
   screen.cur.col = 0;
 
   if (screen.cur.row == screen.bscroll)
-    scr_scroll_text (screen.tscroll, screen.bscroll, 1);
+    scr_scroll_text(screen.tscroll, screen.bscroll, 1);
   else if (screen.cur.row < nrow - 1)
     screen.cur.row++;
 }
@@ -659,16 +615,14 @@ rxvt_term::scr_do_wrap () noexcept
 /*
  * Change the colour for following text
  */
-void
-rxvt_term::scr_color (unsigned int color, int fgbg) noexcept
-{
-  if (!IN_RANGE_INC (color, minCOLOR, maxTermCOLOR24))
+void rxvt_term::scr_color(unsigned int color, int fgbg) noexcept {
+  if (!IN_RANGE_INC(color, minCOLOR, maxTermCOLOR24))
     color = fgbg;
 
   if (fgbg == Color_fg)
-    rstyle = SET_FGCOLOR (rstyle, color);
+    rstyle = SET_FGCOLOR(rstyle, color);
   else
-    rstyle = SET_BGCOLOR (rstyle, color);
+    rstyle = SET_BGCOLOR(rstyle, color);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -676,15 +630,14 @@ rxvt_term::scr_color (unsigned int color, int fgbg) noexcept
  * The colour faint (SGR 2) text is drawn in: halfway between the
  * foreground and the background, in one of the 24-bit colour slots.
  */
-int
-rxvt_term::faint_color (int fore, int back)
-{
+int rxvt_term::faint_color(int fore, int back) {
   rgba f, b;
 
-  pix_colors[fore].get (f);
-  pix_colors[back].get (b);
+  pix_colors[fore].get(f);
+  pix_colors[back].get(b);
 
-  return map_rgb24_color ((f.r + b.r) >> 9, (f.g + b.g) >> 9, (f.b + b.b) >> 9, f.a >> 8);
+  return map_rgb24_color((f.r + b.r) >> 9, (f.g + b.g) >> 9, (f.b + b.b) >> 9,
+                         f.a >> 8);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -693,103 +646,88 @@ rxvt_term::faint_color (int fore, int back)
  * colour. y is the top of the row. Patterns are aligned to absolute
  * pixel positions, so runs drawn separately join up seamlessly.
  */
-void
-rxvt_term::draw_underline (int x, int y, int width, const rxvt_font *font, rend_t rend)
-{
-  int base = y + font->ascent + 1;          // where rxvt-unicode draws it
-  int bottom = y + fheight - 1;             // the last pixel row of the cell
-  int thick = max (1, (font->ascent + font->descent) / 16);
-  int room = max (0, bottom - base);        // pixels below the line
+void rxvt_term::draw_underline(int x, int y, int width, const rxvt_font *font,
+                               rend_t rend) {
+  int base = y + font->ascent + 1; // where rxvt-unicode draws it
+  int bottom = y + fheight - 1;    // the last pixel row of the cell
+  int thick = max(1, (font->ascent + font->descent) / 16);
+  int room = max(0, bottom - base); // pixels below the line
 
-  switch (GET_ULSTYLE (rend))
-    {
-      case UL_double:
-        {
-          int gap = room >= 3 * thick ? thick : 1;
-          int first = min (base, bottom - 2 * thick - gap + 1);
-          XFillRectangle (dpy, vt, gc, x, first, width, thick);
-          XFillRectangle (dpy, vt, gc, x, first + thick + gap, width, thick);
-        }
-        break;
+  switch (GET_ULSTYLE(rend)) {
+  case UL_double: {
+    int gap = room >= 3 * thick ? thick : 1;
+    int first = min(base, bottom - 2 * thick - gap + 1);
+    XFillRectangle(dpy, vt, gc, x, first, width, thick);
+    XFillRectangle(dpy, vt, gc, x, first + thick + gap, width, thick);
+  } break;
 
-      case UL_curly:
-        {
-          // one wave per cell, as tall as the room below the baseline allows
-          int amp = clamp ((room - thick + 1) / 2, 1, max (1, fwidth / 4));
-          int mid = min (base + amp, bottom - amp);
-          int period = max (4, fwidth);
+  case UL_curly: {
+    // one wave per cell, as tall as the room below the baseline allows
+    int amp = clamp((room - thick + 1) / 2, 1, max(1, fwidth / 4));
+    int mid = min(base + amp, bottom - amp);
+    int period = max(4, fwidth);
 
-          // each half wave is a parabola, close enough to a sine (and no libm)
-          XPoint *pts = rxvt_temp_buf<XPoint> (width + 1);
-          for (int i = 0; i <= width; i++)
-            {
-              int a = ((x + i) % period + period) % period * 2; // 0 .. 2 * period
-              int sign = a < period ? 1 : -1;
-              if (a >= period)
-                a -= period;
+    // each half wave is a parabola, close enough to a sine (and no libm)
+    XPoint *pts = rxvt_temp_buf<XPoint>(width + 1);
+    for (int i = 0; i <= width; i++) {
+      int a = ((x + i) % period + period) % period * 2; // 0 .. 2 * period
+      int sign = a < period ? 1 : -1;
+      if (a >= period)
+        a -= period;
 
-              int h = (4 * amp * a * (period - a) + period * period / 2) / (period * period);
+      int h = (4 * amp * a * (period - a) + period * period / 2) /
+              (period * period);
 
-              pts[i].x = x + i;
-              pts[i].y = mid - sign * h;
-            }
-
-          XSetLineAttributes (dpy, gc, thick, LineSolid, CapButt, JoinRound);
-          XDrawLines (dpy, vt, gc, pts, width + 1, CoordModeOrigin);
-          XSetLineAttributes (dpy, gc, 0, LineSolid, CapButt, JoinMiter);
-        }
-        break;
-
-      case UL_dotted:
-        {
-          int step = 2 * thick;
-          for (int px = x + (step - x % step) % step; px < x + width; px += step)
-            XFillRectangle (dpy, vt, gc, px, base, min (thick, x + width - px), thick);
-        }
-        break;
-
-      case UL_dashed:
-        {
-          int dash = max (2, fwidth / 2), step = dash + max (1, fwidth / 4);
-          int start = x - (x % step);
-          for (int px = start; px < x + width; px += step)
-            {
-              int from = max (px, x), to = min (px + dash, x + width);
-              if (to > from)
-                XFillRectangle (dpy, vt, gc, from, base, to - from, thick);
-            }
-        }
-        break;
-
-      default: // UL_single
-        XFillRectangle (dpy, vt, gc, x, base, width, thick);
-        break;
+      pts[i].x = x + i;
+      pts[i].y = mid - sign * h;
     }
+
+    XSetLineAttributes(dpy, gc, thick, LineSolid, CapButt, JoinRound);
+    XDrawLines(dpy, vt, gc, pts, width + 1, CoordModeOrigin);
+    XSetLineAttributes(dpy, gc, 0, LineSolid, CapButt, JoinMiter);
+  } break;
+
+  case UL_dotted: {
+    int step = 2 * thick;
+    for (int px = x + (step - x % step) % step; px < x + width; px += step)
+      XFillRectangle(dpy, vt, gc, px, base, min(thick, x + width - px), thick);
+  } break;
+
+  case UL_dashed: {
+    int dash = max(2, fwidth / 2), step = dash + max(1, fwidth / 4);
+    int start = x - (x % step);
+    for (int px = start; px < x + width; px += step) {
+      int from = max(px, x), to = min(px + dash, x + width);
+      if (to > from)
+        XFillRectangle(dpy, vt, gc, from, base, to - from, thick);
+    }
+  } break;
+
+  default: // UL_single
+    XFillRectangle(dpy, vt, gc, x, base, width, thick);
+    break;
+  }
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * Underline with a style (SGR 4:N), -1 for none
  */
-void
-rxvt_term::scr_underline (int style) noexcept
-{
+void rxvt_term::scr_underline(int style) noexcept {
   if (style < 0)
     rstyle &= ~RS_Uline;
   else
-    rstyle = (rstyle & ~RS_ulStyleMask) | RS_Uline
-             | ((rend_t)min (style, (int)UL_dashed) << RS_ulStyleShift);
+    rstyle = (rstyle & ~RS_ulStyleMask) | RS_Uline |
+             ((rend_t)min(style, (int)UL_dashed) << RS_ulStyleShift);
 }
 
 /*
  * Underline colour (SGR 58), -1 for the default (the text colour)
  */
-void
-rxvt_term::scr_underline_color (int color) noexcept
-{
+void rxvt_term::scr_underline_color(int color) noexcept {
   rstyle &= ~(RS_ulColor | RS_ulColorMask);
 
-  if (IN_RANGE_INC (color, minCOLOR, maxTermCOLOR24))
+  if (IN_RANGE_INC(color, minCOLOR, maxTermCOLOR24))
     rstyle |= RS_ulColor | ((rend_t)color << RS_ulColorShift);
 }
 
@@ -797,13 +735,12 @@ rxvt_term::scr_underline_color (int color) noexcept
 /*
  * Change the rendition style for following text
  */
-void
-rxvt_term::scr_rendition (int set, rend_t style) noexcept
-{
+void rxvt_term::scr_rendition(int set, rend_t style) noexcept {
   if (set)
     rstyle |= style;
   else if (style == ~RS_None)
-    rstyle = DEFAULT_RSTYLE | (rstyle & RS_linkMask); // SGR 0 doesn't end a hyperlink
+    rstyle = DEFAULT_RSTYLE |
+             (rstyle & RS_linkMask); // SGR 0 doesn't end a hyperlink
   else
     rstyle &= ~style;
 }
@@ -814,142 +751,126 @@ rxvt_term::scr_rendition (int set, rend_t style) noexcept
  * count positive ==> scroll up
  * count negative ==> scroll down
  */
-int ecb_hot
-rxvt_term::scr_scroll_text (int row1, int row2, int count) noexcept
-{
+int ecb_hot rxvt_term::scr_scroll_text(int row1, int row2, int count) noexcept {
   if (count == 0 || (row1 > row2))
     return 0;
 
   want_refresh = 1;
   num_scr += count;
 
-  if (count > 0
-      && row1 == 0
-      && (current_screen == PRIMARY || option (Opt_secondaryScroll)))
+  if (count > 0 && row1 == 0 &&
+      (current_screen == PRIMARY || option(Opt_secondaryScroll))) {
+    min_it(count, total_rows - (nrow - (row2 + 1)));
+
+    top_row = max(top_row - count, -saveLines);
+
+    // sever bottommost line
     {
-      min_it (count, total_rows - (nrow - (row2 + 1)));
-
-      top_row = max (top_row - count, -saveLines);
-
-      // sever bottommost line
-      {
-        line_t &l = ROW(row2);
-        l.is_longer (0);
-        l.touch ();
-      }
-
-      // scroll everything up 'count' lines
-      term_start = (term_start + count) % total_rows;
-
-      // now copy lines below the scroll region bottom to the
-      // bottom of the screen again, so they look as if they
-      // hadn't moved.
-      for (int i = nrow; --i > row2; )
-        {
-          line_t &l1 = ROW(i - count);
-          line_t &l2 = ROW(i);
-
-          ::swap (l1, l2);
-          l2.touch ();
-        }
-
-      // erase newly scrolled-in lines
-      for (int i = count; i--; )
-        {
-          line_t &l = ROW(row2 - i);
-
-          // optimise if already cleared, can be significant on slow machines
-          // could be rolled into scr_blank_screen_mem
-          if (l.r && l.l < ncol - 1 && !((l.r[l.l + 1] ^ rstyle) & (RS_fgMask | RS_bgMask)))
-            {
-              scr_blank_line (l, 0, l.l, rstyle);
-              l.l = 0;
-              l.f = 0;
-            }
-          else
-            scr_blank_screen_mem (l, rstyle);
-        }
-
-      // move and/or clear selection, if any
-      if (selection.op && current_screen == selection.screen
-          && selection.beg.row <= row2)
-        {
-          selection.beg.row  -= count;
-          selection.end.row  -= count;
-          selection.mark.row -= count;
-
-          selection_check (0);
-        }
-
-      // finally move the view window, if desired
-      if (option (Opt_scrollWithBuffer)
-          && view_start != 0
-          && view_start != -saveLines)
-        scr_page (count);
-
-      if (SHOULD_INVOKE (HOOK_SCROLL_BACK))
-        HOOK_INVOKE ((this, HOOK_SCROLL_BACK, DT_INT, count, DT_INT, top_row, DT_END));
+      line_t &l = ROW(row2);
+      l.is_longer(0);
+      l.touch();
     }
-  else
-    {
-      if (selection.op && current_screen == selection.screen)
-        {
-          if ((selection.beg.row < row1 && selection.end.row > row1)
-              || (selection.beg.row < row2 && selection.end.row > row2)
-              || (selection.beg.row - count < row1 && selection.beg.row >= row1)
-              || (selection.beg.row - count > row2 && selection.beg.row <= row2)
-              || (selection.end.row - count < row1 && selection.end.row >= row1)
-              || (selection.end.row - count > row2 && selection.end.row <= row2))
-            {
-              CLEAR_ALL_SELECTION ();
-              selection.op = SELECTION_CLEAR;
-            }
-          else if (selection.end.row >= row1 && selection.end.row <= row2)
-            {
-              /* move selected region too */
-              selection.beg.row  -= count;
-              selection.end.row  -= count;
-              selection.mark.row -= count;
 
-              selection_check (0);
-            }
-        }
+    // scroll everything up 'count' lines
+    term_start = (term_start + count) % total_rows;
 
-      // use a simple and robust scrolling algorithm, this
-      // part of scr_scroll_text is not time-critical.
+    // now copy lines below the scroll region bottom to the
+    // bottom of the screen again, so they look as if they
+    // hadn't moved.
+    for (int i = nrow; --i > row2;) {
+      line_t &l1 = ROW(i - count);
+      line_t &l2 = ROW(i);
 
-      // sever line above scroll region
-      if (row1)
-        {
-          line_t &l = ROW(row1 - 1);
-          l.is_longer (0);
-          l.touch ();
-        }
+      ::swap(l1, l2);
+      l2.touch();
+    }
 
-      int rows = row2 - row1 + 1;
+    // erase newly scrolled-in lines
+    for (int i = count; i--;) {
+      line_t &l = ROW(row2 - i);
 
-      min_it (count, rows);
+      // optimise if already cleared, can be significant on slow machines
+      // could be rolled into scr_blank_screen_mem
+      if (l.r && l.l < ncol - 1 &&
+          !((l.r[l.l + 1] ^ rstyle) & (RS_fgMask | RS_bgMask))) {
+        scr_blank_line(l, 0, l.l, rstyle);
+        l.l = 0;
+        l.f = 0;
+      } else
+        scr_blank_screen_mem(l, rstyle);
+    }
 
-      line_t *temp_buf = rxvt_temp_buf<line_t> (rows);
+    // move and/or clear selection, if any
+    if (selection.op && current_screen == selection.screen &&
+        selection.beg.row <= row2) {
+      selection.beg.row -= count;
+      selection.end.row -= count;
+      selection.mark.row -= count;
 
-      for (int row = 0; row < rows; row++)
-        {
-          temp_buf [row] = ROW(row1 + (row + count + rows) % rows);
+      selection_check(0);
+    }
 
-          if (!IN_RANGE_EXC (row + count, 0, rows))
-            scr_blank_screen_mem (temp_buf [row], rstyle);
-        }
+    // finally move the view window, if desired
+    if (option(Opt_scrollWithBuffer) && view_start != 0 &&
+        view_start != -saveLines)
+      scr_page(count);
 
-      for (int row = 0; row < rows; row++)
-        ROW(row1 + row) = temp_buf [row];
+    if (SHOULD_INVOKE(HOOK_SCROLL_BACK))
+      HOOK_INVOKE(
+          (this, HOOK_SCROLL_BACK, DT_INT, count, DT_INT, top_row, DT_END));
+  } else {
+    if (selection.op && current_screen == selection.screen) {
+      if ((selection.beg.row < row1 && selection.end.row > row1) ||
+          (selection.beg.row < row2 && selection.end.row > row2) ||
+          (selection.beg.row - count < row1 && selection.beg.row >= row1) ||
+          (selection.beg.row - count > row2 && selection.beg.row <= row2) ||
+          (selection.end.row - count < row1 && selection.end.row >= row1) ||
+          (selection.end.row - count > row2 && selection.end.row <= row2)) {
+        CLEAR_ALL_SELECTION();
+        selection.op = SELECTION_CLEAR;
+      } else if (selection.end.row >= row1 && selection.end.row <= row2) {
+        /* move selected region too */
+        selection.beg.row -= count;
+        selection.end.row -= count;
+        selection.mark.row -= count;
 
-      // sever bottommost line
-      {
-        line_t &l = ROW(row2);
-        l.is_longer (0);
-        l.touch ();
+        selection_check(0);
       }
     }
+
+    // use a simple and robust scrolling algorithm, this
+    // part of scr_scroll_text is not time-critical.
+
+    // sever line above scroll region
+    if (row1) {
+      line_t &l = ROW(row1 - 1);
+      l.is_longer(0);
+      l.touch();
+    }
+
+    int rows = row2 - row1 + 1;
+
+    min_it(count, rows);
+
+    line_t *temp_buf = rxvt_temp_buf<line_t>(rows);
+
+    for (int row = 0; row < rows; row++) {
+      temp_buf[row] = ROW(row1 + (row + count + rows) % rows);
+
+      if (!IN_RANGE_EXC(row + count, 0, rows))
+        scr_blank_screen_mem(temp_buf[row], rstyle);
+    }
+
+    for (int row = 0; row < rows; row++)
+      ROW(row1 + row) = temp_buf[row];
+
+    // sever bottommost line
+    {
+      line_t &l = ROW(row2);
+      l.is_longer(0);
+      l.touch();
+    }
+  }
 
   return count;
 }
@@ -961,30 +882,24 @@ rxvt_term::scr_scroll_text (int row1, int row2, int count) noexcept
  * cell before the cursor, or the last cell of the line when the next
  * character wraps), add it to that cell and return true.
  */
-bool
-rxvt_term::scr_add_to_cluster (unicode_t c) noexcept
-{
+bool rxvt_term::scr_add_to_cluster(unicode_t c) noexcept {
   line_t *l = &ROW(screen.cur.row);
   int col;
   bool just_before = true; // the cluster ends right before the cursor
 
-  if (screen.flags & Screen_WrapNext)
-    {
-      col = screen.cur.col; // the last column, already written
-      just_before = false;
-    }
-  else if (screen.cur.col > 0)
+  if (screen.flags & Screen_WrapNext) {
+    col = screen.cur.col; // the last column, already written
+    just_before = false;
+  } else if (screen.cur.col > 0)
     col = screen.cur.col - 1;
-  else if (screen.cur.row > top_row && ROW(screen.cur.row - 1).is_longer ())
-    {
-      l = &ROW(screen.cur.row - 1);
-      col = ncol - 1;
-      just_before = false;
-    }
-  else
+  else if (screen.cur.row > top_row && ROW(screen.cur.row - 1).is_longer()) {
+    l = &ROW(screen.cur.row - 1);
+    col = ncol - 1;
+    just_before = false;
+  } else
     return false;
 
-  if (!l->valid () || !l->t)
+  if (!l->valid() || !l->t)
     return false;
 
   while (col > 0 && l->t[col] == NOCHAR)
@@ -994,50 +909,48 @@ rxvt_term::scr_add_to_cluster (unicode_t c) noexcept
   rend_t *rp = l->r + col;
 
   if (*tp == NOCHAR
-# if ENABLE_SIXEL
-      || IS_IMAGE_TILE (*tp)
-# endif
-     )
+#if ENABLE_SIXEL
+      || IS_IMAGE_TILE(*tp)
+#endif
+  )
     return false;
 
   uint32_t cluster[GRAPHEME_MAX];
-  unsigned int n = grapheme_expand (*tp, cluster);
+  unsigned int n = grapheme_expand(*tp, cluster);
 
-  if (!grapheme_continues (cluster, n, c))
+  if (!grapheme_continues(cluster, n, c))
     return false;
 
-  bool widen = grapheme_widens (cluster, n, c)
-               && (col + 1 >= ncol || l->t[col + 1] != NOCHAR); // one cell now
+  bool widen = grapheme_widens(cluster, n, c) &&
+               (col + 1 >= ncol || l->t[col + 1] != NOCHAR); // one cell now
 
-  l->touch ();
-  *tp = rxvt_composite.compose (*tp, c, false); // (sequences repeat characters on purpose)
-  *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
+  l->touch();
+  *tp = rxvt_composite.compose(
+      *tp, c, false); // (sequences repeat characters on purpose)
+  *rp = SET_FONT(*rp, FONTSET(*rp)->find_font(*tp));
 
   // a second cell, if there is room and nothing written after it yet
-  if (widen && just_before && l == &ROW(screen.cur.row) && col + 1 < ncol
-      && screen.cur.col == col + 1)
-    {
-      l->t[col + 1] = NOCHAR;
-      l->r[col + 1] = *rp;
+  if (widen && just_before && l == &ROW(screen.cur.row) && col + 1 < ncol &&
+      screen.cur.col == col + 1) {
+    l->t[col + 1] = NOCHAR;
+    l->r[col + 1] = *rp;
 
-      // the rest of a wide character that was there
-      for (int i = col + 2; i < ncol && l->t[i] == NOCHAR; i++)
-        {
-          l->t[i] = ' ';
-          l->r[i] = *rp;
-        }
-
-      if (col + 2 < ncol)
-        screen.cur.col = col + 2;
-      else
-        {
-          l->l = ncol;
-          if (screen.flags & Screen_Autowrap)
-            screen.flags |= Screen_WrapNext;
-        }
-
-      max_it (l->l, screen.cur.col);
+    // the rest of a wide character that was there
+    for (int i = col + 2; i < ncol && l->t[i] == NOCHAR; i++) {
+      l->t[i] = ' ';
+      l->r[i] = *rp;
     }
+
+    if (col + 2 < ncol)
+      screen.cur.col = col + 2;
+    else {
+      l->l = ncol;
+      if (screen.flags & Screen_Autowrap)
+        screen.flags |= Screen_WrapNext;
+    }
+
+    max_it(l->l, screen.cur.col);
+  }
 
   return true;
 }
@@ -1047,10 +960,9 @@ rxvt_term::scr_add_to_cluster (unicode_t c) noexcept
  * Add text given in <str> of length <len> to screen struct
  */
 
-void ecb_hot
-rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
-{
-  if (len <= 0)               /* sanity */
+void ecb_hot rxvt_term::scr_add_lines(const wchar_t *str, int len,
+                                      int minlines) noexcept {
+  if (len <= 0) /* sanity */
     return;
 
   bool checksel;
@@ -1059,328 +971,300 @@ rxvt_term::scr_add_lines (const wchar_t *str, int len, int minlines) noexcept
   const wchar_t *strend = str + len;
 
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
-  if (minlines > 0)
-    {
-      minlines += screen.cur.row - screen.bscroll;
-      min_it (minlines, screen.cur.row - top_row);
+  if (minlines > 0) {
+    minlines += screen.cur.row - screen.bscroll;
+    min_it(minlines, screen.cur.row - top_row);
 
-      if (minlines > 0
-          && screen.tscroll == 0
-          && screen.bscroll == nrow - 1)
-        {
-          /* _at least_ this many lines need to be scrolled */
-          scr_scroll_text (screen.tscroll, screen.bscroll, minlines);
-          screen.cur.row -= minlines;
-        }
+    if (minlines > 0 && screen.tscroll == 0 && screen.bscroll == nrow - 1) {
+      /* _at least_ this many lines need to be scrolled */
+      scr_scroll_text(screen.tscroll, screen.bscroll, minlines);
+      screen.cur.row -= minlines;
     }
+  }
 
-  assert (screen.cur.col < ncol);
-  assert (screen.cur.row < nrow
-          && screen.cur.row >= top_row);
+  assert(screen.cur.col < ncol);
+  assert(screen.cur.row < nrow && screen.cur.row >= top_row);
   int row = screen.cur.row;
 
   checksel = selection.op && current_screen == selection.screen ? 1 : 0;
 
   line_t *line = &ROW(row);
 
-  while (str < strend)
-    {
-      c = (unicode_t)*str++; // convert to rxvt-unicodes representation
+  while (str < strend) {
+    c = (unicode_t)*str++; // convert to rxvt-unicodes representation
 
-      if (ecb_unlikely (c < 0x20))
-        if (c == C0_LF)
-          {
-            max_it (line->l, screen.cur.col);
+    if (ecb_unlikely(c < 0x20))
+      if (c == C0_LF) {
+        max_it(line->l, screen.cur.col);
 
-            screen.flags &= ~Screen_WrapNext;
+        screen.flags &= ~Screen_WrapNext;
 
-            if (screen.cur.row == screen.bscroll)
-              scr_scroll_text (screen.tscroll, screen.bscroll, 1);
-            else if (screen.cur.row < (nrow - 1))
-              row = ++screen.cur.row;
+        if (screen.cur.row == screen.bscroll)
+          scr_scroll_text(screen.tscroll, screen.bscroll, 1);
+        else if (screen.cur.row < (nrow - 1))
+          row = ++screen.cur.row;
 
-            line = &ROW(row);  /* _must_ refresh */
-            continue;
-          }
-        else if (c == C0_CR)
-          {
-            max_it (line->l, screen.cur.col);
+        line = &ROW(row); /* _must_ refresh */
+        continue;
+      } else if (c == C0_CR) {
+        max_it(line->l, screen.cur.col);
 
-            screen.flags &= ~Screen_WrapNext;
-            screen.cur.col = 0;
-            continue;
-          }
-        else if (c == C0_HT)
-          {
-            scr_tab (1, true);
-            continue;
-          }
+        screen.flags &= ~Screen_WrapNext;
+        screen.cur.col = 0;
+        continue;
+      } else if (c == C0_HT) {
+        scr_tab(1, true);
+        continue;
+      }
 
-      if (ecb_unlikely (
-            checksel            /* see if we're writing within selection */
-            && !ROWCOL_IS_BEFORE (screen.cur, selection.beg)
-            && ROWCOL_IS_BEFORE (screen.cur, selection.end)
-         ))
-        {
-          checksel = 0;
-          /*
-           * If we wrote anywhere in the selected area, kill the selection
-           * XXX: should we kill the mark too?  Possibly, but maybe that
-           *      should be a similar check.
-           */
-          CLEAR_SELECTION ();
-        }
-
-#if ENABLE_GRAPHEMES
-      // Grapheme clusters (mode 2027): a character that continues the
-      // cluster before the cursor goes into its cell, even at the end of
-      // the line, and takes no columns of its own; only VS16 and a flag's
-      // second letter can make a one-cell cluster two cells wide. (Below
-      // U+0300 only the rare Prepend characters are continued: skipped,
-      // so plain text stays fast.)
-      if (ecb_unlikely ((priv_modes & PrivMode_Grapheme) && c >= 0x300)
-          && scr_add_to_cluster (c))
-        {
-          line = &ROW(screen.cur.row);
-          continue;
-        }
-#endif
-
-      if (ecb_unlikely (screen.flags & Screen_WrapNext))
-        {
-          scr_do_wrap ();
-
-          line->l = ncol;
-          line->is_longer (1);
-
-          row = screen.cur.row;
-          line = &ROW(row);   /* _must_ refresh */
-        }
-
-      // some utf-8 decoders "decode" surrogate characters: let's fix this.
-      if (ecb_unlikely (IN_RANGE_INC (c, 0xd800, 0xdfff)))
-        c = 0xfffd;
-
-      // rely on wcwidth to tell us the character width, do wcwidth before
-      // further replacements, as wcwidth might return -1 for the line
-      // drawing characters below as they might be invalid in the current
-      // locale.
-      int width = WCWIDTH (c);
-
-      if (ecb_unlikely (charsets [screen.charset] == '0')) // DEC SPECIAL
-        {
-          // vt100 special graphics and line drawing
-          // 5f-7e standard vt100
-          // 40-5e rxvt extension for extra curses acs chars
-          static uint16_t vt100_0[62] = { // 41 .. 7e
-                    0x2191, 0x2193, 0x2192, 0x2190, 0x2588, 0x259a, 0x2603, // 41-47 hi mr. snowman!
-                 0,      0,      0,      0,      0,      0,      0,      0, // 48-4f
-                 0,      0,      0,      0,      0,      0,      0,      0, // 50-57
-                 0,      0,      0,      0,      0,      0,      0, 0x0020, // 58-5f
-            0x25c6, 0x2592, 0x2409, 0x240c, 0x240d, 0x240a, 0x00b0, 0x00b1, // 60-67
-            0x2424, 0x240b, 0x2518, 0x2510, 0x250c, 0x2514, 0x253c, 0x23ba, // 68-6f
-            0x23bb, 0x2500, 0x23bc, 0x23bd, 0x251c, 0x2524, 0x2534, 0x252c, // 70-77
-            0x2502, 0x2264, 0x2265, 0x03c0, 0x2260, 0x00a3, 0x00b7,         // 78-7e
-          };
-
-          if (c >= 0x41 && c <= 0x7e && vt100_0[c - 0x41])
-            {
-              c = vt100_0[c - 0x41];
-              width = 1; // vt100 line drawing characters are always single-width
-            }
-        }
-
-      if (ecb_unlikely (screen.flags & Screen_Insert))
-        scr_insdel_chars (width, INSERT);
-
-#if ENABLE_EMOJI_SEQUENCES
-      // Emoji sequences (see emoji_join in rxvt.h): the second regional
-      // indicator of a flag, a skin tone after an emoji, or an emoji after
-      // a zero width joiner continue the previous character, which gets
-      // wider by the width of this one.
-      if (ecb_unlikely (width > 0
-                        && screen.cur.col > 0
-                        && !(screen.flags & Screen_WrapNext)
-                        && screen.cur.col + width <= ncol
-                        && (emoji_properties (c) & (EMOJI_REGIONAL | EMOJI_MODIFIER | EMOJI_PICTOGRAPHIC))))
-        {
-          text_t *tp = line->t + screen.cur.col - 1;
-          rend_t *rp = line->r + screen.cur.col - 1;
-
-          while (*tp == NOCHAR && tp > line->t)
-            tp--, rp--;
-
-          bool join = emoji_join (*tp, c)
-                      && !((*rp ^ rstyle) & ~RS_fontMask);
-
-          if (join)
-            {
-              line->touch ();
-
-              *tp = rxvt_composite.compose (*tp, c, false);
-              *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
-
-              do
-                {
-                  line->t[screen.cur.col] = NOCHAR;
-                  line->r[screen.cur.col] = *rp;
-
-                  if (screen.cur.col < ncol - 1)
-                    screen.cur.col++;
-                  else
-                    {
-                      line->l = ncol;
-                      if (screen.flags & Screen_Autowrap)
-                        screen.flags |= Screen_WrapNext;
-
-                      goto joined;
-                    }
-                }
-              while (--width);
-
-              // pad with spaces when overwriting a wide character
-              for (int col = screen.cur.col; col < ncol && line->t[col] == NOCHAR; col++)
-                {
-                  line->t[col] = ' ';
-                  line->r[col] = *rp;
-                }
-
-            joined:
-              continue;
-            }
-        }
-#endif
-
-      if (width != 0)
-        {
-#if !UNICODE_3
-          // trim characters we can't store directly :(
-          if (c >= 0x10000)
-# if ENABLE_COMBINING
-            c = rxvt_composite.compose (c); // map to lower 16 bits
-# else
-            c = 0xfffd;
-# endif
-#endif
-
-          rend_t rend = SET_FONT (rstyle, FONTSET (rstyle)->find_font (c));
-
-          // if the character doesn't fit into the remaining columns...
-          if (ecb_unlikely (screen.cur.col > ncol - width && ncol >= width))
-            {
-              if (screen.flags & Screen_Autowrap)
-                {
-                  // ... artificially enlargen the previous one
-                  c = NOCHAR;
-                  // and try the same character next loop iteration
-                  --str;
-                }
-              else
-                screen.cur.col = ncol - width;
-            }
-
-          // nuke the character at this position, if required
-          // due to wonderful coincidences everywhere else in this loop
-          // we never have to check for overwriting a wide char itself,
-          // only its tail.
-          if (ecb_unlikely (line->t[screen.cur.col] == NOCHAR))
-            scr_kill_char (*line, screen.cur.col);
-
-          line->touch ();
-
-          do
-            {
-              line->t[screen.cur.col] = c;
-              line->r[screen.cur.col] = rend;
-
-              if (ecb_likely (screen.cur.col < ncol - 1))
-                screen.cur.col++;
-              else
-                {
-                  line->l = ncol;
-                  if (screen.flags & Screen_Autowrap)
-                    screen.flags |= Screen_WrapNext;
-
-                  goto end_of_line;
-                }
-
-              c = NOCHAR;
-            }
-          while (ecb_unlikely (--width > 0));
-
-          // pad with spaces when overwriting wide character with smaller one
-          for (int c = screen.cur.col; ecb_unlikely (c < ncol && line->t[c] == NOCHAR); c++)
-            {
-              line->t[c] = ' ';
-              line->r[c] = rend;
-            }
-
-end_of_line:
-          ;
-        }
-#if ENABLE_COMBINING
-      else // width == 0
-        {
-          if (c != 0xfeff) // ignore BOM
-            {
-              // handle combining characters
-              // we just tag the accent on the previous on-screen character.
-              // this is arguably not correct, but also arguably not wrong.
-              // we don't handle double-width characters nicely yet.
-              line_t *linep;
-              text_t *tp;
-              rend_t *rp;
-
-              if (screen.cur.col > 0)
-                {
-                  linep = line;
-                  tp = line->t + screen.cur.col - 1;
-                  rp = line->r + screen.cur.col - 1;
-                }
-              else if (screen.cur.row > 0
-                       && ROW(screen.cur.row - 1).is_longer ())
-                {
-                  linep = &ROW(screen.cur.row - 1);
-                  tp = linep->t + ncol - 1;
-                  rp = linep->r + ncol - 1;
-                }
-              else
-                continue;
-
-              linep->touch ();
-
-              while (*tp == NOCHAR && tp > linep->t)
-                tp--, rp--;
-
-              // first try to find a precomposed character
-              unicode_t n = rxvt_compose (*tp, c);
-              if (n == NOCHAR)
-                {
-                  // (readline repeats combining characters by mistake:
-                  // dropped; emoji sequences and the kitty placeholders'
-                  // row and column marks repeat them on purpose)
-                  bool dedupe = true;
-#if ENABLE_EMOJI_SEQUENCES
-                  dedupe = !emoji_join (*tp, c);
-#endif
-#if ENABLE_SIXEL
-                  dedupe = dedupe && !is_kitty_placeholder (*tp);
-#endif
-                  n = rxvt_composite.compose (*tp, c, dedupe);
-                }
-
-              *tp = n;
-              *rp = SET_FONT (*rp, FONTSET (*rp)->find_font (*tp));
-            }
-        }
-#endif
+    if (ecb_unlikely(checksel /* see if we're writing within selection */
+                     && !ROWCOL_IS_BEFORE(screen.cur, selection.beg) &&
+                     ROWCOL_IS_BEFORE(screen.cur, selection.end))) {
+      checksel = 0;
+      /*
+       * If we wrote anywhere in the selected area, kill the selection
+       * XXX: should we kill the mark too?  Possibly, but maybe that
+       *      should be a similar check.
+       */
+      CLEAR_SELECTION();
     }
 
-  max_it (line->l, screen.cur.col);
+#if ENABLE_GRAPHEMES
+    // Grapheme clusters (mode 2027): a character that continues the
+    // cluster before the cursor goes into its cell, even at the end of
+    // the line, and takes no columns of its own; only VS16 and a flag's
+    // second letter can make a one-cell cluster two cells wide. (Below
+    // U+0300 only the rare Prepend characters are continued: skipped,
+    // so plain text stays fast.)
+    if (ecb_unlikely((priv_modes & PrivMode_Grapheme) && c >= 0x300) &&
+        scr_add_to_cluster(c)) {
+      line = &ROW(screen.cur.row);
+      continue;
+    }
+#endif
 
-  assert (screen.cur.row >= 0);
+    if (ecb_unlikely(screen.flags & Screen_WrapNext)) {
+      scr_do_wrap();
+
+      line->l = ncol;
+      line->is_longer(1);
+
+      row = screen.cur.row;
+      line = &ROW(row); /* _must_ refresh */
+    }
+
+    // some utf-8 decoders "decode" surrogate characters: let's fix this.
+    if (ecb_unlikely(IN_RANGE_INC(c, 0xd800, 0xdfff)))
+      c = 0xfffd;
+
+    // rely on wcwidth to tell us the character width, do wcwidth before
+    // further replacements, as wcwidth might return -1 for the line
+    // drawing characters below as they might be invalid in the current
+    // locale.
+    int width = WCWIDTH(c);
+
+    if (ecb_unlikely(charsets[screen.charset] == '0')) // DEC SPECIAL
+    {
+      // vt100 special graphics and line drawing
+      // 5f-7e standard vt100
+      // 40-5e rxvt extension for extra curses acs chars
+      static uint16_t vt100_0[62] = {
+          // 41 .. 7e
+          0x2191, 0x2193, 0x2192, 0x2190,
+          0x2588, 0x259a, 0x2603, // 41-47 hi mr. snowman!
+          0,      0,      0,      0,
+          0,      0,      0,      0, // 48-4f
+          0,      0,      0,      0,
+          0,      0,      0,      0, // 50-57
+          0,      0,      0,      0,
+          0,      0,      0,      0x0020, // 58-5f
+          0x25c6, 0x2592, 0x2409, 0x240c,
+          0x240d, 0x240a, 0x00b0, 0x00b1, // 60-67
+          0x2424, 0x240b, 0x2518, 0x2510,
+          0x250c, 0x2514, 0x253c, 0x23ba, // 68-6f
+          0x23bb, 0x2500, 0x23bc, 0x23bd,
+          0x251c, 0x2524, 0x2534, 0x252c, // 70-77
+          0x2502, 0x2264, 0x2265, 0x03c0,
+          0x2260, 0x00a3, 0x00b7, // 78-7e
+      };
+
+      if (c >= 0x41 && c <= 0x7e && vt100_0[c - 0x41]) {
+        c = vt100_0[c - 0x41];
+        width = 1; // vt100 line drawing characters are always single-width
+      }
+    }
+
+    if (ecb_unlikely(screen.flags & Screen_Insert))
+      scr_insdel_chars(width, INSERT);
+
+#if ENABLE_EMOJI_SEQUENCES
+    // Emoji sequences (see emoji_join in rxvt.h): the second regional
+    // indicator of a flag, a skin tone after an emoji, or an emoji after
+    // a zero width joiner continue the previous character, which gets
+    // wider by the width of this one.
+    if (ecb_unlikely(width > 0 && screen.cur.col > 0 &&
+                     !(screen.flags & Screen_WrapNext) &&
+                     screen.cur.col + width <= ncol &&
+                     (emoji_properties(c) & (EMOJI_REGIONAL | EMOJI_MODIFIER |
+                                             EMOJI_PICTOGRAPHIC)))) {
+      text_t *tp = line->t + screen.cur.col - 1;
+      rend_t *rp = line->r + screen.cur.col - 1;
+
+      while (*tp == NOCHAR && tp > line->t)
+        tp--, rp--;
+
+      bool join = emoji_join(*tp, c) && !((*rp ^ rstyle) & ~RS_fontMask);
+
+      if (join) {
+        line->touch();
+
+        *tp = rxvt_composite.compose(*tp, c, false);
+        *rp = SET_FONT(*rp, FONTSET(*rp)->find_font(*tp));
+
+        do {
+          line->t[screen.cur.col] = NOCHAR;
+          line->r[screen.cur.col] = *rp;
+
+          if (screen.cur.col < ncol - 1)
+            screen.cur.col++;
+          else {
+            line->l = ncol;
+            if (screen.flags & Screen_Autowrap)
+              screen.flags |= Screen_WrapNext;
+
+            goto joined;
+          }
+        } while (--width);
+
+        // pad with spaces when overwriting a wide character
+        for (int col = screen.cur.col; col < ncol && line->t[col] == NOCHAR;
+             col++) {
+          line->t[col] = ' ';
+          line->r[col] = *rp;
+        }
+
+      joined:
+        continue;
+      }
+    }
+#endif
+
+    if (width != 0) {
+#if !UNICODE_3
+      // trim characters we can't store directly :(
+      if (c >= 0x10000)
+#if ENABLE_COMBINING
+        c = rxvt_composite.compose(c); // map to lower 16 bits
+#else
+        c = 0xfffd;
+#endif
+#endif
+
+      rend_t rend = SET_FONT(rstyle, FONTSET(rstyle)->find_font(c));
+
+      // if the character doesn't fit into the remaining columns...
+      if (ecb_unlikely(screen.cur.col > ncol - width && ncol >= width)) {
+        if (screen.flags & Screen_Autowrap) {
+          // ... artificially enlargen the previous one
+          c = NOCHAR;
+          // and try the same character next loop iteration
+          --str;
+        } else
+          screen.cur.col = ncol - width;
+      }
+
+      // nuke the character at this position, if required
+      // due to wonderful coincidences everywhere else in this loop
+      // we never have to check for overwriting a wide char itself,
+      // only its tail.
+      if (ecb_unlikely(line->t[screen.cur.col] == NOCHAR))
+        scr_kill_char(*line, screen.cur.col);
+
+      line->touch();
+
+      do {
+        line->t[screen.cur.col] = c;
+        line->r[screen.cur.col] = rend;
+
+        if (ecb_likely(screen.cur.col < ncol - 1))
+          screen.cur.col++;
+        else {
+          line->l = ncol;
+          if (screen.flags & Screen_Autowrap)
+            screen.flags |= Screen_WrapNext;
+
+          goto end_of_line;
+        }
+
+        c = NOCHAR;
+      } while (ecb_unlikely(--width > 0));
+
+      // pad with spaces when overwriting wide character with smaller one
+      for (int c = screen.cur.col;
+           ecb_unlikely(c < ncol && line->t[c] == NOCHAR); c++) {
+        line->t[c] = ' ';
+        line->r[c] = rend;
+      }
+
+    end_of_line:;
+    }
+#if ENABLE_COMBINING
+    else // width == 0
+    {
+      if (c != 0xfeff) // ignore BOM
+      {
+        // handle combining characters
+        // we just tag the accent on the previous on-screen character.
+        // this is arguably not correct, but also arguably not wrong.
+        // we don't handle double-width characters nicely yet.
+        line_t *linep;
+        text_t *tp;
+        rend_t *rp;
+
+        if (screen.cur.col > 0) {
+          linep = line;
+          tp = line->t + screen.cur.col - 1;
+          rp = line->r + screen.cur.col - 1;
+        } else if (screen.cur.row > 0 && ROW(screen.cur.row - 1).is_longer()) {
+          linep = &ROW(screen.cur.row - 1);
+          tp = linep->t + ncol - 1;
+          rp = linep->r + ncol - 1;
+        } else
+          continue;
+
+        linep->touch();
+
+        while (*tp == NOCHAR && tp > linep->t)
+          tp--, rp--;
+
+        // first try to find a precomposed character
+        unicode_t n = rxvt_compose(*tp, c);
+        if (n == NOCHAR) {
+          // (readline repeats combining characters by mistake:
+          // dropped; emoji sequences and the kitty placeholders'
+          // row and column marks repeat them on purpose)
+          bool dedupe = true;
+#if ENABLE_EMOJI_SEQUENCES
+          dedupe = !emoji_join(*tp, c);
+#endif
+#if ENABLE_SIXEL
+          dedupe = dedupe && !is_kitty_placeholder(*tp);
+#endif
+          n = rxvt_composite.compose(*tp, c, dedupe);
+        }
+
+        *tp = n;
+        *rp = SET_FONT(*rp, FONTSET(*rp)->find_font(*tp));
+      }
+    }
+#endif
+  }
+
+  max_it(line->l, screen.cur.col);
+
+  assert(screen.cur.row >= 0);
 }
 
 #if ENABLE_SIXEL
@@ -1389,103 +1273,94 @@ end_of_line:
  * edge), scrolling as text would, and leave the cursor on the line below,
  * in the column the picture starts in.
  */
-void
-rxvt_term::scr_add_image (int slot, int cols, int rows, int cursor) noexcept
-{
+void rxvt_term::scr_add_image(int slot, int cols, int rows,
+                              int cursor) noexcept {
   row_col_t start = screen.cur;
 
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
   int col0 = screen.cur.col;
-  int width = min (cols, ncol - col0);
+  int width = min(cols, ncol - col0);
 
   screen.flags &= ~Screen_WrapNext;
 
-  for (int r = 0; r < rows; r++)
-    {
-      line_t &l = ROW (screen.cur.row);
+  for (int r = 0; r < rows; r++) {
+    line_t &l = ROW(screen.cur.row);
 
-      // wide characters the picture covers partly
-      if (col0 < ncol && l.t[col0] == NOCHAR)
-        scr_kill_char (l, col0);
-      if (col0 + width < ncol && l.t[col0 + width] == NOCHAR)
-        scr_kill_char (l, col0 + width);
+    // wide characters the picture covers partly
+    if (col0 < ncol && l.t[col0] == NOCHAR)
+      scr_kill_char(l, col0);
+    if (col0 + width < ncol && l.t[col0 + width] == NOCHAR)
+      scr_kill_char(l, col0 + width);
 
-      for (int c = 0; c < width; c++)
-        {
-          text_t code = IMAGE_TILE (slot, r, c);
-          l.t[col0 + c] = code;
-          l.r[col0 + c] = SET_FONT (rstyle & ~(RS_baseattrMask | RS_linkMask), FONTSET (rstyle)->find_font (code));
-        }
-
-      l.touch (col0 + width);
-
-      // the next line (after the last one too, unless the cursor stays on it)
-      if (r == rows - 1 && cursor != IMAGE_CURSOR_BELOW)
-        break;
-
-      if (screen.cur.row == screen.bscroll)
-        scr_scroll_text (screen.tscroll, screen.bscroll, 1);
-      else if (screen.cur.row < nrow - 1)
-        screen.cur.row++;
+    for (int c = 0; c < width; c++) {
+      text_t code = IMAGE_TILE(slot, r, c);
+      l.t[col0 + c] = code;
+      l.r[col0 + c] = SET_FONT(rstyle & ~(RS_baseattrMask | RS_linkMask),
+                               FONTSET(rstyle)->find_font(code));
     }
+
+    l.touch(col0 + width);
+
+    // the next line (after the last one too, unless the cursor stays on it)
+    if (r == rows - 1 && cursor != IMAGE_CURSOR_BELOW)
+      break;
+
+    if (screen.cur.row == screen.bscroll)
+      scr_scroll_text(screen.tscroll, screen.bscroll, 1);
+    else if (screen.cur.row < nrow - 1)
+      screen.cur.row++;
+  }
 
   if (cursor == IMAGE_CURSOR_BELOW)
     screen.cur.col = col0;
-  else if (cursor == IMAGE_CURSOR_AFTER)
-    {
-      // after the picture, on its last line (kitty)
-      screen.cur.col = col0 + width;
-      if (screen.cur.col >= ncol)
-        {
-          screen.cur.col = ncol - 1;
-          screen.flags |= Screen_WrapNext;
-        }
+  else if (cursor == IMAGE_CURSOR_AFTER) {
+    // after the picture, on its last line (kitty)
+    screen.cur.col = col0 + width;
+    if (screen.cur.col >= ncol) {
+      screen.cur.col = ncol - 1;
+      screen.flags |= Screen_WrapNext;
     }
-  else
-    {
-      // where it was, unless the picture scrolled the screen
-      int scrolled = start.row + rows - 1 - screen.cur.row;
-      screen.cur.row = max (start.row - scrolled, 0);
-      screen.cur.col = start.col;
-    }
+  } else {
+    // where it was, unless the picture scrolled the screen
+    int scrolled = start.row + rows - 1 - screen.cur.row;
+    screen.cur.row = max(start.row - scrolled, 0);
+    screen.cur.col = start.col;
+  }
 }
 
 /*
  * Replace the cells of pictures match () picks with blanks, on both
  * screens and in the scrollback.
  */
-void
-rxvt_term::scr_erase_images (bool (*match)(rxvt_term *, term_image *, void *), void *data)
-{
-  auto erase = [&](line_t &l)
-  {
-    if (!l.valid () || !l.t)
+void rxvt_term::scr_erase_images(bool (*match)(rxvt_term *, term_image *,
+                                               void *),
+                                 void *data) {
+  auto erase = [&](line_t &l) {
+    if (!l.valid() || !l.t)
       return;
 
     for (int col = 0; col < ncol; col++)
-      if (IS_IMAGE_TILE (l.t[col]))
-        {
-          term_image *img = images[IMAGE_TILE_SLOT (l.t[col])];
+      if (IS_IMAGE_TILE(l.t[col])) {
+        term_image *img = images[IMAGE_TILE_SLOT(l.t[col])];
 
-          if (!img || match (this, img, data))
-            {
-              l.t[col] = ' ';
-              l.r[col] = SET_FONT (l.r[col], FONTSET (l.r[col])->find_space_font ());
-              l.touch ();
-            }
+        if (!img || match(this, img, data)) {
+          l.t[col] = ' ';
+          l.r[col] = SET_FONT(l.r[col], FONTSET(l.r[col])->find_space_font());
+          l.touch();
         }
+      }
   };
 
   for (int row = top_row; row < nrow; row++)
-    erase (ROW (row));
+    erase(ROW(row));
 
   if (swap_buf)
     for (int row = 0; row < nrow; row++)
-      erase (swap_buf[row]);
+      erase(swap_buf[row]);
 
-  scr_touch (true);
+  scr_touch(true);
 }
 #endif
 
@@ -1494,25 +1369,20 @@ rxvt_term::scr_erase_images (bool (*match)(rxvt_term *, term_image *, void *), v
  * Process Backspace.  Move back the cursor back a position, wrap if have to
  * XTERM_SEQ: CTRL-H
  */
-void
-rxvt_term::scr_backspace () noexcept
-{
-  if (screen.cur.col == 0)
-    {
-      if (screen.cur.row > 0)
-        {
+void rxvt_term::scr_backspace() noexcept {
+  if (screen.cur.col == 0) {
+    if (screen.cur.row > 0) {
 #ifdef TERMCAP_HAS_BW
-          screen.cur.col = ncol - 1;
-          --screen.cur.row;
+      screen.cur.col = ncol - 1;
+      --screen.cur.row;
 
-          want_refresh = 1;
+      want_refresh = 1;
 #endif
-        }
     }
-  else if (screen.flags & Screen_WrapNext)
+  } else if (screen.flags & Screen_WrapNext)
     screen.flags &= ~Screen_WrapNext;
   else
-    scr_gotorc (0, -1, RELATIVE);
+    scr_gotorc(0, -1, RELATIVE);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1521,9 +1391,7 @@ rxvt_term::scr_backspace () noexcept
  * count: +ve = forward; -ve = backwards
  * XTERM_SEQ: CTRL-I
  */
-void
-rxvt_term::scr_tab (int count, bool ht) noexcept
-{
+void rxvt_term::scr_tab(int count, bool ht) noexcept {
   int i, x;
 
   want_refresh = 1;
@@ -1531,63 +1399,55 @@ rxvt_term::scr_tab (int count, bool ht) noexcept
 
   if (count == 0)
     return;
-  else if (count > 0)
-    {
-      line_t &l = ROW(screen.cur.row);
-      rend_t base_rend = l.r[i];
-      ht &= l.t[i] == ' ';
+  else if (count > 0) {
+    line_t &l = ROW(screen.cur.row);
+    rend_t base_rend = l.r[i];
+    ht &= l.t[i] == ' ';
 
-      for (; ++i < ncol; )
-        if (tabs[i])
-          {
-            x = i;
+    for (; ++i < ncol;)
+      if (tabs[i]) {
+        x = i;
 
-            if (!--count)
-              break;
-          }
-        else
-          ht &= l.t[i] == ' '
-                && RS_SAME (l.r[i], base_rend);
+        if (!--count)
+          break;
+      } else
+        ht &= l.t[i] == ' ' && RS_SAME(l.r[i], base_rend);
 
-      if (count)
-        x = ncol - 1;
+    if (count)
+      x = ncol - 1;
 
-      // store horizontal tab commands as characters inside the text
-      // buffer so they can be selected and pasted.
-      if (ht && option (Opt_pastableTabs))
-        {
-          base_rend = SET_FONT (base_rend, 0);
+    // store horizontal tab commands as characters inside the text
+    // buffer so they can be selected and pasted.
+    if (ht && option(Opt_pastableTabs)) {
+      base_rend = SET_FONT(base_rend, 0);
 
-          l.touch (x);
+      l.touch(x);
 
-          i = screen.cur.col;
+      i = screen.cur.col;
 
-          l.t[i] = '\t';
-          l.r[i] = base_rend;
+      l.t[i] = '\t';
+      l.r[i] = base_rend;
 
-          while (++i < x)
-            {
-              l.t[i] = NOCHAR;
-              l.r[i] = base_rend;
-            }
-        }
+      while (++i < x) {
+        l.t[i] = NOCHAR;
+        l.r[i] = base_rend;
+      }
     }
-  else /* if (count < 0) */
-    {
-      for (; --i >= 0; )
-        if (tabs[i])
-          {
-            x = i;
-            if (!++count)
-              break;
-          }
+  } else /* if (count < 0) */
+  {
+    for (; --i >= 0;)
+      if (tabs[i]) {
+        x = i;
+        if (!++count)
+          break;
+      }
 
-      if (count)
-        x = 0;
-    }
+    if (count)
+      x = 0;
+  }
 
   if (x != screen.cur.col)
-    scr_gotorc (0, x, R_RELATIVE);
+    scr_gotorc(0, x, R_RELATIVE);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1598,13 +1458,11 @@ rxvt_term::scr_tab (int count, bool ht) noexcept
  * in that row right.  Clear left column.
  */
 #if !ENABLE_MINIMAL
-void ecb_cold
-rxvt_term::scr_backindex () noexcept
-{
+void ecb_cold rxvt_term::scr_backindex() noexcept {
   if (screen.cur.col > 0)
-    scr_gotorc (0, -1, R_RELATIVE | C_RELATIVE);
+    scr_gotorc(0, -1, R_RELATIVE | C_RELATIVE);
   else
-    scr_insdel_chars (1, INSERT);
+    scr_insdel_chars(1, INSERT);
 }
 #endif
 /* ------------------------------------------------------------------------- */
@@ -1615,22 +1473,19 @@ rxvt_term::scr_backindex () noexcept
  * in that row left.  Clear right column.
  */
 #if !ENABLE_MINIMAL
-void ecb_cold
-rxvt_term::scr_forwardindex () noexcept
-{
+void ecb_cold rxvt_term::scr_forwardindex() noexcept {
   if (screen.cur.col < ncol - 1)
-    scr_gotorc (0, 1, R_RELATIVE | C_RELATIVE);
-  else
-    {
-      line_t &l = ROW(screen.cur.row);
+    scr_gotorc(0, 1, R_RELATIVE | C_RELATIVE);
+  else {
+    line_t &l = ROW(screen.cur.row);
 
-      l.touch ();
-      l.is_longer (0);
+    l.touch();
+    l.is_longer(0);
 
-      scr_gotorc (0, 0, R_RELATIVE);
-      scr_insdel_chars (1, DELETE);
-      scr_gotorc (0, ncol - 1, R_RELATIVE);
-    }
+    scr_gotorc(0, 0, R_RELATIVE);
+    scr_insdel_chars(1, DELETE);
+    scr_gotorc(0, ncol - 1, R_RELATIVE);
+  }
 }
 #endif
 
@@ -1638,71 +1493,59 @@ rxvt_term::scr_forwardindex () noexcept
 /*
  * Goto Row/Column
  */
-void
-rxvt_term::scr_gotorc (int row, int col, int relative) noexcept
-{
+void rxvt_term::scr_gotorc(int row, int col, int relative) noexcept {
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
   screen.cur.col = relative & C_RELATIVE ? screen.cur.col + col : col;
-  clamp_it (screen.cur.col, 0, ncol - 1);
+  clamp_it(screen.cur.col, 0, ncol - 1);
 
   screen.flags &= ~Screen_WrapNext;
 
-  if (relative & R_RELATIVE)
-    {
-      if (row > 0)
-        {
-          if (screen.cur.row <= screen.bscroll
-              && (screen.cur.row + row) > screen.bscroll)
-            screen.cur.row = screen.bscroll;
-          else
-            screen.cur.row += row;
-        }
-      else if (row < 0)
-        {
-          if (screen.cur.row >= screen.tscroll
-              && (screen.cur.row + row) < screen.tscroll)
-            screen.cur.row = screen.tscroll;
-          else
-            screen.cur.row += row;
-        }
-    }
-  else
-    {
-      if (screen.flags & Screen_Relative)
-        {
-          /* relative origin mode */
-          screen.cur.row = row + screen.tscroll;
-          min_it (screen.cur.row, screen.bscroll);
-        }
+  if (relative & R_RELATIVE) {
+    if (row > 0) {
+      if (screen.cur.row <= screen.bscroll &&
+          (screen.cur.row + row) > screen.bscroll)
+        screen.cur.row = screen.bscroll;
       else
-        screen.cur.row = row;
+        screen.cur.row += row;
+    } else if (row < 0) {
+      if (screen.cur.row >= screen.tscroll &&
+          (screen.cur.row + row) < screen.tscroll)
+        screen.cur.row = screen.tscroll;
+      else
+        screen.cur.row += row;
     }
+  } else {
+    if (screen.flags & Screen_Relative) {
+      /* relative origin mode */
+      screen.cur.row = row + screen.tscroll;
+      min_it(screen.cur.row, screen.bscroll);
+    } else
+      screen.cur.row = row;
+  }
 
-  clamp_it (screen.cur.row, 0, nrow - 1);
+  clamp_it(screen.cur.row, 0, nrow - 1);
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * direction should be UP or DN
  */
-void
-rxvt_term::scr_index (enum page_dirn direction) noexcept
-{
+void rxvt_term::scr_index(enum page_dirn direction) noexcept {
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
   screen.flags &= ~Screen_WrapNext;
 
-  if ((screen.cur.row == screen.bscroll && direction == UP)
-      || (screen.cur.row == screen.tscroll && direction == DN))
-    scr_scroll_text (screen.tscroll, screen.bscroll, direction);
+  if ((screen.cur.row == screen.bscroll && direction == UP) ||
+      (screen.cur.row == screen.tscroll && direction == DN))
+    scr_scroll_text(screen.tscroll, screen.bscroll, direction);
   else
     screen.cur.row += direction;
 
-  clamp_it (screen.cur.row, 0, nrow - 1);
-  selection_check (0);
+  clamp_it(screen.cur.row, 0, nrow - 1);
+  selection_check(0);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1713,61 +1556,58 @@ rxvt_term::scr_index (enum page_dirn direction) noexcept
  * XTERM_SEQ: Clear whole line   : ESC [ 2 K
  * extension: clear to right unless wrapped: ESC [ 3 K
  */
-void
-rxvt_term::scr_erase_line (int mode) noexcept
-{
+void rxvt_term::scr_erase_line(int mode) noexcept {
   unsigned int col, num;
 
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
-  selection_check (1);
+  selection_check(1);
 
   line_t &line = ROW(screen.cur.row);
 
-  line.touch ();
-  line.is_longer (0);
+  line.touch();
+  line.is_longer(0);
 
-  switch (mode)
-    {
-      case 3:
-        if (screen.flags & Screen_WrapNext)
-          return;
+  switch (mode) {
+  case 3:
+    if (screen.flags & Screen_WrapNext)
+      return;
 
-        /* fall through */
+    /* fall through */
 
-      case 0:                     /* erase to end of line */
-        col = screen.cur.col;
-        num = ncol - col;
-        min_it (line.l, col);
+  case 0: /* erase to end of line */
+    col = screen.cur.col;
+    num = ncol - col;
+    min_it(line.l, col);
 
-        if (ROWCOL_IN_ROW_AT_OR_AFTER (selection.beg, screen.cur)
-            || ROWCOL_IN_ROW_AT_OR_AFTER (selection.end, screen.cur))
-          CLEAR_SELECTION ();
-        break;
+    if (ROWCOL_IN_ROW_AT_OR_AFTER(selection.beg, screen.cur) ||
+        ROWCOL_IN_ROW_AT_OR_AFTER(selection.end, screen.cur))
+      CLEAR_SELECTION();
+    break;
 
-      case 1:                     /* erase to beginning of line */
-        col = 0;
-        num = screen.cur.col + 1;
+  case 1: /* erase to beginning of line */
+    col = 0;
+    num = screen.cur.col + 1;
 
-        if (ROWCOL_IN_ROW_AT_OR_BEFORE (selection.beg, screen.cur)
-            || ROWCOL_IN_ROW_AT_OR_BEFORE (selection.end, screen.cur))
-          CLEAR_SELECTION ();
-        break;
+    if (ROWCOL_IN_ROW_AT_OR_BEFORE(selection.beg, screen.cur) ||
+        ROWCOL_IN_ROW_AT_OR_BEFORE(selection.end, screen.cur))
+      CLEAR_SELECTION();
+    break;
 
-      case 2:                     /* erase whole line */
-        col = 0;
-        num = ncol;
-        line.l = 0;
-        if (selection.beg.row <= screen.cur.row
-            && selection.end.row >= screen.cur.row)
-          CLEAR_SELECTION ();
-        break;
-      default:
-        return;
-    }
+  case 2: /* erase whole line */
+    col = 0;
+    num = ncol;
+    line.l = 0;
+    if (selection.beg.row <= screen.cur.row &&
+        selection.end.row >= screen.cur.row)
+      CLEAR_SELECTION();
+    break;
+  default:
+    return;
+  }
 
-  scr_blank_line (line, col, num, rstyle);
+  scr_blank_line(line, col, num, rstyle);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1777,9 +1617,7 @@ rxvt_term::scr_erase_line (int mode) noexcept
  * XTERM_SEQ: Clear screen before cursor: ESC [ 1 J
  * XTERM_SEQ: Clear whole screen        : ESC [ 2 J
  */
-void
-rxvt_term::scr_erase_screen (int mode) noexcept
-{
+void rxvt_term::scr_erase_screen(int mode) noexcept {
   erased++; // (24-bit colour slots may be free again)
   int num;
   int32_t row;
@@ -1787,83 +1625,72 @@ rxvt_term::scr_erase_screen (int mode) noexcept
   XGCValues gcvalue;
 
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
-  switch (mode)
-    {
-      case 0:                     /* erase to end of screen */
-        scr_erase_line (0);
-        row = screen.cur.row + 1;    /* possible OOB */
-        num = nrow - row;
-        break;
-      case 1:                     /* erase to beginning of screen */
-        scr_erase_line (1);
-        row = 0;
-        num = screen.cur.row;
-        break;
-      case 2:                     /* erase whole screen */
-        row = 0;
-        num = nrow;
-        break;
-      default:
-        return;
-    }
+  switch (mode) {
+  case 0: /* erase to end of screen */
+    scr_erase_line(0);
+    row = screen.cur.row + 1; /* possible OOB */
+    num = nrow - row;
+    break;
+  case 1: /* erase to beginning of screen */
+    scr_erase_line(1);
+    row = 0;
+    num = screen.cur.row;
+    break;
+  case 2: /* erase whole screen */
+    row = 0;
+    num = nrow;
+    break;
+  default:
+    return;
+  }
 
-  if (selection.op && current_screen == selection.screen
-      && ((selection.beg.row >= row && selection.beg.row <= row + num)
-          || (selection.end.row >= row
-              && selection.end.row <= row + num)))
-    CLEAR_SELECTION ();
+  if (selection.op && current_screen == selection.screen &&
+      ((selection.beg.row >= row && selection.beg.row <= row + num) ||
+       (selection.end.row >= row && selection.end.row <= row + num)))
+    CLEAR_SELECTION();
 
   if (row >= nrow) /* Out Of Bounds */
     return;
 
-  min_it (num, nrow - row);
+  min_it(num, nrow - row);
 
   if (rstyle & (RS_Blink | RS_RVid | RS_Uline))
-    ren = (rend_t) ~RS_None;
-  else if (GET_BASEBG (rstyle) == Color_bg)
-    {
-      ren = DEFAULT_RSTYLE;
+    ren = (rend_t)~RS_None;
+  else if (GET_BASEBG(rstyle) == Color_bg) {
+    ren = DEFAULT_RSTYLE;
 
-      if (mapped)
-        XClearArea (dpy, vt, 0,
-                    Row2Pixel (row - view_start), (unsigned int)vt_width,
-                    (unsigned int)Height2Pixel (num), False);
+    if (mapped)
+      XClearArea(dpy, vt, 0, Row2Pixel(row - view_start),
+                 (unsigned int)vt_width, (unsigned int)Height2Pixel(num),
+                 False);
+  } else {
+    ren = rstyle & (RS_fgMask | RS_bgMask);
+
+    if (mapped) {
+      gcvalue.foreground = pix_colors[bgcolor_of(rstyle)];
+      XChangeGC(dpy, gc, GCForeground, &gcvalue);
+      XFillRectangle(dpy, vt, gc, 0, Row2Pixel(row - view_start),
+                     (unsigned int)vt_width, (unsigned int)Height2Pixel(num));
+      gcvalue.foreground = pix_colors[Color_fg];
+      XChangeGC(dpy, gc, GCForeground, &gcvalue);
     }
-  else
-    {
-      ren = rstyle & (RS_fgMask | RS_bgMask);
+  }
 
-      if (mapped)
-        {
-          gcvalue.foreground = pix_colors[bgcolor_of (rstyle)];
-          XChangeGC (dpy, gc, GCForeground, &gcvalue);
-          XFillRectangle (dpy, vt, gc,
-                          0, Row2Pixel (row - view_start),
-                          (unsigned int)vt_width,
-                          (unsigned int)Height2Pixel (num));
-          gcvalue.foreground = pix_colors[Color_fg];
-          XChangeGC (dpy, gc, GCForeground, &gcvalue);
-        }
-    }
+  for (; num--; row++) {
+    scr_blank_screen_mem(ROW(row), rstyle);
 
-  for (; num--; row++)
-    {
-      scr_blank_screen_mem (ROW(row), rstyle);
-
-      if (row - view_start < nrow)
-        scr_blank_line (drawn_buf [row - view_start], 0, ncol, ren);
-    }
+    if (row - view_start < nrow)
+      scr_blank_line(drawn_buf[row - view_start], 0, ncol, ren);
+  }
 }
 
 #if !ENABLE_MINIMAL
-void
-rxvt_term::scr_erase_savelines () noexcept
-{
+void rxvt_term::scr_erase_savelines() noexcept {
   erased++;
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
   top_row = 0;
 }
@@ -1874,173 +1701,160 @@ rxvt_term::scr_erase_savelines () noexcept
  * Fill the screen with `E's
  * XTERM_SEQ: Screen Alignment Test: ESC # 8
  */
-void ecb_cold
-rxvt_term::scr_E () noexcept
-{
+void ecb_cold rxvt_term::scr_E() noexcept {
   rend_t fs;
 
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
   num_scr_allow = 0;
 
   row_col_t pos;
   pos.row = pos.col = 0;
-  if (ROWCOL_IS_AFTER (selection.end, pos))
-    CLEAR_SELECTION ();
+  if (ROWCOL_IS_AFTER(selection.end, pos))
+    CLEAR_SELECTION();
 
-  fs = SET_FONT (rstyle, FONTSET (rstyle)->find_font ('E'));
-  for (int row = nrow; row--; )
-    {
-      line_t &line = ROW(row);
+  fs = SET_FONT(rstyle, FONTSET(rstyle)->find_font('E'));
+  for (int row = nrow; row--;) {
+    line_t &line = ROW(row);
 
-      fill_text (line.t, 'E', ncol);
-      rend_t *r1 = line.r;
+    fill_text(line.t, 'E', ncol);
+    rend_t *r1 = line.r;
 
-      for (int j = ncol; j--; )
-        *r1++ = fs;
+    for (int j = ncol; j--;)
+      *r1++ = fs;
 
-      line.is_longer (0);
-      line.touch (ncol);
-    }
+    line.is_longer(0);
+    line.touch(ncol);
+  }
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * Insert/Delete <count> lines
  */
-void
-rxvt_term::scr_insdel_lines (int count, int insdel) noexcept
-{
+void rxvt_term::scr_insdel_lines(int count, int insdel) noexcept {
   int end;
 
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
-  selection_check (1);
+  selection_check(1);
 
   if (screen.cur.row > screen.bscroll)
     return;
 
   end = screen.bscroll - screen.cur.row + 1;
-  if (count > end)
-    {
-      if (insdel == DELETE)
-        return;
-      else if (insdel == INSERT)
-        count = end;
-    }
+  if (count > end) {
+    if (insdel == DELETE)
+      return;
+    else if (insdel == INSERT)
+      count = end;
+  }
 
-  scr_do_wrap ();
+  scr_do_wrap();
 
-  scr_scroll_text (screen.cur.row, screen.bscroll, insdel * count);
+  scr_scroll_text(screen.cur.row, screen.bscroll, insdel * count);
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * Insert/Delete <count> characters from the current position
  */
-void
-rxvt_term::scr_insdel_chars (int count, int insdel) noexcept
-{
+void rxvt_term::scr_insdel_chars(int count, int insdel) noexcept {
   want_refresh = 1;
-  ZERO_SCROLLBACK ();
+  ZERO_SCROLLBACK();
 
   if (count <= 0)
     return;
 
-  scr_do_wrap ();
+  scr_do_wrap();
 
-  selection_check (1);
-  min_it (count, ncol - screen.cur.col);
+  selection_check(1);
+  min_it(count, ncol - screen.cur.col);
 
   int row = screen.cur.row;
 
   line_t *line = &ROW(row);
 
-  line->touch ();
-  line->is_longer (0);
+  line->touch();
+  line->is_longer(0);
 
   // nuke wide spanning the start
   if (line->t[screen.cur.col] == NOCHAR)
-    scr_kill_char (*line, screen.cur.col);
+    scr_kill_char(*line, screen.cur.col);
 
-  switch (insdel)
-    {
-      case INSERT:
-        line->l = min (line->l + count, ncol);
+  switch (insdel) {
+  case INSERT:
+    line->l = min(line->l + count, ncol);
 
-        if (line->t[screen.cur.col] == NOCHAR)
-          scr_kill_char (*line, screen.cur.col);
+    if (line->t[screen.cur.col] == NOCHAR)
+      scr_kill_char(*line, screen.cur.col);
 
-        for (int col = ncol - 1; (col - count) >= screen.cur.col; col--)
-          {
-            line->t[col] = line->t[col - count];
-            line->r[col] = line->r[col - count];
-          }
-
-        if (selection.op && current_screen == selection.screen
-            && ROWCOL_IN_ROW_AT_OR_AFTER (selection.beg, screen.cur))
-          {
-            if (selection.end.row != screen.cur.row
-                || (selection.end.col + count >= ncol))
-              CLEAR_SELECTION ();
-            else
-              {
-                /* shift selection */
-                selection.beg.col  += count;
-                selection.mark.col += count; /* XXX: yes? */
-                selection.end.col  += count;
-              }
-          }
-
-        scr_blank_line (*line, screen.cur.col, count, rstyle);
-        break;
-
-      case ERASE:
-        screen.cur.col += count;     /* don't worry if > ncol */
-        selection_check (1);
-        screen.cur.col -= count;
-
-        // nuke wide char after the end
-        if (screen.cur.col + count < ncol && line->t[screen.cur.col + count] == NOCHAR)
-          scr_kill_char (*line, screen.cur.col + count);
-
-        scr_blank_line (*line, screen.cur.col, count, rstyle);
-        break;
-
-      case DELETE:
-        line->l = max (line->l - count, 0);
-
-        // nuke wide char spanning the end
-        if (screen.cur.col + count < ncol && line->t[screen.cur.col + count] == NOCHAR)
-          scr_kill_char (*line, screen.cur.col + count);
-
-        for (int col = screen.cur.col; (col + count) < ncol; col++)
-          {
-            line->t[col] = line->t[col + count];
-            line->r[col] = line->r[col + count];
-          }
-
-        scr_blank_line (*line, ncol - count, count, rstyle);
-
-        if (selection.op && current_screen == selection.screen
-            && ROWCOL_IN_ROW_AT_OR_AFTER (selection.beg, screen.cur))
-          {
-            if (selection.end.row != screen.cur.row
-                || (screen.cur.col >= selection.beg.col - count)
-                || selection.end.col >= ncol)
-              CLEAR_SELECTION ();
-            else
-              {
-                /* shift selection */
-                selection.beg.col  -= count;
-                selection.mark.col -= count; /* XXX: yes? */
-                selection.end.col  -= count;
-              }
-          }
-
-        break;
+    for (int col = ncol - 1; (col - count) >= screen.cur.col; col--) {
+      line->t[col] = line->t[col - count];
+      line->r[col] = line->r[col - count];
     }
+
+    if (selection.op && current_screen == selection.screen &&
+        ROWCOL_IN_ROW_AT_OR_AFTER(selection.beg, screen.cur)) {
+      if (selection.end.row != screen.cur.row ||
+          (selection.end.col + count >= ncol))
+        CLEAR_SELECTION();
+      else {
+        /* shift selection */
+        selection.beg.col += count;
+        selection.mark.col += count; /* XXX: yes? */
+        selection.end.col += count;
+      }
+    }
+
+    scr_blank_line(*line, screen.cur.col, count, rstyle);
+    break;
+
+  case ERASE:
+    screen.cur.col += count; /* don't worry if > ncol */
+    selection_check(1);
+    screen.cur.col -= count;
+
+    // nuke wide char after the end
+    if (screen.cur.col + count < ncol &&
+        line->t[screen.cur.col + count] == NOCHAR)
+      scr_kill_char(*line, screen.cur.col + count);
+
+    scr_blank_line(*line, screen.cur.col, count, rstyle);
+    break;
+
+  case DELETE:
+    line->l = max(line->l - count, 0);
+
+    // nuke wide char spanning the end
+    if (screen.cur.col + count < ncol &&
+        line->t[screen.cur.col + count] == NOCHAR)
+      scr_kill_char(*line, screen.cur.col + count);
+
+    for (int col = screen.cur.col; (col + count) < ncol; col++) {
+      line->t[col] = line->t[col + count];
+      line->r[col] = line->r[col + count];
+    }
+
+    scr_blank_line(*line, ncol - count, count, rstyle);
+
+    if (selection.op && current_screen == selection.screen &&
+        ROWCOL_IN_ROW_AT_OR_AFTER(selection.beg, screen.cur)) {
+      if (selection.end.row != screen.cur.row ||
+          (screen.cur.col >= selection.beg.col - count) ||
+          selection.end.col >= ncol)
+        CLEAR_SELECTION();
+      else {
+        /* shift selection */
+        selection.beg.col -= count;
+        selection.mark.col -= count; /* XXX: yes? */
+        selection.end.col -= count;
+      }
+    }
+
+    break;
+  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2048,18 +1862,16 @@ rxvt_term::scr_insdel_chars (int count, int insdel) noexcept
  * Set the scrolling region
  * XTERM_SEQ: Set region <top> - <bot> inclusive: ESC [ <top> ; <bot> r
  */
-void ecb_cold
-rxvt_term::scr_scroll_region (int top, int bot) noexcept
-{
-  max_it (top, 0);
-  min_it (bot, nrow - 1);
+void ecb_cold rxvt_term::scr_scroll_region(int top, int bot) noexcept {
+  max_it(top, 0);
+  min_it(bot, nrow - 1);
 
   if (top > bot)
     return;
 
   screen.tscroll = top;
   screen.bscroll = bot;
-  scr_gotorc (0, 0, 0);
+  scr_gotorc(0, 0, 0);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2068,9 +1880,7 @@ rxvt_term::scr_scroll_region (int top, int bot) noexcept
  * XTERM_SEQ: Make cursor visible  : ESC [ ? 25 h
  * XTERM_SEQ: Make cursor invisible: ESC [ ? 25 l
  */
-void ecb_cold
-rxvt_term::scr_cursor_visible (int mode) noexcept
-{
+void ecb_cold rxvt_term::scr_cursor_visible(int mode) noexcept {
   want_refresh = 1;
 
   if (mode)
@@ -2085,9 +1895,7 @@ rxvt_term::scr_cursor_visible (int mode) noexcept
  * XTERM_SEQ: Set Wraparound  : ESC [ ? 7 h
  * XTERM_SEQ: Unset Wraparound: ESC [ ? 7 l
  */
-void ecb_cold
-rxvt_term::scr_autowrap (int mode) noexcept
-{
+void ecb_cold rxvt_term::scr_autowrap(int mode) noexcept {
   if (mode)
     screen.flags |= Screen_Autowrap;
   else
@@ -2104,15 +1912,13 @@ rxvt_term::scr_autowrap (int mode) noexcept
  * XTERM_SEQ: Set Absolute: ESC [ ? 6 h
  * XTERM_SEQ: Set Relative: ESC [ ? 6 l
  */
-void ecb_cold
-rxvt_term::scr_relative_origin (int mode) noexcept
-{
+void ecb_cold rxvt_term::scr_relative_origin(int mode) noexcept {
   if (mode)
     screen.flags |= Screen_Relative;
   else
     screen.flags &= ~Screen_Relative;
 
-  scr_gotorc (0, 0, 0);
+  scr_gotorc(0, 0, 0);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2121,9 +1927,7 @@ rxvt_term::scr_relative_origin (int mode) noexcept
  * XTERM_SEQ: Set Insert mode : ESC [ ? 4 h
  * XTERM_SEQ: Set Replace mode: ESC [ ? 4 l
  */
-void ecb_cold
-rxvt_term::scr_insert_mode (int mode) noexcept
-{
+void ecb_cold rxvt_term::scr_insert_mode(int mode) noexcept {
   if (mode)
     screen.flags |= Screen_Insert;
   else
@@ -2137,13 +1941,11 @@ rxvt_term::scr_insert_mode (int mode) noexcept
  * XTERM_SEQ: Clear tab at current column: ESC [ 0 g
  * XTERM_SEQ: Clear all tabs             : ESC [ 3 g
  */
-void ecb_cold
-rxvt_term::scr_set_tab (int mode) noexcept
-{
+void ecb_cold rxvt_term::scr_set_tab(int mode) noexcept {
   if (mode < 0)
-    memset (tabs, 0, ncol);
+    memset(tabs, 0, ncol);
   else if (screen.cur.col < ncol)
-    tabs [screen.cur.col] = !!mode;
+    tabs[screen.cur.col] = !!mode;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2152,41 +1954,36 @@ rxvt_term::scr_set_tab (int mode) noexcept
  * XTERM_SEQ: Reverse video: ESC [ ? 5 h
  * XTERM_SEQ: Normal video : ESC [ ? 5 l
  */
-void
-rxvt_term::scr_rvideo_mode (bool on) noexcept
-{
+void rxvt_term::scr_rvideo_mode(bool on) noexcept {
   rvideo_mode = on;
 
 #ifndef NO_BELL
   on ^= rvideo_bell;
 #endif
 
-  if (rvideo_state != on)
-    {
-      rvideo_state = on;
+  if (rvideo_state != on) {
+    rvideo_state = on;
 
 #if OFF_FOCUS_FADING
-      if (rs[Rs_fade])
-        {
-          ::swap (pix_colors_focused[Color_fg], pix_colors_focused[Color_bg]);
-          ::swap (pix_colors_unfocused[Color_fg], pix_colors_unfocused[Color_bg]);
-        }
-      else
+    if (rs[Rs_fade]) {
+      ::swap(pix_colors_focused[Color_fg], pix_colors_focused[Color_bg]);
+      ::swap(pix_colors_unfocused[Color_fg], pix_colors_unfocused[Color_bg]);
+    } else
 #endif
-      ::swap (pix_colors[Color_fg], pix_colors[Color_bg]);
+      ::swap(pix_colors[Color_fg], pix_colors[Color_bg]);
 #ifdef HAVE_IMG
-      if (bg_img == 0)
+    if (bg_img == 0)
 #endif
-          XSetWindowBackground (dpy, vt, pix_colors[Color_bg]);
+      XSetWindowBackground(dpy, vt, pix_colors[Color_bg]);
 
-      XGCValues gcvalue;
-      gcvalue.foreground = pix_colors[Color_fg];
-      gcvalue.background = pix_colors[Color_bg];
-      XChangeGC (dpy, gc, GCBackground | GCForeground, &gcvalue);
+    XGCValues gcvalue;
+    gcvalue.foreground = pix_colors[Color_fg];
+    gcvalue.background = pix_colors[Color_bg];
+    XChangeGC(dpy, gc, GCBackground | GCForeground, &gcvalue);
 
-      scr_clear ();
-      scr_touch (true);
-    }
+    scr_clear();
+    scr_touch(true);
+  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2194,12 +1991,10 @@ rxvt_term::scr_rvideo_mode (bool on) noexcept
  * Report current cursor position
  * XTERM_SEQ: Report position: ESC [ 6 n
  */
-void ecb_cold
-rxvt_term::scr_report_position () noexcept
-{
-  tt_printf ("\033[%d;%dR", screen.cur.row + 1, screen.cur.col + 1);
+void ecb_cold rxvt_term::scr_report_position() noexcept {
+  tt_printf("\033[%d;%dR", screen.cur.row + 1, screen.cur.col + 1);
 }
-
+
 /* ------------------------------------------------------------------------- *
  *                                  FONTS                                    *
  * ------------------------------------------------------------------------- */
@@ -2207,9 +2002,7 @@ rxvt_term::scr_report_position () noexcept
 /*
  * Set font style
  */
-void ecb_cold
-rxvt_term::set_font_style () noexcept
-{
+void ecb_cold rxvt_term::set_font_style() noexcept {
 #if 0
   switch (charsets [screen.charset])
     {
@@ -2239,11 +2032,9 @@ rxvt_term::set_font_style () noexcept
  * XTERM_SEQ: Invoke G2 character set: ESC N
  * XTERM_SEQ: Invoke G3 character set: ESC O
  */
-void ecb_cold
-rxvt_term::scr_charset_choose (int set) noexcept
-{
+void ecb_cold rxvt_term::scr_charset_choose(int set) noexcept {
   screen.charset = set;
-  set_font_style ();
+  set_font_style();
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2255,14 +2046,11 @@ rxvt_term::scr_charset_choose (int set) noexcept
  * XTERM_SEQ: Set G3 character set: ESC + <C>
  * See set_font_style for possible values for <C>
  */
-void
-rxvt_term::scr_charset_set (int set, unsigned int ch) noexcept
-{
+void rxvt_term::scr_charset_set(int set, unsigned int ch) noexcept {
   charsets[set] = (unsigned char)ch;
-  set_font_style ();
+  set_font_style();
 }
 
-
 /* ------------------------------------------------------------------------- *
  *                        MAJOR SCREEN MANIPULATION                          *
  * ------------------------------------------------------------------------- */
@@ -2270,22 +2058,18 @@ rxvt_term::scr_charset_set (int set, unsigned int ch) noexcept
 /*
  * refresh matching text.
  */
-bool ecb_cold
-rxvt_term::scr_refresh_rend (rend_t mask, rend_t value) noexcept
-{
+bool ecb_cold rxvt_term::scr_refresh_rend(rend_t mask, rend_t value) noexcept {
   bool found = false;
 
-  for (int i = 0; i < nrow; i++)
-    {
-      rend_t *drp = drawn_buf[i].r;
+  for (int i = 0; i < nrow; i++) {
+    rend_t *drp = drawn_buf[i].r;
 
-      for (int col = 0; col < ncol; col++, drp++)
-        if ((*drp & mask) == value)
-          {
-            found = true;
-            *drp = ~value;
-          }
-    }
+    for (int col = 0; col < ncol; col++, drp++)
+      if ((*drp & mask) == value) {
+        found = true;
+        *drp = ~value;
+      }
+  }
 
   return found;
 }
@@ -2293,60 +2077,52 @@ rxvt_term::scr_refresh_rend (rend_t mask, rend_t value) noexcept
 /*
  * Refresh an area
  */
-enum {
-  PART_BEG = 0,
-  PART_END,
-  RC_COUNT
-};
+enum { PART_BEG = 0, PART_END, RC_COUNT };
 
-void ecb_hot
-rxvt_term::scr_expose (int x, int y, int ewidth, int eheight, bool refresh) noexcept
-{
+void ecb_hot rxvt_term::scr_expose(int x, int y, int ewidth, int eheight,
+                                   bool refresh) noexcept {
   int i;
   row_col_t rc[RC_COUNT];
 
-  if (!drawn_buf)  /* sanity check */
+  if (!drawn_buf) /* sanity check */
     return;
 
 #ifndef NO_SLOW_LINK_SUPPORT
-  if (refresh_type == FAST_REFRESH && !display->is_local)
-    {
-      y = 0;
-      eheight = height;
-    }
+  if (refresh_type == FAST_REFRESH && !display->is_local) {
+    y = 0;
+    eheight = height;
+  }
 #endif
 
   /* round down */
-  rc[PART_BEG].col = Pixel2Col (x);
-  rc[PART_BEG].row = Pixel2Row (y);
+  rc[PART_BEG].col = Pixel2Col(x);
+  rc[PART_BEG].row = Pixel2Row(y);
   /* round up */
-  rc[PART_END].col = Pixel2Width (x + ewidth  + fwidth  - 1);
-  rc[PART_END].row = Pixel2Row   (y + eheight + fheight - 1);
+  rc[PART_END].col = Pixel2Width(x + ewidth + fwidth - 1);
+  rc[PART_END].row = Pixel2Row(y + eheight + fheight - 1);
 
   /* sanity checks */
-  for (i = PART_BEG; i < RC_COUNT; i++)
-    {
-      min_it (rc[i].col, ncol - 1);
-      min_it (rc[i].row, nrow - 1);
-    }
+  for (i = PART_BEG; i < RC_COUNT; i++) {
+    min_it(rc[i].col, ncol - 1);
+    min_it(rc[i].row, nrow - 1);
+  }
 
   for (i = rc[PART_BEG].row; i <= rc[PART_END].row; i++)
-    fill_text (&drawn_buf[i].t[rc[PART_BEG].col], 0, rc[PART_END].col - rc[PART_BEG].col + 1);
+    fill_text(&drawn_buf[i].t[rc[PART_BEG].col], 0,
+              rc[PART_END].col - rc[PART_BEG].col + 1);
 
   num_scr_allow = 0;
 
   if (refresh)
-    scr_refresh ();
+    scr_refresh();
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * Refresh the entire screen
  */
-void
-rxvt_term::scr_touch (bool refresh) noexcept
-{
-  scr_expose (0, 0, vt_width, vt_height, refresh);
+void rxvt_term::scr_touch(bool refresh) noexcept {
+  scr_expose(0, 0, vt_width, vt_height, refresh);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2354,11 +2130,9 @@ rxvt_term::scr_touch (bool refresh) noexcept
  * Move the display so that the line represented by scrollbar value Y is at
  * the top of the screen
  */
-void
-rxvt_term::scr_move_to (int y, int len) noexcept
-{
+void rxvt_term::scr_move_to(int y, int len) noexcept {
   // lerp (y, 0, len, top_row, nrow - 1)
-  scr_changeview (top_row + (nrow - 1 - top_row) * y / len);
+  scr_changeview(top_row + (nrow - 1 - top_row) * y / len);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2366,16 +2140,12 @@ rxvt_term::scr_move_to (int y, int len) noexcept
  * Page the screen up/down nlines
  * direction should be UP or DN
  */
-bool
-rxvt_term::scr_page (int nlines) noexcept
-{
-  return scr_changeview (view_start - nlines);
+bool rxvt_term::scr_page(int nlines) noexcept {
+  return scr_changeview(view_start - nlines);
 }
 
-bool
-rxvt_term::scr_changeview (int new_view_start) noexcept
-{
-  clamp_it (new_view_start, top_row, 0);
+bool rxvt_term::scr_changeview(int new_view_start) noexcept {
+  clamp_it(new_view_start, top_row, 0);
 
   if (new_view_start == view_start)
     return false;
@@ -2384,104 +2154,91 @@ rxvt_term::scr_changeview (int new_view_start) noexcept
   view_start = new_view_start;
   want_refresh = 1;
 
-  HOOK_INVOKE ((this, HOOK_VIEW_CHANGE, DT_INT, view_start, DT_END));
+  HOOK_INVOKE((this, HOOK_VIEW_CHANGE, DT_INT, view_start, DT_END));
 
   return true;
 }
 
 #ifndef NO_BELL
-void
-rxvt_term::bell_cb (ev::timer &w, int revents)
-{
+void rxvt_term::bell_cb(ev::timer &w, int revents) {
   rvideo_bell = false;
-  scr_rvideo_mode (rvideo_mode);
-  refresh_check ();
+  scr_rvideo_mode(rvideo_mode);
+  refresh_check();
 }
 #endif
 
 /* ------------------------------------------------------------------------- */
-void
-rxvt_term::scr_bell () noexcept
-{
+void rxvt_term::scr_bell() noexcept {
 #ifndef NO_BELL
 
-# ifndef NO_MAPALERT
-#  ifdef MAPALERT_OPTION
-  if (option (Opt_mapAlert))
-#  endif
-    XMapWindow (dpy, parent);
-# endif
+#ifndef NO_MAPALERT
+#ifdef MAPALERT_OPTION
+  if (option(Opt_mapAlert))
+#endif
+    XMapWindow(dpy, parent);
+#endif
 
-# if ENABLE_FRILLS
-  if (option (Opt_urgentOnBell))
-    set_urgency (1);
-# endif
+#if ENABLE_FRILLS
+  if (option(Opt_urgentOnBell))
+    set_urgency(1);
+#endif
 
-  if (option (Opt_visualBell))
-    {
-      rvideo_bell = true;
-      scr_rvideo_mode (rvideo_mode);
-      flush ();
+  if (option(Opt_visualBell)) {
+    rvideo_bell = true;
+    scr_rvideo_mode(rvideo_mode);
+    flush();
 
-      bell_ev.start (VISUAL_BELL_DURATION);
-    }
-  else
-    XBell (dpy, 0);
-  HOOK_INVOKE ((this, HOOK_BELL, DT_END));
+    bell_ev.start(VISUAL_BELL_DURATION);
+  } else
+    XBell(dpy, 0);
+  HOOK_INVOKE((this, HOOK_BELL, DT_END));
 #endif
 }
 
 /* ------------------------------------------------------------------------- */
-void ecb_cold
-rxvt_term::scr_printscreen (int fullhist) noexcept
-{
+void ecb_cold rxvt_term::scr_printscreen(int fullhist) noexcept {
 #ifdef PRINTPIPE
   int nrows, row_start;
-  FILE *fd = popen_printer ();
+  FILE *fd = popen_printer();
 
   if (!fd)
     return;
 
-  if (fullhist)
+  if (fullhist) {
+    nrows = nrow - top_row;
+    row_start = top_row;
+  } else {
+    nrows = nrow;
+    row_start = view_start;
+  }
+
+  wctomb(0, 0);
+
+  for (int r1 = row_start; r1 < row_start + nrows; r1++) {
+    text_t *tp = ROW(r1).t;
+    int len = ROW(r1).l;
+
+    for (int i = len >= 0 ? len : ncol - 1; i--;) // TODO//FIXME//LEN
     {
-      nrows = nrow - top_row;
-      row_start = top_row;
-    }
-  else
-    {
-      nrows = nrow;
-      row_start = view_start;
-    }
+      char mb[MB_LEN_MAX];
+      text_t t = *tp++;
+      if (t == NOCHAR)
+        continue;
 
-  wctomb (0, 0);
+      len = wctomb(mb, t);
 
-  for (int r1 = row_start; r1 < row_start + nrows; r1++)
-    {
-      text_t *tp = ROW(r1).t;
-      int len    = ROW(r1).l;
+      if (len <= 0) {
+        mb[0] = ' ';
+        len = 1;
+      }
 
-      for (int i = len >= 0 ? len : ncol - 1; i--; ) //TODO//FIXME//LEN
-        {
-          char mb[MB_LEN_MAX];
-          text_t t = *tp++;
-          if (t == NOCHAR)
-            continue;
-
-          len = wctomb (mb, t);
-
-          if (len <= 0)
-            {
-              mb[0] = ' ';
-              len = 1;
-            }
-
-          fwrite (mb, 1, len, fd);
-        }
-
-      fputc ('\n', fd);
+      fwrite(mb, 1, len, fd);
     }
 
-  pclose_printer (fd);
+    fputc('\n', fd);
+  }
+
+  pclose_printer(fd);
 #endif
 }
 
@@ -2491,19 +2248,17 @@ rxvt_term::scr_printscreen (int fullhist) noexcept
  * drawn_text/drawn_rend contain the screen information before the update.
  * screen.text/screen.rend contain what the screen will change to.
  */
-void ecb_hot
-rxvt_term::scr_refresh () noexcept
-{
-  int16_t col, row,   /* column/row we're processing               */
-          ocrow;      /* old cursor row                            */
-  int i;              /* tmp                                       */
-  rend_t ccol1,  /* Cursor colour       */
-         ccol2;  /* Cursor colour2      */
+void ecb_hot rxvt_term::scr_refresh() noexcept {
+  int16_t col, row, /* column/row we're processing               */
+      ocrow;        /* old cursor row                            */
+  int i;            /* tmp                                       */
+  rend_t ccol1,     /* Cursor colour       */
+      ccol2;        /* Cursor colour2      */
   rend_t cur_rend;
   int cur_col;
   int cursorwidth;
 
-  want_refresh = 0;        /* screen is current */
+  want_refresh = 0; /* screen is current */
 
   if (refresh_type == NO_REFRESH || !mapped)
     return;
@@ -2523,11 +2278,11 @@ rxvt_term::scr_refresh () noexcept
   /*
    * B: reverse any characters which are selected
    */
-  scr_reverse_selection ();
+  scr_reverse_selection();
 
-  HOOK_INVOKE ((this, HOOK_REFRESH_BEGIN, DT_END));
+  HOOK_INVOKE((this, HOOK_REFRESH_BEGIN, DT_END));
 #if ENABLE_OVERLAY
-  scr_swap_overlay ();
+  scr_swap_overlay();
 #endif
 
   bool showcursor = screen.flags & Screen_VisibleCursor;
@@ -2541,54 +2296,52 @@ rxvt_term::scr_refresh () noexcept
       showcursor = 0;
 #endif
 
-    if (showcursor)
-      {
-        int col = screen.cur.col;
+    if (showcursor) {
+      int col = screen.cur.col;
 
-        while (col && ROW(screen.cur.row).t[col] == NOCHAR)
-          col--;
+      while (col && ROW(screen.cur.row).t[col] == NOCHAR)
+        col--;
 
-        cursorwidth = 1;
-        while (col + cursorwidth < ncol
-               && ROW(screen.cur.row).t[col + cursorwidth] == NOCHAR)
-          cursorwidth++;
+      cursorwidth = 1;
+      while (col + cursorwidth < ncol &&
+             ROW(screen.cur.row).t[col + cursorwidth] == NOCHAR)
+        cursorwidth++;
 
-        cur_rend = ROW(screen.cur.row).r[col];
-        cur_col = col;
-
-#ifndef NO_CURSORCOLOR
-        if (ISSET_PIXCOLOR (Color_cursor))
-          ccol1 = Color_cursor;
-        else
-#endif
-#ifdef CURSOR_COLOR_IS_RENDITION_COLOR
-          ccol1 = fgcolor_of (rstyle);
-#else
-          ccol1 = Color_fg;
-#endif
+      cur_rend = ROW(screen.cur.row).r[col];
+      cur_col = col;
 
 #ifndef NO_CURSORCOLOR
-        if (ISSET_PIXCOLOR (Color_cursor2))
-          ccol2 = Color_cursor2;
-        else
+      if (ISSET_PIXCOLOR(Color_cursor))
+        ccol1 = Color_cursor;
+      else
 #endif
 #ifdef CURSOR_COLOR_IS_RENDITION_COLOR
-          ccol2 = bgcolor_of (rstyle);
+        ccol1 = fgcolor_of(rstyle);
 #else
-          ccol2 = Color_bg;
+      ccol1 = Color_fg;
 #endif
 
-        if (focus && cursor_type == 0)
-          {
-            rend_t rend = cur_rend;
+#ifndef NO_CURSORCOLOR
+      if (ISSET_PIXCOLOR(Color_cursor2))
+        ccol2 = Color_cursor2;
+      else
+#endif
+#ifdef CURSOR_COLOR_IS_RENDITION_COLOR
+        ccol2 = bgcolor_of(rstyle);
+#else
+      ccol2 = Color_bg;
+#endif
 
-            rend ^= RS_RVid;
-            rend = SET_FGCOLOR (rend, ccol1);
-            rend = SET_BGCOLOR (rend, ccol2);
+      if (focus && cursor_type == 0) {
+        rend_t rend = cur_rend;
 
-            scr_set_char_rend (ROW(screen.cur.row), cur_col, rend);
-          }
+        rend ^= RS_RVid;
+        rend = SET_FGCOLOR(rend, ccol1);
+        rend = SET_BGCOLOR(rend, ccol2);
+
+        scr_set_char_rend(ROW(screen.cur.row), cur_col, rend);
       }
+    }
 
     /* make sure no outline cursor is left around */
     if (ocrow != -1 && ocrow < nrow && oldcursor.col < ncol)
@@ -2598,12 +2351,11 @@ rxvt_term::scr_refresh () noexcept
     // and either the window is unfocused or the cursor style is
     // underline or vertical bar, so as to clear the outline cursor in
     // the next refresh if the cursor moves or becomes invisible
-    if (showcursor && (!focus || cursor_type != 0) && screen.cur.row - view_start < nrow)
-      {
-        oldcursor.row = screen.cur.row - view_start;
-        oldcursor.col = screen.cur.col;
-      }
-    else
+    if (showcursor && (!focus || cursor_type != 0) &&
+        screen.cur.row - view_start < nrow) {
+      oldcursor.row = screen.cur.row - view_start;
+      oldcursor.col = screen.cur.col;
+    } else
       oldcursor.row = -1;
   }
 
@@ -2612,452 +2364,402 @@ rxvt_term::scr_refresh () noexcept
    * D: CopyArea pass - very useful for slower links
    *    This has been deliberately kept simple.
    */
-  if (!display->is_local
-      && refresh_type == FAST_REFRESH && num_scr_allow && num_scr
-      && abs (num_scr) < nrow && !have_bg)
-    {
-      int16_t nits;
-      int i = num_scr;
-      int j;
-      int len, wlen;
+  if (!display->is_local && refresh_type == FAST_REFRESH && num_scr_allow &&
+      num_scr && abs(num_scr) < nrow && !have_bg) {
+    int16_t nits;
+    int i = num_scr;
+    int j;
+    int len, wlen;
 
-      j = nrow;
-      wlen = len = -1;
-      row = i > 0 ? 0 : j - 1;
+    j = nrow;
+    wlen = len = -1;
+    row = i > 0 ? 0 : j - 1;
 
-      for (; j-- >= 0; row += (i > 0 ? 1 : -1))
+    for (; j-- >= 0; row += (i > 0 ? 1 : -1)) {
+      if (row + i >= 0 && row + i < nrow && row + i != ocrow) {
+        line_t s = ROW(view_start + row);
+        line_t d = drawn_buf[row];
+        line_t d2 = drawn_buf[row + i];
+
+        for (nits = 0, col = ncol; col--;)
+          if (s.t[col] != d2.t[col] || s.r[col] != d2.r[col])
+            nits--;
+          else if (s.t[col] != d.t[col] || s.r[col] != d.r[col])
+            nits++;
+
+        if (nits > 8) /* XXX: arbitrary choice */
         {
-          if (row + i >= 0 && row + i < nrow && row + i != ocrow)
-            {
-              line_t s  = ROW(view_start + row);
-              line_t d  = drawn_buf[row];
-              line_t d2 = drawn_buf[row + i];
+          for (col = ncol; col--;) {
+            *d.t++ = *d2.t++;
+            *d.r++ = *d2.r++;
+          }
 
-              for (nits = 0, col = ncol; col--; )
-                if (s.t[col] != d2.t[col] || s.r[col] != d2.r[col])
-                  nits--;
-                else if (s.t[col] != d.t[col] || s.r[col] != d.r[col])
-                  nits++;
+          if (len == -1)
+            len = row;
 
-              if (nits > 8) /* XXX: arbitrary choice */
-                {
-                  for (col = ncol; col--; )
-                    {
-                      *d.t++ = *d2.t++;
-                      *d.r++ = *d2.r++;
-                    }
-
-                  if (len == -1)
-                    len = row;
-
-                  wlen = row;
-                  continue;
-                }
-            }
-
-          if (len >= 0)
-            {
-              /* also comes here at end if needed because of >= above */
-              if (wlen < len)
-                ::swap (wlen, len);
-
-              XGCValues gcv;
-
-              gcv.graphics_exposures = 1; XChangeGC (dpy, gc, GCGraphicsExposures, &gcv);
-              XCopyArea (dpy, vt, vt,
-                         gc, 0, Row2Pixel (len + i),
-                         (unsigned int)this->width,
-                         (unsigned int)Height2Pixel (wlen - len + 1),
-                         0, Row2Pixel (len));
-              gcv.graphics_exposures = 0; XChangeGC (dpy, gc, GCGraphicsExposures, &gcv);
-
-              len = -1;
-            }
+          wlen = row;
+          continue;
         }
+      }
+
+      if (len >= 0) {
+        /* also comes here at end if needed because of >= above */
+        if (wlen < len)
+          ::swap(wlen, len);
+
+        XGCValues gcv;
+
+        gcv.graphics_exposures = 1;
+        XChangeGC(dpy, gc, GCGraphicsExposures, &gcv);
+        XCopyArea(
+            dpy, vt, vt, gc, 0, Row2Pixel(len + i), (unsigned int)this->width,
+            (unsigned int)Height2Pixel(wlen - len + 1), 0, Row2Pixel(len));
+        gcv.graphics_exposures = 0;
+        XChangeGC(dpy, gc, GCGraphicsExposures, &gcv);
+
+        len = -1;
+      }
     }
+  }
 #endif
 
   /*
    * E: main pass across every character
    */
-  for (row = 0; row < nrow; row++)
-    {
-      text_t *stp = ROW(view_start + row).t;
-      rend_t *srp = ROW(view_start + row).r;
-      text_t *dtp = drawn_buf[row].t;
-      rend_t *drp = drawn_buf[row].r;
+  for (row = 0; row < nrow; row++) {
+    text_t *stp = ROW(view_start + row).t;
+    rend_t *srp = ROW(view_start + row).r;
+    text_t *dtp = drawn_buf[row].t;
+    rend_t *drp = drawn_buf[row].r;
 
-      /*
-       * E2: OK, now the real pass
-       */
-      int ypixel = (int)Row2Pixel (row);
+    /*
+     * E2: OK, now the real pass
+     */
+    int ypixel = (int)Row2Pixel(row);
 
-      for (col = 0; col < ncol; col++)
-        {
-          /* compare new text with old - if exactly the same then continue */
-          if (stp[col] == dtp[col] && RS_SAME (srp[col], drp[col]))
-            continue;
+    for (col = 0; col < ncol; col++) {
+      /* compare new text with old - if exactly the same then continue */
+      if (stp[col] == dtp[col] && RS_SAME(srp[col], drp[col]))
+        continue;
 
-          // redraw one or more characters
+      // redraw one or more characters
 
-          // seek to the beginning of wide characters
-          while (ecb_unlikely (stp[col] == NOCHAR && col > 0))
-            --col;
+      // seek to the beginning of wide characters
+      while (ecb_unlikely(stp[col] == NOCHAR && col > 0))
+        --col;
 
-          rend_t rend = srp[col];     /* screen rendition (target rendition) */
-          text_t *text = stp + col;
-          int count = 1;
+      rend_t rend = srp[col]; /* screen rendition (target rendition) */
+      text_t *text = stp + col;
+      int count = 1;
+
+      dtp[col] = stp[col];
+      drp[col] = rend;
+
+      int xpixel = Col2Pixel(col);
+
+      for (i = 0; ++col < ncol;) {
+        if (stp[col] == NOCHAR) {
+          dtp[col] = stp[col];
+          drp[col] = srp[col];
+
+          count++;
+          i++;
+
+          continue;
+        }
+
+        if (!RS_SAME(rend, srp[col]))
+          break;
+
+        count++;
+
+        if (stp[col] != dtp[col] || !RS_SAME(srp[col], drp[col])) {
+          if (have_bg && (i++ > count / 2))
+            break;
 
           dtp[col] = stp[col];
           drp[col] = rend;
+          i = 0;
+        } else if (have_bg || (stp[col] != ' ' && ++i >= 16))
+          break;
+      }
 
-          int xpixel = Col2Pixel (col);
+      col--;      /* went one too far.  move back */
+      count -= i; /* dump any matching trailing chars */
 
-          for (i = 0; ++col < ncol; )
-            {
-              if (stp[col] == NOCHAR)
-                {
-                  dtp[col] = stp[col];
-                  drp[col] = srp[col];
+      // sometimes we optimize away the trailing NOCHAR's, add them back
+      while (ecb_unlikely(i && text[count] == NOCHAR))
+        count++, i--;
 
-                  count++;
-                  i++;
+      /*
+       * Determine the attributes for the string
+       */
+      int fore = fgcolor_of(rend); // desired foreground
+      int back = bgcolor_of(rend); // desired background
 
-                  continue;
-                }
-
-              if (!RS_SAME (rend, srp[col]))
-                break;
-
-              count++;
-
-              if (stp[col] != dtp[col]
-                  || !RS_SAME (srp[col], drp[col]))
-                {
-                  if (have_bg && (i++ > count / 2))
-                    break;
-
-                  dtp[col] = stp[col];
-                  drp[col] = rend;
-                  i = 0;
-                }
-              else if (have_bg || (stp[col] != ' ' && ++i >= 16))
-                break;
-            }
-
-          col--;      /* went one too far.  move back */
-          count -= i; /* dump any matching trailing chars */
-
-          // sometimes we optimize away the trailing NOCHAR's, add them back
-          while (ecb_unlikely (i && text[count] == NOCHAR))
-            count++, i--;
-
-          /*
-           * Determine the attributes for the string
-           */
-          int fore = fgcolor_of (rend); // desired foreground
-          int back = bgcolor_of (rend); // desired background
-
-          // only do special processing if any attributes are set, which is unlikely
-          if (ecb_unlikely (rend & (RS_baseattrMask | RS_Careful | RS_Sel)))
-            {
-              bool invert = rend & RS_RVid;
+      // only do special processing if any attributes are set, which is unlikely
+      if (ecb_unlikely(rend & (RS_baseattrMask | RS_Careful | RS_Sel))) {
+        bool invert = rend & RS_RVid;
 
 #ifndef NO_BOLD_UNDERLINE_REVERSE
-              if (rend & RS_Bold && fore == Color_fg)
-                {
-                  if (ISSET_PIXCOLOR (Color_BD))
-                    fore = Color_BD;
-# if !ENABLE_STYLES
-                  else
-                    invert = !invert;
-# endif
-                }
+        if (rend & RS_Bold && fore == Color_fg) {
+          if (ISSET_PIXCOLOR(Color_BD))
+            fore = Color_BD;
+#if !ENABLE_STYLES
+          else
+            invert = !invert;
+#endif
+        }
 
-              if (rend & RS_Italic && fore == Color_fg)
-                {
-                  if (ISSET_PIXCOLOR (Color_IT))
-                    fore = Color_IT;
-# if !ENABLE_STYLES
-                  else
-                    invert = !invert;
-# endif
-                }
+        if (rend & RS_Italic && fore == Color_fg) {
+          if (ISSET_PIXCOLOR(Color_IT))
+            fore = Color_IT;
+#if !ENABLE_STYLES
+          else
+            invert = !invert;
+#endif
+        }
 
-              if (rend & RS_Uline && fore == Color_fg && ISSET_PIXCOLOR (Color_UL))
-                fore = Color_UL;
+        if (rend & RS_Uline && fore == Color_fg && ISSET_PIXCOLOR(Color_UL))
+          fore = Color_UL;
 #endif
 
 #ifdef OPTION_HC
-              if (rend & RS_Sel)
-                {
-                  /* invert the column if no highlightColor is set or it is the
-                   * current cursor column */
-                  if (!(showcursor && row == screen.cur.row && text - stp == screen.cur.col)
-                      && ISSET_PIXCOLOR (Color_HC))
-                    {
-                      if (ISSET_PIXCOLOR (Color_HTC))
-                        fore = Color_HTC;
-                      // if invert is 0 reverse video is set so we use bg color as fg color
-                      else if (!invert)
-                        fore = back;
+        if (rend & RS_Sel) {
+          /* invert the column if no highlightColor is set or it is the
+           * current cursor column */
+          if (!(showcursor && row == screen.cur.row &&
+                text - stp == screen.cur.col) &&
+              ISSET_PIXCOLOR(Color_HC)) {
+            if (ISSET_PIXCOLOR(Color_HTC))
+              fore = Color_HTC;
+            // if invert is 0 reverse video is set so we use bg color as fg
+            // color
+            else if (!invert)
+              fore = back;
 
-                      back = Color_HC;
-                      invert = 0;
-                    }
-                }
+            back = Color_HC;
+            invert = 0;
+          }
+        }
 #endif
 
-              if (invert)
-                {
-                    ::swap (fore, back);
+        if (invert) {
+          ::swap(fore, back);
 
 #ifndef NO_BOLD_UNDERLINE_REVERSE
-                  if (fore == back)
-                    {
-                      fore = Color_bg;
-                      back = Color_fg;
-                    }
+          if (fore == back) {
+            fore = Color_bg;
+            back = Color_fg;
+          }
 #endif
-                }
+        }
 
-              if (rend & RS_Faint)
-                fore = faint_color (fore, back);
+        if (rend & RS_Faint)
+          fore = faint_color(fore, back);
 
-              if (rend & RS_Conceal)
-                fore = back;
+        if (rend & RS_Conceal)
+          fore = back;
 
 #ifdef TEXT_BLINK
-              if (rend & RS_Blink && (back == Color_bg || fore == Color_bg))
-                {
-                  if (!text_blink_ev.is_active ())
-                    {
-                      text_blink_ev.again ();
-                      hidden_text = 0;
-                    }
-                  else if (hidden_text)
-                    fore = back;
-                }
+        if (rend & RS_Blink && (back == Color_bg || fore == Color_bg)) {
+          if (!text_blink_ev.is_active()) {
+            text_blink_ev.again();
+            hidden_text = 0;
+          } else if (hidden_text)
+            fore = back;
+        }
 #endif
 
 #if ENABLE_STYLES
-              // "careful" (too wide) character handling
+        // "careful" (too wide) character handling
 
-              // include previous careful character(s) if possible, looks nicer (best effort...)
-              while (text > stp
-                  && srp[text - stp - 1] & RS_Careful
-                  && RS_SAME (rend, srp[text - stp - 1]))
-                text--, count++, xpixel -= fwidth;
+        // include previous careful character(s) if possible, looks nicer (best
+        // effort...)
+        while (text > stp && srp[text - stp - 1] & RS_Careful &&
+               RS_SAME(rend, srp[text - stp - 1]))
+          text--, count++, xpixel -= fwidth;
 
-              // force redraw after "careful" characters to avoid pixel droppings
-              for (int i = 0; srp[col + i] & RS_Careful && col + i < ncol - 1; i++)
-                drp[col + i + 1] = srp[col + i + 1] ^ RS_redraw;
+        // force redraw after "careful" characters to avoid pixel droppings
+        for (int i = 0; srp[col + i] & RS_Careful && col + i < ncol - 1; i++)
+          drp[col + i + 1] = srp[col + i + 1] ^ RS_redraw;
 
-              // force redraw before "careful" characters to avoid pixel droppings
-              for (int i = 0; srp[text - stp - i] & RS_Careful && text - i > stp; i++)
-                drp[text - stp - i - 1] = srp[text - stp - i - 1] ^ RS_redraw;
+        // force redraw before "careful" characters to avoid pixel droppings
+        for (int i = 0; srp[text - stp - i] & RS_Careful && text - i > stp; i++)
+          drp[text - stp - i - 1] = srp[text - stp - i - 1] ^ RS_redraw;
 #endif
-            }
+      }
 
-          /*
-           * Actually do the drawing of the string here
-           */
-          rxvt_font *font = (*fontset[GET_STYLE (rend)])[GET_FONT (rend)];
+      /*
+       * Actually do the drawing of the string here
+       */
+      rxvt_font *font = (*fontset[GET_STYLE(rend)])[GET_FONT(rend)];
 
-          if (ecb_likely (have_bg && back == Color_bg))
-            {
-              // this is very ugly, maybe push it into ->draw?
+      if (ecb_likely(have_bg && back == Color_bg)) {
+        // this is very ugly, maybe push it into ->draw?
 
-              for (i = 0; i < count; i++) /* don't draw empty strings */
-                if (text[i] != ' ')
-                  {
-                    font->draw (*drawable, xpixel, ypixel, text, count, fore, Color_transparent);
-                    goto did_clear;
-                  }
+        for (i = 0; i < count; i++) /* don't draw empty strings */
+          if (text[i] != ' ') {
+            font->draw(*drawable, xpixel, ypixel, text, count, fore,
+                       Color_transparent);
+            goto did_clear;
+          }
 
-              CLEAR_CHARS (xpixel, ypixel, count);
-              did_clear: ;
-            }
-          else
-            font->draw (*drawable, xpixel, ypixel, text, count, fore, back);
+        CLEAR_CHARS(xpixel, ypixel, count);
+      did_clear:;
+      } else
+        font->draw(*drawable, xpixel, ypixel, text, count, fore, back);
 
-          if (ecb_unlikely (rend & RS_Uline && font->descent > 1 && fore != back))
-            {
-              if (showcursor && focus && row == screen.cur.row
-                  && IN_RANGE_EXC (col, cur_col, cur_col + cursorwidth))
-                XSetForeground (dpy, gc, pix_colors[ccol1]);
-              else if (rend & RS_ulColor) // the program's colour (SGR 58)
-                XSetForeground (dpy, gc, pix_colors[GET_ULCOLOR (rend)]);
-              else
+      if (ecb_unlikely(rend & RS_Uline && font->descent > 1 && fore != back)) {
+        if (showcursor && focus && row == screen.cur.row &&
+            IN_RANGE_EXC(col, cur_col, cur_col + cursorwidth))
+          XSetForeground(dpy, gc, pix_colors[ccol1]);
+        else if (rend & RS_ulColor) // the program's colour (SGR 58)
+          XSetForeground(dpy, gc, pix_colors[GET_ULCOLOR(rend)]);
+        else
 #if ENABLE_FRILLS
-              if (ISSET_PIXCOLOR (Color_underline))
-                XSetForeground (dpy, gc, pix_colors[Color_underline]);
-              else
+            if (ISSET_PIXCOLOR(Color_underline))
+          XSetForeground(dpy, gc, pix_colors[Color_underline]);
+        else
 #endif
-                XSetForeground (dpy, gc, pix_colors[fore]);
+          XSetForeground(dpy, gc, pix_colors[fore]);
 
-              draw_underline (xpixel, ypixel, Width2Pixel (count), font, rend);
-            }
+        draw_underline(xpixel, ypixel, Width2Pixel(count), font, rend);
+      }
 
-          // hyperlinks without an underline of their own get a dashed one
-          if (ecb_unlikely (rend & RS_linkMask && !(rend & RS_Uline) && font->descent > 1 && fore != back))
-            {
-              XSetForeground (dpy, gc, pix_colors[fore]);
-              draw_underline (xpixel, ypixel, Width2Pixel (count), font,
-                              (rend & ~RS_ulStyleMask) | ((rend_t)UL_dashed << RS_ulStyleShift));
-            }
+      // hyperlinks without an underline of their own get a dashed one
+      if (ecb_unlikely(rend & RS_linkMask && !(rend & RS_Uline) &&
+                       font->descent > 1 && fore != back)) {
+        XSetForeground(dpy, gc, pix_colors[fore]);
+        draw_underline(xpixel, ypixel, Width2Pixel(count), font,
+                       (rend & ~RS_ulStyleMask) |
+                           ((rend_t)UL_dashed << RS_ulStyleShift));
+      }
 
-          if (ecb_unlikely (rend & (RS_Strike | RS_Overline) && fore != back))
-            {
-              // as thick as the font's strokes, roughly
-              int thickness = max (1, (font->ascent + font->descent) / 16);
+      if (ecb_unlikely(rend & (RS_Strike | RS_Overline) && fore != back)) {
+        // as thick as the font's strokes, roughly
+        int thickness = max(1, (font->ascent + font->descent) / 16);
 
-              XSetForeground (dpy, gc, pix_colors[fore]);
+        XSetForeground(dpy, gc, pix_colors[fore]);
 
-              // through the middle of the lower-case letters
-              if (rend & RS_Strike)
-                XFillRectangle (dpy, vt, gc, xpixel,
-                                ypixel + font->ascent - font->ascent * 3 / 10 - thickness / 2,
-                                Width2Pixel (count), thickness);
+        // through the middle of the lower-case letters
+        if (rend & RS_Strike)
+          XFillRectangle(dpy, vt, gc, xpixel,
+                         ypixel + font->ascent - font->ascent * 3 / 10 -
+                             thickness / 2,
+                         Width2Pixel(count), thickness);
 
-              if (rend & RS_Overline)
-                XFillRectangle (dpy, vt, gc, xpixel, ypixel, Width2Pixel (count), thickness);
-            }
-        }                     /* for (col....) */
-    }                         /* for (row....) */
+        if (rend & RS_Overline)
+          XFillRectangle(dpy, vt, gc, xpixel, ypixel, Width2Pixel(count),
+                         thickness);
+      }
+    } /* for (col....) */
+  } /* for (row....) */
 
   /*
    * G: cleanup cursor and display outline cursor if necessary
    */
-  if (showcursor)
-    {
-      if (focus)
-        {
-          if (cursor_type == 0)
-            scr_set_char_rend (ROW(screen.cur.row), cur_col, cur_rend);
-          else if (oldcursor.row >= 0)
-            {
-              XSetForeground (dpy, gc, pix_colors[ccol1]);
-              if (cursor_type == 1)
-                XFillRectangle (dpy, vt, gc,
-                                Col2Pixel (cur_col),
-                                Row2Pixel (oldcursor.row + 1) - 2,
-                                Width2Pixel (1),
-                                2);
-              else
-                XFillRectangle (dpy, vt, gc,
-                                Col2Pixel (cur_col),
-                                Row2Pixel (oldcursor.row),
-                                2,
-                                Height2Pixel (1));
-            }
-        }
-      else if (oldcursor.row >= 0)
-        {
-          XSetForeground (dpy, gc, pix_colors[ccol1]);
+  if (showcursor) {
+    if (focus) {
+      if (cursor_type == 0)
+        scr_set_char_rend(ROW(screen.cur.row), cur_col, cur_rend);
+      else if (oldcursor.row >= 0) {
+        XSetForeground(dpy, gc, pix_colors[ccol1]);
+        if (cursor_type == 1)
+          XFillRectangle(dpy, vt, gc, Col2Pixel(cur_col),
+                         Row2Pixel(oldcursor.row + 1) - 2, Width2Pixel(1), 2);
+        else
+          XFillRectangle(dpy, vt, gc, Col2Pixel(cur_col),
+                         Row2Pixel(oldcursor.row), 2, Height2Pixel(1));
+      }
+    } else if (oldcursor.row >= 0) {
+      XSetForeground(dpy, gc, pix_colors[ccol1]);
 
-          XDrawRectangle (dpy, vt, gc,
-                          Col2Pixel (cur_col),
-                          Row2Pixel (oldcursor.row),
-                          (unsigned int) (Width2Pixel (cursorwidth) - 1),
-                          (unsigned int) (Height2Pixel (1) - 1));
-        }
+      XDrawRectangle(dpy, vt, gc, Col2Pixel(cur_col), Row2Pixel(oldcursor.row),
+                     (unsigned int)(Width2Pixel(cursorwidth) - 1),
+                     (unsigned int)(Height2Pixel(1) - 1));
     }
+  }
 
   /*
    * H: cleanup selection
    */
 #if ENABLE_OVERLAY
-  scr_swap_overlay ();
+  scr_swap_overlay();
 #endif
-  HOOK_INVOKE ((this, HOOK_REFRESH_END, DT_END));
+  HOOK_INVOKE((this, HOOK_REFRESH_END, DT_END));
 
-  scr_reverse_selection ();
+  scr_reverse_selection();
 
   screen.flags = old_screen_flags;
   num_scr = 0;
   num_scr_allow = 1;
 }
 
-void ecb_cold
-rxvt_term::scr_remap_chars (line_t &l) noexcept
-{
-  if (!l.valid ())
+void ecb_cold rxvt_term::scr_remap_chars(line_t &l) noexcept {
+  if (!l.valid())
     return;
 
-  l.touch (); // maybe a bit of an overkill, but it's not performance-relevant
+  l.touch(); // maybe a bit of an overkill, but it's not performance-relevant
 
-  for (int i = ncol; i--; )
-    l.r[i] = SET_FONT (l.r[i], FONTSET (l.r[i])->find_font (l.t[i]));
+  for (int i = ncol; i--;)
+    l.r[i] = SET_FONT(l.r[i], FONTSET(l.r[i])->find_font(l.t[i]));
 }
 
-void ecb_cold
-rxvt_term::scr_remap_chars () noexcept
-{
-  for (int i = total_rows; i--; )
-    scr_remap_chars (row_buf [i]);
+void ecb_cold rxvt_term::scr_remap_chars() noexcept {
+  for (int i = total_rows; i--;)
+    scr_remap_chars(row_buf[i]);
 
-  for (int i = nrow; i--; )
-    {
-      scr_remap_chars (drawn_buf [i]);
-      scr_remap_chars (swap_buf [i]);
-    }
+  for (int i = nrow; i--;) {
+    scr_remap_chars(drawn_buf[i]);
+    scr_remap_chars(swap_buf[i]);
+  }
 }
 
-void ecb_cold
-rxvt_term::scr_recolor (bool refresh) noexcept
-{
+void ecb_cold rxvt_term::scr_recolor(bool refresh) noexcept {
   bool transparent = false;
 
 #ifdef HAVE_IMG
-  if (bg_img != 0)
-    {
-# if ENABLE_TRANSPARENCY
-      if (bg_flags & BG_IS_TRANSPARENT)
-        {
-          XSetWindowBackgroundPixmap (dpy, parent, bg_img->pm);
-          XSetWindowBackgroundPixmap (dpy, vt, ParentRelative);
+  if (bg_img != 0) {
+#if ENABLE_TRANSPARENCY
+    if (bg_flags & BG_IS_TRANSPARENT) {
+      XSetWindowBackgroundPixmap(dpy, parent, bg_img->pm);
+      XSetWindowBackgroundPixmap(dpy, vt, ParentRelative);
 
-          transparent = true;
-        }
-      else
-# endif
-        {
-          XSetWindowBackground (dpy, parent, pix_colors[Color_border]);
-          XSetWindowBackgroundPixmap (dpy, vt, bg_img->pm);
-        }
-    }
-  else
+      transparent = true;
+    } else
 #endif
     {
-      XSetWindowBackground (dpy, parent, pix_colors[Color_border]);
-      XSetWindowBackground (dpy, vt, pix_colors[Color_bg]);
+      XSetWindowBackground(dpy, parent, pix_colors[Color_border]);
+      XSetWindowBackgroundPixmap(dpy, vt, bg_img->pm);
     }
+  } else
+#endif
+  {
+    XSetWindowBackground(dpy, parent, pix_colors[Color_border]);
+    XSetWindowBackground(dpy, vt, pix_colors[Color_bg]);
+  }
 
-  XClearWindow (dpy, parent);
+  XClearWindow(dpy, parent);
 
-  if (scrollBar.state && scrollBar.win)
-    {
-      if (transparent)
-        XSetWindowBackgroundPixmap (dpy, scrollBar.win, ParentRelative);
-      else
-        XSetWindowBackground (dpy, scrollBar.win, pix_colors[scrollBar.color ()]);
-      scrollBar.state = SB_STATE_IDLE;
-      scrollBar.show (0);
-    }
+  if (scrollBar.state && scrollBar.win) {
+    if (transparent)
+      XSetWindowBackgroundPixmap(dpy, scrollBar.win, ParentRelative);
+    else
+      XSetWindowBackground(dpy, scrollBar.win, pix_colors[scrollBar.color()]);
+    scrollBar.state = SB_STATE_IDLE;
+    scrollBar.show(0);
+  }
 
-  if (refresh)
-    {
-      scr_clear ();
-      scr_touch (true);
-    }
+  if (refresh) {
+    scr_clear();
+    scr_touch(true);
+  }
   want_refresh = 1;
 }
 
 /* ------------------------------------------------------------------------- */
-void
-rxvt_term::scr_clear (bool really) noexcept
-{
+void rxvt_term::scr_clear(bool really) noexcept {
   if (!mapped)
     return;
 
@@ -3065,49 +2767,44 @@ rxvt_term::scr_clear (bool really) noexcept
   want_refresh = 1;
 
   if (really)
-    XClearWindow (dpy, vt);
+    XClearWindow(dpy, vt);
 }
 
-void
-rxvt_term::scr_xor_rect (int beg_row, int beg_col, int end_row, int end_col, rend_t rstyle1, rend_t rstyle2) noexcept
-{
+void rxvt_term::scr_xor_rect(int beg_row, int beg_col, int end_row, int end_col,
+                             rend_t rstyle1, rend_t rstyle2) noexcept {
   int view_end = view_start + nrow;
   int row, col;
 
-  for (row = max (beg_row, view_start); row <= min (end_row, view_end); row++)
-    {
-      text_t *stp = ROW(row).t;
-      rend_t *srp = ROW(row).r;
+  for (row = max(beg_row, view_start); row <= min(end_row, view_end); row++) {
+    text_t *stp = ROW(row).t;
+    rend_t *srp = ROW(row).r;
 
-      for (col = beg_col; col < end_col; col++)
-        srp[col] ^= rstyle1;
+    for (col = beg_col; col < end_col; col++)
+      srp[col] ^= rstyle1;
 
-      while (col-- > beg_col && (stp[col] == NOCHAR || unicode::is_space (stp[col])))
-        srp[col] ^= rstyle2;
+    while (col-- > beg_col &&
+           (stp[col] == NOCHAR || unicode::is_space(stp[col])))
+      srp[col] ^= rstyle2;
 
-      if (++col < end_col)
-        srp[col] ^= rstyle2;
-    }
+    if (++col < end_col)
+      srp[col] ^= rstyle2;
+  }
 }
 
-void
-rxvt_term::scr_xor_span (int beg_row, int beg_col, int end_row, int end_col, rend_t rstyle) noexcept
-{
+void rxvt_term::scr_xor_span(int beg_row, int beg_col, int end_row, int end_col,
+                             rend_t rstyle) noexcept {
   int view_end = view_start + nrow;
   int row, col;
 
-  if (beg_row >= view_start)
-    {
-      col = beg_col;
-      row = beg_row;
-    }
-  else
-    {
-      col = 0;
-      row = view_start;
-    }
+  if (beg_row >= view_start) {
+    col = beg_col;
+    row = beg_row;
+  } else {
+    col = 0;
+    row = view_start;
+  }
 
-  for (; row < min (end_row, view_end); row++, col = 0)
+  for (; row < min(end_row, view_end); row++, col = 0)
     for (rend_t *srp = ROW(row).r; col < ncol; col++)
       srp[col] ^= rstyle;
 
@@ -3117,24 +2814,19 @@ rxvt_term::scr_xor_span (int beg_row, int beg_col, int end_row, int end_col, ren
 }
 
 /* ------------------------------------------------------------------------- */
-void ecb_hot
-rxvt_term::scr_reverse_selection () noexcept
-{
-  if (selection.op
-      && current_screen == selection.screen
-      && selection.end.row >= view_start)
-    {
+void ecb_hot rxvt_term::scr_reverse_selection() noexcept {
+  if (selection.op && current_screen == selection.screen &&
+      selection.end.row >= view_start) {
 #if !ENABLE_MINIMAL
-      if (selection.rect)
-        scr_xor_rect (selection.beg.row, selection.beg.col,
-                      selection.end.row, selection.end.col,
-                      RS_Sel | RS_RVid, RS_Sel | RS_RVid | RS_Uline);
-      else
+    if (selection.rect)
+      scr_xor_rect(selection.beg.row, selection.beg.col, selection.end.row,
+                   selection.end.col, RS_Sel | RS_RVid,
+                   RS_Sel | RS_RVid | RS_Uline);
+    else
 #endif
-        scr_xor_span (selection.beg.row, selection.beg.col,
-                      selection.end.row, selection.end.col,
-                      RS_Sel | RS_RVid);
-    }
+      scr_xor_span(selection.beg.row, selection.beg.col, selection.end.row,
+                   selection.end.col, RS_Sel | RS_RVid);
+  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3150,35 +2842,30 @@ rxvt_term::scr_dump (int fd) noexcept
   // relevant code in scr_printscreen
 }
 #endif
-
+
 /* ------------------------------------------------------------------------- *
  *                           CHARACTER SELECTION                             *
  * ------------------------------------------------------------------------- */
-void
-rxvt_term::selection_check (int check_more) noexcept
-{
+void rxvt_term::selection_check(int check_more) noexcept {
   if (!selection.op)
     return;
 
-  if (!IN_RANGE_EXC (selection.beg.row, top_row, nrow)
-      || !IN_RANGE_EXC (selection.mark.row, top_row, nrow)
-      || !IN_RANGE_EXC (selection.end.row, top_row, nrow)
-      || (check_more == 1
-          && current_screen == selection.screen
-          && !ROWCOL_IS_BEFORE (screen.cur, selection.beg)
-          && ROWCOL_IS_BEFORE (screen.cur, selection.end)))
-    CLEAR_ALL_SELECTION ();
+  if (!IN_RANGE_EXC(selection.beg.row, top_row, nrow) ||
+      !IN_RANGE_EXC(selection.mark.row, top_row, nrow) ||
+      !IN_RANGE_EXC(selection.end.row, top_row, nrow) ||
+      (check_more == 1 && current_screen == selection.screen &&
+       !ROWCOL_IS_BEFORE(screen.cur, selection.beg) &&
+       ROWCOL_IS_BEFORE(screen.cur, selection.end)))
+    CLEAR_ALL_SELECTION();
 }
 
-void
-rxvt_term::selection_changed () noexcept
-{
-  line_t &r1 = ROW (selection.beg.row);
-  while (selection.beg.col < r1.l && r1.t [selection.beg.col] == NOCHAR)
+void rxvt_term::selection_changed() noexcept {
+  line_t &r1 = ROW(selection.beg.row);
+  while (selection.beg.col < r1.l && r1.t[selection.beg.col] == NOCHAR)
     ++selection.beg.col;
 
-  line_t &r2 = ROW (selection.end.row);
-  while (selection.end.col < r2.l && r2.t [selection.end.col] == NOCHAR)
+  line_t &r2 = ROW(selection.end.row);
+  while (selection.end.col < r2.l && r2.t[selection.end.col] == NOCHAR)
     ++selection.end.col;
 
   want_refresh = 1;
@@ -3188,34 +2875,30 @@ rxvt_term::selection_changed () noexcept
 /*
  * Paste a selection direct to the command fd
  */
-void
-rxvt_term::tt_paste (char *data, unsigned int len) noexcept
-{
+void rxvt_term::tt_paste(char *data, unsigned int len) noexcept {
   /* convert normal newline chars into common keyboard Return key sequence */
   for (unsigned int i = 0; i < len; i++)
     if (data[i] == C0_LF)
       data[i] = C0_CR;
 
-  #if ENABLE_FRILLS
-  if ((priv_modes & PrivMode_BracketPaste) && !option (Opt_disablePasteBrackets))
-    tt_printf ("\x1b[200~");
-  #endif
+#if ENABLE_FRILLS
+  if ((priv_modes & PrivMode_BracketPaste) && !option(Opt_disablePasteBrackets))
+    tt_printf("\x1b[200~");
+#endif
 
-  tt_write (data, len);
+  tt_write(data, len);
 
-  #if ENABLE_FRILLS
-  if ((priv_modes & PrivMode_BracketPaste) && !option (Opt_disablePasteBrackets))
-    tt_printf ("\x1b[201~");
-  #endif
+#if ENABLE_FRILLS
+  if ((priv_modes & PrivMode_BracketPaste) && !option(Opt_disablePasteBrackets))
+    tt_printf("\x1b[201~");
+#endif
 }
 
-void
-rxvt_term::paste (char *data, unsigned int len) noexcept
-{
-  if (HOOK_INVOKE ((this, HOOK_TT_PASTE, DT_STR_LEN, data, len, DT_END)))
+void rxvt_term::paste(char *data, unsigned int len) noexcept {
+  if (HOOK_INVOKE((this, HOOK_TT_PASTE, DT_STR_LEN, data, len, DT_END)))
     return;
 
-  tt_paste (data, len);
+  tt_paste(data, len);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3225,14 +2908,12 @@ rxvt_term::paste (char *data, unsigned int len) noexcept
  * as fallback
  * EXT: button 2 release
  */
-void
-rxvt_term::selection_request (Time tm, int selnum) noexcept
-{
-  if (!selection_req)
-    {
-      selection_req = new rxvt_selection (display, selnum, tm, vt, xa[XA_VT_SELECTION], this);
-      selection_req->run ();
-    }
+void rxvt_term::selection_request(Time tm, int selnum) noexcept {
+  if (!selection_req) {
+    selection_req =
+        new rxvt_selection(display, selnum, tm, vt, xa[XA_VT_SELECTION], this);
+    selection_req->run();
+  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3240,29 +2921,24 @@ rxvt_term::selection_request (Time tm, int selnum) noexcept
  * Clear all selected text
  * EXT: SelectionClear
  */
-void
-rxvt_term::selection_clear (bool clipboard) noexcept
-{
-  if (!clipboard)
-    {
-      want_refresh = 1;
-      free (selection.text);
-      selection.text = NULL;
-      selection.len = 0;
-      CLEAR_SELECTION ();
+void rxvt_term::selection_clear(bool clipboard) noexcept {
+  if (!clipboard) {
+    want_refresh = 1;
+    free(selection.text);
+    selection.text = NULL;
+    selection.len = 0;
+    CLEAR_SELECTION();
 
-      if (display->selection_owner == this)
-        display->selection_owner = 0;
-    }
-  else
-    {
-      free (selection.clip_text);
-      selection.clip_text = NULL;
-      selection.clip_len = 0;
+    if (display->selection_owner == this)
+      display->selection_owner = 0;
+  } else {
+    free(selection.clip_text);
+    selection.clip_text = NULL;
+    selection.clip_len = 0;
 
-      if (display->clipboard_owner == this)
-        display->clipboard_owner = 0;
-    }
+    if (display->clipboard_owner == this)
+      display->clipboard_owner = 0;
+  }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3270,37 +2946,34 @@ rxvt_term::selection_clear (bool clipboard) noexcept
  * Copy a selection into the cut buffer
  * EXT: button 1 or 3 release
  */
-void
-rxvt_term::selection_make (Time tm)
-{
+void rxvt_term::selection_make(Time tm) {
   int size;
   wchar_t *new_selection_text;
   text_t *t;
 
-  switch (selection.op)
-    {
-      case SELECTION_CONT:
-        break;
-      case SELECTION_INIT:
-        CLEAR_SELECTION ();
-        /* FALLTHROUGH */
-      case SELECTION_BEGIN:
-        selection.op = SELECTION_DONE;
-        /* FALLTHROUGH */
-      default:
-        return;
-    }
+  switch (selection.op) {
+  case SELECTION_CONT:
+    break;
+  case SELECTION_INIT:
+    CLEAR_SELECTION();
+    /* FALLTHROUGH */
+  case SELECTION_BEGIN:
+    selection.op = SELECTION_DONE;
+    /* FALLTHROUGH */
+  default:
+    return;
+  }
 
   selection.op = SELECTION_DONE;
 
   if (selection.clicks == 4)
-    return;                 /* nothing selected, go away */
+    return; /* nothing selected, go away */
 
-  if (HOOK_INVOKE ((this, HOOK_SEL_MAKE, DT_LONG, (long)tm, DT_END)))
+  if (HOOK_INVOKE((this, HOOK_SEL_MAKE, DT_LONG, (long)tm, DT_END)))
     return;
 
   size = (selection.end.row - selection.beg.row + 1) * (ncol + 1);
-  new_selection_text = (wchar_t *)rxvt_malloc ((size + 4) * sizeof (wchar_t));
+  new_selection_text = (wchar_t *)rxvt_malloc((size + 4) * sizeof(wchar_t));
 
   int ofs = 0;
   int extra = 0;
@@ -3310,122 +2983,105 @@ rxvt_term::selection_make (Time tm)
 
   int end_col;
 
-  for (; row <= selection.end.row; row++, col = 0)
-    {
+  for (; row <= selection.end.row; row++, col = 0) {
 #if !ENABLE_MINIMAL
-      if (selection.rect)
-        {
-          col = selection.beg.col;
-          end_col = selection.end.col;
-        }
-      else
+    if (selection.rect) {
+      col = selection.beg.col;
+      end_col = selection.end.col;
+    } else
 #endif
-        end_col = ROW(row).l;
+      end_col = ROW(row).l;
 
-      col = max (col, 0);
+    col = max(col, 0);
 
-      if (row == selection.end.row)
-        min_it (end_col, selection.end.col);
+    if (row == selection.end.row)
+      min_it(end_col, selection.end.col);
 
-      t = ROW(row).t + col;
+    t = ROW(row).t + col;
 
-      for (; col < end_col; col++)
-        {
-          if (*t == NOCHAR)
-            t++;
+    for (; col < end_col; col++) {
+      if (*t == NOCHAR)
+        t++;
 #if ENABLE_COMBINING
-          else if (IS_COMPOSE (*t))
-            {
-              int len = rxvt_composite.expand (*t);
+      else if (IS_COMPOSE(*t)) {
+        int len = rxvt_composite.expand(*t);
 
-              extra -= (len - 1);
+        extra -= (len - 1);
 
-              if (extra < 0)
-                {
-                  extra += size;
-                  size += size;
-                  new_selection_text = (wchar_t *)rxvt_realloc (new_selection_text, (size + 4) * sizeof (wchar_t));
-                }
+        if (extra < 0) {
+          extra += size;
+          size += size;
+          new_selection_text = (wchar_t *)rxvt_realloc(
+              new_selection_text, (size + 4) * sizeof(wchar_t));
+        }
 
-              ofs += rxvt_composite.expand (*t++, new_selection_text + ofs);
-            }
+        ofs += rxvt_composite.expand(*t++, new_selection_text + ofs);
+      }
 #endif
 #if ENABLE_SIXEL
-          else if (IS_IMAGE_TILE (*t))
-            {
-              new_selection_text[ofs++] = ' '; // pictures copy as blanks
-              t++;
-            }
+      else if (IS_IMAGE_TILE(*t)) {
+        new_selection_text[ofs++] = ' '; // pictures copy as blanks
+        t++;
+      }
 #endif
-          else
-            new_selection_text[ofs++] = *t++;
-        }
+      else
+        new_selection_text[ofs++] = *t++;
+    }
 
 #if !ENABLE_MINIMAL
-      if (selection.rect)
-        {
-          while (ofs
-                 && new_selection_text[ofs - 1] != C0_LF
-                 && unicode::is_space (new_selection_text[ofs - 1]))
-            --ofs;
+    if (selection.rect) {
+      while (ofs && new_selection_text[ofs - 1] != C0_LF &&
+             unicode::is_space(new_selection_text[ofs - 1]))
+        --ofs;
 
-          new_selection_text[ofs++] = C0_LF;
-        }
-      else
+      new_selection_text[ofs++] = C0_LF;
+    } else
 #endif
-        if (!ROW(row).is_longer ()
-            && (row != selection.end.row || end_col != selection.end.col)
-            && (row != selection.beg.row || selection.beg.col < ncol))
-          new_selection_text[ofs++] = C0_LF;
-    }
+        if (!ROW(row).is_longer() &&
+            (row != selection.end.row || end_col != selection.end.col) &&
+            (row != selection.beg.row || selection.beg.col < ncol))
+      new_selection_text[ofs++] = C0_LF;
+  }
 
   new_selection_text[ofs] = 0;
 
-  if (ofs == 0)
-    {
-      free (new_selection_text);
-      return;
-    }
+  if (ofs == 0) {
+    free(new_selection_text);
+    return;
+  }
 
-  free (selection.text);
+  free(selection.text);
 
   // we usually allocate much more than necessary, so realloc it smaller again
   selection.len = ofs;
-  selection.text = (wchar_t *)rxvt_realloc (new_selection_text, (ofs + 1) * sizeof (wchar_t));
+  selection.text =
+      (wchar_t *)rxvt_realloc(new_selection_text, (ofs + 1) * sizeof(wchar_t));
 
-  if (HOOK_INVOKE ((this, HOOK_SEL_GRAB, DT_LONG, (long)tm, DT_END)))
+  if (HOOK_INVOKE((this, HOOK_SEL_GRAB, DT_LONG, (long)tm, DT_END)))
     return;
 
-  selection_grab (tm);
+  selection_grab(tm);
 }
 
-bool
-rxvt_term::selection_grab (Time tm, bool clipboard) noexcept
-{
+bool rxvt_term::selection_grab(Time tm, bool clipboard) noexcept {
   Atom sel;
 
-  if (!clipboard)
-    {
-      selection_time = tm;
-      sel = XA_PRIMARY;
-    }
-  else
-    {
-      clipboard_time = tm;
-      sel = xa[XA_CLIPBOARD];
-    }
+  if (!clipboard) {
+    selection_time = tm;
+    sel = XA_PRIMARY;
+  } else {
+    clipboard_time = tm;
+    sel = xa[XA_CLIPBOARD];
+  }
 
-  XSetSelectionOwner (dpy, sel, vt, tm);
-  if (XGetSelectionOwner (dpy, sel) == vt)
-    {
-      display->set_selection_owner (this, clipboard);
-      return true;
-    }
-  else
-    {
-      selection_clear (clipboard);
-      return false;
-    }
+  XSetSelectionOwner(dpy, sel, vt, tm);
+  if (XGetSelectionOwner(dpy, sel) == vt) {
+    display->set_selection_owner(this, clipboard);
+    return true;
+  } else {
+    selection_clear(clipboard);
+    return false;
+  }
 
 #if 0
   XTextProperty ct;
@@ -3443,56 +3099,49 @@ rxvt_term::selection_grab (Time tm, bool clipboard) noexcept
  * Mark or select text based upon number of clicks: 1, 2, or 3
  * EXT: button 1 press
  */
-void ecb_cold
-rxvt_term::selection_click (int clicks, int x, int y) noexcept
-{
+void ecb_cold rxvt_term::selection_click(int clicks, int x, int y) noexcept {
   clicks = ((clicks - 1) % 3) + 1;
-  selection.clicks = clicks;       /* save clicks so extend will work */
+  selection.clicks = clicks; /* save clicks so extend will work */
 
-  if (clicks == 2 && !selection.rect
-      && HOOK_INVOKE ((this, HOOK_SEL_EXTEND, DT_END)))
-    {
-      MEvent.clicks = 1; // what a mess
-      selection.screen = current_screen;
-      selection.op = SELECTION_CONT;
-      return;
-    }
+  if (clicks == 2 && !selection.rect &&
+      HOOK_INVOKE((this, HOOK_SEL_EXTEND, DT_END))) {
+    MEvent.clicks = 1; // what a mess
+    selection.screen = current_screen;
+    selection.op = SELECTION_CONT;
+    return;
+  }
 
-  selection_start_colrow (Pixel2Col (x), Pixel2Row (y));
+  selection_start_colrow(Pixel2Col(x), Pixel2Row(y));
 
   if (clicks == 2 || clicks == 3)
-    selection_extend_colrow (selection.mark.col,
-                             selection.mark.row - view_start,
-                             0, /* button 3     */
-                             1, /* button press */
-                             0);        /* click change */
+    selection_extend_colrow(selection.mark.col, selection.mark.row - view_start,
+                            0,  /* button 3     */
+                            1,  /* button press */
+                            0); /* click change */
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * Mark a selection at the specified col/row
  */
-void ecb_cold
-rxvt_term::selection_start_colrow (int col, int row) noexcept
-{
+void ecb_cold rxvt_term::selection_start_colrow(int col, int row) noexcept {
   want_refresh = 1;
 
   selection.mark.row = row + view_start;
   selection.mark.col = col;
 
-  selection.mark.row = clamp (selection.mark.row, top_row, nrow - 1);
-  selection.mark.col = clamp (selection.mark.col,       0, ncol - 1);
+  selection.mark.row = clamp(selection.mark.row, top_row, nrow - 1);
+  selection.mark.col = clamp(selection.mark.col, 0, ncol - 1);
 
-  while (selection.mark.col > 0
-         && ROW(selection.mark.row).t[selection.mark.col] == NOCHAR)
+  while (selection.mark.col > 0 &&
+         ROW(selection.mark.row).t[selection.mark.col] == NOCHAR)
     --selection.mark.col;
 
-  if (selection.op)
-    {
-      /* clear the old selection */
-      selection.beg.row = selection.end.row = selection.mark.row;
-      selection.beg.col = selection.end.col = selection.mark.col;
-    }
+  if (selection.op) {
+    /* clear the old selection */
+    selection.beg.row = selection.end.row = selection.mark.row;
+    selection.beg.col = selection.end.col = selection.mark.col;
+  }
 
   selection.op = SELECTION_INIT;
   selection.screen = current_screen;
@@ -3505,80 +3154,75 @@ rxvt_term::selection_start_colrow (int col, int row) noexcept
  */
 
 /* what do we want: spaces/tabs are delimiters or cutchars or non-cutchars */
-#define DELIMIT_TEXT(x)		\
-    (unicode::is_space (x) ? 2 : (x) <= 0xff && !!strchr (rs[Rs_cutchars], (x)))
-#define DELIMIT_REND(x)        1
+#define DELIMIT_TEXT(x)                                                        \
+  (unicode::is_space(x) ? 2 : (x) <= 0xff && !!strchr(rs[Rs_cutchars], (x)))
+#define DELIMIT_REND(x) 1
 
-void ecb_cold
-rxvt_term::selection_delimit_word (enum page_dirn dirn, const row_col_t *mark, row_col_t *ret) noexcept
-{
+void ecb_cold rxvt_term::selection_delimit_word(enum page_dirn dirn,
+                                                const row_col_t *mark,
+                                                row_col_t *ret) noexcept {
   int col, row, dirnadd, tcol, trow, w1, w2;
   row_col_t bound;
   text_t *stp;
   rend_t *srp;
 
-  if (dirn == UP)
-    {
-      bound.row = top_row - 1;
-      bound.col = 0;
-      dirnadd = -1;
-    }
-  else
-    {
-      bound.row = nrow;
-      bound.col = ncol - 1;
-      dirnadd = 1;
-    }
+  if (dirn == UP) {
+    bound.row = top_row - 1;
+    bound.col = 0;
+    dirnadd = -1;
+  } else {
+    bound.row = nrow;
+    bound.col = ncol - 1;
+    dirnadd = 1;
+  }
 
   row = mark->row;
-  col = max (mark->col, 0);
+  col = max(mark->col, 0);
 
   /* find the edge of a word */
-  stp = ROW(row).t + col; w1 = DELIMIT_TEXT (*stp);
-  srp = ROW(row).r + col; w2 = DELIMIT_REND (*srp);
+  stp = ROW(row).t + col;
+  w1 = DELIMIT_TEXT(*stp);
+  srp = ROW(row).r + col;
+  w2 = DELIMIT_REND(*srp);
 
-  for (;;)
-    {
-      for (; col != bound.col; col += dirnadd)
-        {
-          stp += dirnadd;
-          srp += dirnadd;
+  for (;;) {
+    for (; col != bound.col; col += dirnadd) {
+      stp += dirnadd;
+      srp += dirnadd;
 
-          if (*stp == NOCHAR)
-            continue;
+      if (*stp == NOCHAR)
+        continue;
 
-          if (DELIMIT_TEXT (*stp) != w1)
-            break;
-          if (DELIMIT_REND (*srp) != w2)
-            break;
-        }
-
-      if ((col == bound.col) && (row != bound.row))
-        {
-          if (ROW(row - (dirn == UP ? 1 : 0)).is_longer ())
-            {
-              trow = row + dirnadd;
-              tcol = dirn == UP ? ncol - 1 : 0;
-
-              if (!ROW(trow).t)
-                break;
-
-              stp = ROW(trow).t + tcol;
-              srp = ROW(trow).r + tcol;
-
-              if (DELIMIT_TEXT (*stp) != w1 || DELIMIT_REND (*srp) != w2)
-                break;
-
-              row = trow;
-              col = tcol;
-              continue;
-            }
-        }
-      break;
+      if (DELIMIT_TEXT(*stp) != w1)
+        break;
+      if (DELIMIT_REND(*srp) != w2)
+        break;
     }
 
+    if ((col == bound.col) && (row != bound.row)) {
+      if (ROW(row - (dirn == UP ? 1 : 0)).is_longer()) {
+        trow = row + dirnadd;
+        tcol = dirn == UP ? ncol - 1 : 0;
+
+        if (!ROW(trow).t)
+          break;
+
+        stp = ROW(trow).t + tcol;
+        srp = ROW(trow).r + tcol;
+
+        if (DELIMIT_TEXT(*stp) != w1 || DELIMIT_REND(*srp) != w2)
+          break;
+
+        row = trow;
+        col = tcol;
+        continue;
+      }
+    }
+    break;
+  }
+
   if (dirn == DN)
-    col++;                  /* put us on one past the end */
+    col++; /* put us on one past the end */
 
   /* Poke the values back in */
   ret->row = row;
@@ -3593,81 +3237,73 @@ rxvt_term::selection_delimit_word (enum page_dirn dirn, const row_col_t *mark, r
  * flag == 1 ==> button 3 press
  * flag == 2 ==> button 3 motion
  */
-void ecb_cold
-rxvt_term::selection_extend (int x, int y, int flag) noexcept
-{
-  int col = clamp (Pixel2Col (x), 0, ncol);
-  int row = clamp (Pixel2Row (y), 0, nrow - 1);
+void ecb_cold rxvt_term::selection_extend(int x, int y, int flag) noexcept {
+  int col = clamp(Pixel2Col(x), 0, ncol);
+  int row = clamp(Pixel2Row(y), 0, nrow - 1);
 
   /*
-  * If we're selecting characters (single click) then we must check first
-  * if we are at the same place as the original mark.  If we are then
-  * select nothing.  Otherwise, if we're to the right of the mark, you have to
-  * be _past_ a character for it to be selected.
-  */
-  if (((selection.clicks % 3) == 1) && !flag
-      && (col == selection.mark.col
-          && (row == selection.mark.row - view_start)))
-    {
-      /* select nothing */
-      selection.beg.row = selection.end.row = 0;
-      selection.beg.col = selection.end.col = 0;
-      selection.clicks = 4;
-      want_refresh = 1;
-      return;
-    }
+   * If we're selecting characters (single click) then we must check first
+   * if we are at the same place as the original mark.  If we are then
+   * select nothing.  Otherwise, if we're to the right of the mark, you have to
+   * be _past_ a character for it to be selected.
+   */
+  if (((selection.clicks % 3) == 1) && !flag &&
+      (col == selection.mark.col && (row == selection.mark.row - view_start))) {
+    /* select nothing */
+    selection.beg.row = selection.end.row = 0;
+    selection.beg.col = selection.end.col = 0;
+    selection.clicks = 4;
+    want_refresh = 1;
+    return;
+  }
 
   if (selection.clicks == 4)
     selection.clicks = 1;
 
-  selection_extend_colrow (col, row, !!flag,  /* ? button 3      */
-                           flag == 1 ? 1 : 0,     /* ? button press  */
-                           0);    /* no click change */
+  selection_extend_colrow(col, row, !!flag,  /* ? button 3      */
+                          flag == 1 ? 1 : 0, /* ? button press  */
+                          0);                /* no click change */
 }
 
 /* ------------------------------------------------------------------------- */
 /*
  * Extend the selection to the specified col/row
  */
-void ecb_cold
-rxvt_term::selection_extend_colrow (int32_t col, int32_t row, int button3, int buttonpress, int clickchange) noexcept
-{
+void ecb_cold rxvt_term::selection_extend_colrow(int32_t col, int32_t row,
+                                                 int button3, int buttonpress,
+                                                 int clickchange) noexcept {
   row_col_t pos;
-  enum {
-    LEFT, RIGHT
-  } closeto = RIGHT;
+  enum { LEFT, RIGHT } closeto = RIGHT;
 
-  switch (selection.op)
-    {
-      case SELECTION_INIT:
-        CLEAR_SELECTION ();
-        selection.op = SELECTION_BEGIN;
-        /* FALLTHROUGH */
-      case SELECTION_BEGIN:
-        if (row != selection.mark.row || col != selection.mark.col
-            || (!button3 && buttonpress))
-          selection.op = SELECTION_CONT;
-        break;
-      case SELECTION_DONE:
-        selection.op = SELECTION_CONT;
-        /* FALLTHROUGH */
-      case SELECTION_CONT:
-        break;
-      case SELECTION_CLEAR:
-        selection_start_colrow (col, row);
-        /* FALLTHROUGH */
-      default:
-        return;
-    }
+  switch (selection.op) {
+  case SELECTION_INIT:
+    CLEAR_SELECTION();
+    selection.op = SELECTION_BEGIN;
+    /* FALLTHROUGH */
+  case SELECTION_BEGIN:
+    if (row != selection.mark.row || col != selection.mark.col ||
+        (!button3 && buttonpress))
+      selection.op = SELECTION_CONT;
+    break;
+  case SELECTION_DONE:
+    selection.op = SELECTION_CONT;
+    /* FALLTHROUGH */
+  case SELECTION_CONT:
+    break;
+  case SELECTION_CLEAR:
+    selection_start_colrow(col, row);
+    /* FALLTHROUGH */
+  default:
+    return;
+  }
 
-  if (selection.beg.col == selection.end.col
-      && selection.beg.col != selection.mark.col
-      && selection.beg.row == selection.end.row
-      && selection.beg.row != selection.mark.row)
-    {
-      selection.beg.col = selection.end.col = selection.mark.col;
-      selection.beg.row = selection.end.row = selection.mark.row;
-    }
+  if (selection.beg.col == selection.end.col &&
+      selection.beg.col != selection.mark.col &&
+      selection.beg.row == selection.end.row &&
+      selection.beg.row != selection.mark.row) {
+    selection.beg.col = selection.end.col = selection.mark.col;
+    selection.beg.row = selection.end.row = selection.mark.row;
+  }
 
   pos.col = col;
   pos.row = view_start + row;
@@ -3676,199 +3312,164 @@ rxvt_term::selection_extend_colrow (int32_t col, int32_t row, int button3, int b
    * This is mainly xterm style selection with a couple of differences, mainly
    * in the way button3 drag extension works.
    * We're either doing: button1 drag; button3 press; or button3 drag
-   *  a) button1 drag : select around a midpoint/word/line - that point/word/line
-   *     is always at the left/right edge of the selection.
-   *  b) button3 press: extend/contract character/word/line at whichever edge of
-   *     the selection we are closest to.
-   *  c) button3 drag : extend/contract character/word/line - we select around
-   *     a point/word/line which is either the start or end of the selection
-   *     and it was decided by whichever point/word/line was `fixed' at the
-   *     time of the most recent button3 press
+   *  a) button1 drag : select around a midpoint/word/line - that
+   * point/word/line is always at the left/right edge of the selection. b)
+   * button3 press: extend/contract character/word/line at whichever edge of the
+   * selection we are closest to. c) button3 drag : extend/contract
+   * character/word/line - we select around a point/word/line which is either
+   * the start or end of the selection and it was decided by whichever
+   * point/word/line was `fixed' at the time of the most recent button3 press
    */
-  if (button3 && buttonpress)
-    {
-      /* button3 press */
-      /*
-       * first determine which edge of the selection we are closest to
-       */
-      if (ROWCOL_IS_BEFORE (pos, selection.beg)
-          || (!ROWCOL_IS_AFTER (pos, selection.end)
-              && (((pos.col - selection.beg.col)
-                   + ((pos.row - selection.beg.row) * ncol))
-                  < ((selection.end.col - pos.col)
-                     + ((selection.end.row - pos.row) * ncol)))))
-        closeto = LEFT;
+  if (button3 && buttonpress) {
+    /* button3 press */
+    /*
+     * first determine which edge of the selection we are closest to
+     */
+    if (ROWCOL_IS_BEFORE(pos, selection.beg) ||
+        (!ROWCOL_IS_AFTER(pos, selection.end) &&
+         (((pos.col - selection.beg.col) +
+           ((pos.row - selection.beg.row) * ncol)) <
+          ((selection.end.col - pos.col) +
+           ((selection.end.row - pos.row) * ncol)))))
+      closeto = LEFT;
 
-      if (closeto == LEFT)
-        {
-          selection.beg.row = pos.row;
-          selection.beg.col = pos.col;
-          selection.mark.row = selection.end.row;
-          selection.mark.col = selection.end.col - (selection.clicks == 2);
-        }
-      else
-        {
-          selection.end.row = pos.row;
-          selection.end.col = pos.col;
-          selection.mark.row = selection.beg.row;
-          selection.mark.col = selection.beg.col;
-        }
+    if (closeto == LEFT) {
+      selection.beg.row = pos.row;
+      selection.beg.col = pos.col;
+      selection.mark.row = selection.end.row;
+      selection.mark.col = selection.end.col - (selection.clicks == 2);
+    } else {
+      selection.end.row = pos.row;
+      selection.end.col = pos.col;
+      selection.mark.row = selection.beg.row;
+      selection.mark.col = selection.beg.col;
     }
-  else
-    {
-      /* button1 drag or button3 drag */
-      if (ROWCOL_IS_AFTER (selection.mark, pos))
-        {
-          if (selection.mark.row == selection.end.row
-              && selection.mark.col == selection.end.col
-              && clickchange
-              && selection.clicks == 2)
-            selection.mark.col--;
+  } else {
+    /* button1 drag or button3 drag */
+    if (ROWCOL_IS_AFTER(selection.mark, pos)) {
+      if (selection.mark.row == selection.end.row &&
+          selection.mark.col == selection.end.col && clickchange &&
+          selection.clicks == 2)
+        selection.mark.col--;
 
-          selection.beg.row = pos.row;
-          selection.beg.col = pos.col;
-          selection.end.row = selection.mark.row;
-          selection.end.col = selection.mark.col + (selection.clicks == 2);
-        }
-      else
-        {
-          selection.beg.row = selection.mark.row;
-          selection.beg.col = selection.mark.col;
-          selection.end.row = pos.row;
-          selection.end.col = pos.col;
-        }
+      selection.beg.row = pos.row;
+      selection.beg.col = pos.col;
+      selection.end.row = selection.mark.row;
+      selection.end.col = selection.mark.col + (selection.clicks == 2);
+    } else {
+      selection.beg.row = selection.mark.row;
+      selection.beg.col = selection.mark.col;
+      selection.end.row = pos.row;
+      selection.end.col = pos.col;
     }
+  }
 
-  if (selection.clicks == 1)
-    {
-      if (selection.beg.col > ROW(selection.beg.row).l //TODO//FIXME//LEN
-          && !ROW(selection.beg.row).is_longer ()
+  if (selection.clicks == 1) {
+    if (selection.beg.col > ROW(selection.beg.row).l // TODO//FIXME//LEN
+        && !ROW(selection.beg.row).is_longer()
 #if !ENABLE_MINIMAL
-          && !selection.rect
+        && !selection.rect
 #endif
-         )
-        selection.beg.col = ncol;
+    )
+      selection.beg.col = ncol;
 
-      if (
-          selection.end.col > ROW(selection.end.row).l //TODO//FIXME//LEN
-          && !ROW(selection.end.row).is_longer ()
+    if (selection.end.col > ROW(selection.end.row).l // TODO//FIXME//LEN
+        && !ROW(selection.end.row).is_longer()
 #if !ENABLE_MINIMAL
-          && !selection.rect
+        && !selection.rect
 #endif
-         )
-        selection.end.col = ncol;
-    }
-  else if (selection.clicks == 2)
-    {
-      if (ROWCOL_IS_AFTER (selection.end, selection.beg))
-        selection.end.col--;
+    )
+      selection.end.col = ncol;
+  } else if (selection.clicks == 2) {
+    if (ROWCOL_IS_AFTER(selection.end, selection.beg))
+      selection.end.col--;
 
-      selection_delimit_word (UP, &selection.beg, &selection.beg);
-      selection_delimit_word (DN, &selection.end, &selection.end);
-    }
-  else if (selection.clicks == 3)
-    {
+    selection_delimit_word(UP, &selection.beg, &selection.beg);
+    selection_delimit_word(DN, &selection.end, &selection.end);
+  } else if (selection.clicks == 3) {
 #if ENABLE_FRILLS
-      if (option (Opt_tripleclickwords))
-        {
-          selection_delimit_word (UP, &selection.beg, &selection.beg);
+    if (option(Opt_tripleclickwords)) {
+      selection_delimit_word(UP, &selection.beg, &selection.beg);
 
-          for (int end_row = selection.mark.row; end_row < nrow; end_row++)
-            {
-              if (!ROW(end_row).is_longer ())
-                {
-                  selection.end.row = end_row;
-                  selection.end.col = ROW(end_row).l;
-# if !ENABLE_MINIMAL
-                  selection_remove_trailing_spaces ();
-# endif
-                  break;
-                }
-            }
-        }
-      else
+      for (int end_row = selection.mark.row; end_row < nrow; end_row++) {
+        if (!ROW(end_row).is_longer()) {
+          selection.end.row = end_row;
+          selection.end.col = ROW(end_row).l;
+#if !ENABLE_MINIMAL
+          selection_remove_trailing_spaces();
 #endif
-        {
-          if (ROWCOL_IS_AFTER (selection.mark, selection.beg))
-            selection.mark.col++;
-
-          selection.beg.col = 0;
-          selection.end.col = ncol;
-
-          // select a complete logical line
-          while (selection.beg.row > -saveLines
-                 && ROW(selection.beg.row - 1).is_longer ())
-            selection.beg.row--;
-
-          while (selection.end.row < nrow
-                 && ROW(selection.end.row).is_longer ())
-            selection.end.row++;
+          break;
         }
-    }
-
-  if (button3 && buttonpress)
+      }
+    } else
+#endif
     {
-      /* mark may need to be changed */
-      if (closeto == LEFT)
-        {
-          selection.mark.row = selection.end.row;
-          selection.mark.col = selection.end.col - (selection.clicks == 2);
-        }
-      else
-        {
-          selection.mark.row = selection.beg.row;
-          selection.mark.col = selection.beg.col;
-        }
+      if (ROWCOL_IS_AFTER(selection.mark, selection.beg))
+        selection.mark.col++;
+
+      selection.beg.col = 0;
+      selection.end.col = ncol;
+
+      // select a complete logical line
+      while (selection.beg.row > -saveLines &&
+             ROW(selection.beg.row - 1).is_longer())
+        selection.beg.row--;
+
+      while (selection.end.row < nrow && ROW(selection.end.row).is_longer())
+        selection.end.row++;
     }
+  }
+
+  if (button3 && buttonpress) {
+    /* mark may need to be changed */
+    if (closeto == LEFT) {
+      selection.mark.row = selection.end.row;
+      selection.mark.col = selection.end.col - (selection.clicks == 2);
+    } else {
+      selection.mark.row = selection.beg.row;
+      selection.mark.col = selection.beg.col;
+    }
+  }
 
 #if !ENABLE_MINIMAL
   if (selection.rect && selection.beg.col > selection.end.col)
-    ::swap (selection.beg.col, selection.end.col);
+    ::swap(selection.beg.col, selection.end.col);
 #endif
 
-  selection_changed ();
+  selection_changed();
 }
 
 #if !ENABLE_MINIMAL
-void ecb_cold
-rxvt_term::selection_remove_trailing_spaces () noexcept
-{
+void ecb_cold rxvt_term::selection_remove_trailing_spaces() noexcept {
   int32_t end_col, end_row;
   text_t *stp;
 
   end_col = selection.end.col;
   end_row = selection.end.row;
 
-  for (; end_row >= selection.beg.row; )
-    {
-      stp = ROW(end_row).t;
+  for (; end_row >= selection.beg.row;) {
+    stp = ROW(end_row).t;
 
-      while (--end_col >= 0)
-        {
-          if (stp[end_col] != NOCHAR
-              && !unicode::is_space (stp[end_col]))
-            break;
-        }
-
-      if (end_col >= 0
-          || !ROW(end_row - 1).is_longer ())
-        {
-          selection.end.col = end_col + 1;
-          selection.end.row = end_row;
-          break;
-        }
-
-      end_row--;
-      end_col = ncol;
+    while (--end_col >= 0) {
+      if (stp[end_col] != NOCHAR && !unicode::is_space(stp[end_col]))
+        break;
     }
 
-  if (selection.mark.row > selection.end.row)
-    {
-      selection.mark.row = selection.end.row;
-      selection.mark.col = selection.end.col;
+    if (end_col >= 0 || !ROW(end_row - 1).is_longer()) {
+      selection.end.col = end_col + 1;
+      selection.end.row = end_row;
+      break;
     }
-  else if (selection.mark.row == selection.end.row
-           && selection.mark.col > selection.end.col)
+
+    end_row--;
+    end_col = ncol;
+  }
+
+  if (selection.mark.row > selection.end.row) {
+    selection.mark.row = selection.end.row;
+    selection.mark.col = selection.end.col;
+  } else if (selection.mark.row == selection.end.row &&
+             selection.mark.col > selection.end.col)
     selection.mark.col = selection.end.col;
 }
 #endif
@@ -3878,11 +3479,9 @@ rxvt_term::selection_remove_trailing_spaces () noexcept
  * Double click on button 3 when already selected
  * EXT: button 3 double click
  */
-void ecb_cold
-rxvt_term::selection_rotate (int x, int y) noexcept
-{
+void ecb_cold rxvt_term::selection_rotate(int x, int y) noexcept {
   selection.clicks = selection.clicks % 3 + 1;
-  selection_extend_colrow (Pixel2Col (x), Pixel2Row (y), 1, 0, 1);
+  selection_extend_colrow(Pixel2Col(x), Pixel2Row(y), 1, 0, 1);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -3891,8 +3490,7 @@ rxvt_term::selection_rotate (int x, int y) noexcept
  * EXT: SelectionRequest
  */
 void ecb_cold
-rxvt_term::selection_send (const XSelectionRequestEvent &rq) noexcept
-{
+rxvt_term::selection_send(const XSelectionRequestEvent &rq) noexcept {
   Atom property = rq.property == None ? rq.target : rq.property;
   XSelectionEvent ev;
 
@@ -3904,225 +3502,208 @@ rxvt_term::selection_send (const XSelectionRequestEvent &rq) noexcept
   ev.target = rq.target;
   ev.time = rq.time;
 
-  if (rq.target == xa[XA_TARGETS])
-    {
-      Atom target_list[6];
-      Atom *target = target_list;
+  if (rq.target == xa[XA_TARGETS]) {
+    Atom target_list[6];
+    Atom *target = target_list;
 
-      *target++ = xa[XA_TARGETS];
-      *target++ = xa[XA_TIMESTAMP];
-      *target++ = XA_STRING;
-      *target++ = xa[XA_TEXT];
-      *target++ = xa[XA_COMPOUND_TEXT];
+    *target++ = xa[XA_TARGETS];
+    *target++ = xa[XA_TIMESTAMP];
+    *target++ = XA_STRING;
+    *target++ = xa[XA_TEXT];
+    *target++ = xa[XA_COMPOUND_TEXT];
 #if X_HAVE_UTF8_STRING
-      *target++ = xa[XA_UTF8_STRING];
+    *target++ = xa[XA_UTF8_STRING];
 #endif
 
-      XChangeProperty (dpy, rq.requestor, property, XA_ATOM,
-                       32, PropModeReplace,
-                       (unsigned char *)target_list, target - target_list);
-      ev.property = property;
-    }
+    XChangeProperty(dpy, rq.requestor, property, XA_ATOM, 32, PropModeReplace,
+                    (unsigned char *)target_list, target - target_list);
+    ev.property = property;
+  }
 #if TODO // TODO
-  else if (rq.target == xa[XA_MULTIPLE])
-    {
-      /* TODO: Handle MULTIPLE */
-    }
+  else if (rq.target == xa[XA_MULTIPLE]) {
+    /* TODO: Handle MULTIPLE */
+  }
 #endif
-  else if (rq.target == xa[XA_TIMESTAMP] && rq.selection == XA_PRIMARY && selection.text)
-    {
-      XChangeProperty (dpy, rq.requestor, property, rq.target,
-                       32, PropModeReplace, (unsigned char *)&selection_time, 1);
-      ev.property = property;
-    }
-  else if (rq.target == xa[XA_TIMESTAMP] && rq.selection == xa[XA_CLIPBOARD] && selection.clip_text)
-    {
-      XChangeProperty (dpy, rq.requestor, property, rq.target,
-                       32, PropModeReplace, (unsigned char *)&clipboard_time, 1);
-      ev.property = property;
-    }
-  else if (rq.target == XA_STRING
-           || rq.target == xa[XA_TEXT]
-           || rq.target == xa[XA_COMPOUND_TEXT]
-           || rq.target == xa[XA_UTF8_STRING]
-          )
-    {
-      XTextProperty ct;
-      Atom target = rq.target;
-      short freect = 0;
-      int selectlen;
-      wchar_t *cl;
-      enum {
-        enc_string        = XStringStyle,
-        enc_text          = XStdICCTextStyle,
-        enc_compound_text = XCompoundTextStyle,
+  else if (rq.target == xa[XA_TIMESTAMP] && rq.selection == XA_PRIMARY &&
+           selection.text) {
+    XChangeProperty(dpy, rq.requestor, property, rq.target, 32, PropModeReplace,
+                    (unsigned char *)&selection_time, 1);
+    ev.property = property;
+  } else if (rq.target == xa[XA_TIMESTAMP] &&
+             rq.selection == xa[XA_CLIPBOARD] && selection.clip_text) {
+    XChangeProperty(dpy, rq.requestor, property, rq.target, 32, PropModeReplace,
+                    (unsigned char *)&clipboard_time, 1);
+    ev.property = property;
+  } else if (rq.target == XA_STRING || rq.target == xa[XA_TEXT] ||
+             rq.target == xa[XA_COMPOUND_TEXT] ||
+             rq.target == xa[XA_UTF8_STRING]) {
+    XTextProperty ct;
+    Atom target = rq.target;
+    short freect = 0;
+    int selectlen;
+    wchar_t *cl;
+    enum {
+      enc_string = XStringStyle,
+      enc_text = XStdICCTextStyle,
+      enc_compound_text = XCompoundTextStyle,
 #ifdef X_HAVE_UTF8_STRING
-        enc_utf8          = XUTF8StringStyle,
+      enc_utf8 = XUTF8StringStyle,
 #else
-        enc_utf8          = -1,
+      enc_utf8 = -1,
 #endif
-      } style;
+    } style;
 
-      if (target == XA_STRING)
-        // we actually don't do XA_STRING, but who cares, as i18n clients
-        // will ask for another format anyways.
-        style = enc_string;
-      else if (target == xa[XA_TEXT])
-        style = enc_text;
-      else if (target == xa[XA_COMPOUND_TEXT])
-        style = enc_compound_text;
+    if (target == XA_STRING)
+      // we actually don't do XA_STRING, but who cares, as i18n clients
+      // will ask for another format anyways.
+      style = enc_string;
+    else if (target == xa[XA_TEXT])
+      style = enc_text;
+    else if (target == xa[XA_COMPOUND_TEXT])
+      style = enc_compound_text;
 #if !ENABLE_MINIMAL
-      else if (target == xa[XA_UTF8_STRING])
-        style = enc_utf8;
+    else if (target == xa[XA_UTF8_STRING])
+      style = enc_utf8;
 #endif
-      else
-        {
-          target = xa[XA_COMPOUND_TEXT];
-          style = enc_compound_text;
-        }
-
-      if (rq.selection == XA_PRIMARY && selection.text)
-        {
-          cl = selection.text;
-          selectlen = selection.len;
-        }
-      else if (rq.selection == xa[XA_CLIPBOARD] && selection.clip_text)
-        {
-          cl = selection.clip_text;
-          selectlen = selection.clip_len;
-        }
-      else
-        {
-          cl = (wchar_t *)L"";
-          selectlen = 0;
-        }
-
-#if !ENABLE_MINIMAL
-      // xlib is horribly broken with respect to UTF8_STRING, and nobody cares to fix it
-      // so recode it manually
-      if (style == enc_utf8)
-        {
-          freect = 1;
-          ct.encoding = target;
-          ct.format = 8;
-          ct.value = (unsigned char *)rxvt_wcstoutf8 (cl, selectlen);
-          ct.nitems = strlen ((char *)ct.value);
-        }
-      else
-#endif
-      if (XwcTextListToTextProperty (dpy, &cl, 1, (XICCEncodingStyle) style, &ct) >= 0)
-        freect = 1;
-      else
-        {
-          /* if we failed to convert then send it raw */
-          ct.value = (unsigned char *)cl;
-          ct.nitems = selectlen;
-          ct.encoding = target;
-        }
-
-      XChangeProperty (dpy, rq.requestor, property,
-                       ct.encoding, 8, PropModeReplace,
-                       ct.value, (int)ct.nitems);
-      ev.property = property;
-
-      if (freect)
-        XFree (ct.value);
+    else {
+      target = xa[XA_COMPOUND_TEXT];
+      style = enc_compound_text;
     }
 
-  XSendEvent (dpy, rq.requestor, False, 0L, (XEvent *)&ev);
+    if (rq.selection == XA_PRIMARY && selection.text) {
+      cl = selection.text;
+      selectlen = selection.len;
+    } else if (rq.selection == xa[XA_CLIPBOARD] && selection.clip_text) {
+      cl = selection.clip_text;
+      selectlen = selection.clip_len;
+    } else {
+      cl = (wchar_t *)L"";
+      selectlen = 0;
+    }
+
+#if !ENABLE_MINIMAL
+    // xlib is horribly broken with respect to UTF8_STRING, and nobody cares to
+    // fix it so recode it manually
+    if (style == enc_utf8) {
+      freect = 1;
+      ct.encoding = target;
+      ct.format = 8;
+      ct.value = (unsigned char *)rxvt_wcstoutf8(cl, selectlen);
+      ct.nitems = strlen((char *)ct.value);
+    } else
+#endif
+        if (XwcTextListToTextProperty(dpy, &cl, 1, (XICCEncodingStyle)style,
+                                      &ct) >= 0)
+      freect = 1;
+    else {
+      /* if we failed to convert then send it raw */
+      ct.value = (unsigned char *)cl;
+      ct.nitems = selectlen;
+      ct.encoding = target;
+    }
+
+    XChangeProperty(dpy, rq.requestor, property, ct.encoding, 8,
+                    PropModeReplace, ct.value, (int)ct.nitems);
+    ev.property = property;
+
+    if (freect)
+      XFree(ct.value);
+  }
+
+  XSendEvent(dpy, rq.requestor, False, 0L, (XEvent *)&ev);
 }
 
 /* ------------------------------------------------------------------------- */
 #if USE_XIM
-void ecb_cold
-rxvt_term::im_set_position (XPoint &pos) noexcept
-{
+void ecb_cold rxvt_term::im_set_position(XPoint &pos) noexcept {
   XWindowAttributes xwa;
 
-  XGetWindowAttributes (dpy, vt, &xwa);
+  XGetWindowAttributes(dpy, vt, &xwa);
 
-  pos.x = xwa.x + Col2Pixel    (screen.cur.col);
-  pos.y = xwa.y + Height2Pixel (screen.cur.row) + fbase;
+  pos.x = xwa.x + Col2Pixel(screen.cur.col);
+  pos.y = xwa.y + Height2Pixel(screen.cur.row) + fbase;
 }
 #endif
 
 #if ENABLE_OVERLAY
-void
-rxvt_term::scr_overlay_new (int x, int y, int w, int h) noexcept
-{
+void rxvt_term::scr_overlay_new(int x, int y, int w, int h) noexcept {
   if (nrow < 1 || ncol < 1)
     return;
 
   want_refresh = 1;
 
-  scr_overlay_off ();
+  scr_overlay_off();
 
-  if (x < 0) x = ncol - w;
-  if (y < 0) y = nrow - h;
+  if (x < 0)
+    x = ncol - w;
+  if (y < 0)
+    y = nrow - h;
 
   // make space for border
-  w += 2; min_it (w, ncol);
-  h += 2; min_it (h, nrow);
+  w += 2;
+  min_it(w, ncol);
+  h += 2;
+  min_it(h, nrow);
 
-  x -= 1; clamp_it (x, 0, ncol - w);
-  y -= 1; clamp_it (y, 0, nrow - h);
+  x -= 1;
+  clamp_it(x, 0, ncol - w);
+  y -= 1;
+  clamp_it(y, 0, nrow - h);
 
-  ov.x = x; ov.y = y;
-  ov.w = w; ov.h = h;
+  ov.x = x;
+  ov.y = y;
+  ov.w = w;
+  ov.h = h;
 
   ov.text = new text_t *[h];
   ov.rend = new rend_t *[h];
 
-  for (y = 0; y < h; y++)
-    {
-      text_t *tp = ov.text[y] = new text_t[w];
-      rend_t *rp = ov.rend[y] = new rend_t[w];
+  for (y = 0; y < h; y++) {
+    text_t *tp = ov.text[y] = new text_t[w];
+    rend_t *rp = ov.rend[y] = new rend_t[w];
 
-      text_t t0, t1, t2;
-      rend_t r = OVERLAY_RSTYLE;
+    text_t t0, t1, t2;
+    rend_t r = OVERLAY_RSTYLE;
 
-      if (y == 0)
-        t0 = 0x2554, t1 = 0x2550, t2 = 0x2557;
-      else if (y < h - 1)
-        t0 = 0x2551, t1 = 0x0020, t2 = 0x2551;
-      else
-        t0 = 0x255a, t1 = 0x2550, t2 = 0x255d;
+    if (y == 0)
+      t0 = 0x2554, t1 = 0x2550, t2 = 0x2557;
+    else if (y < h - 1)
+      t0 = 0x2551, t1 = 0x0020, t2 = 0x2551;
+    else
+      t0 = 0x255a, t1 = 0x2550, t2 = 0x255d;
 
-      *tp++ = t0;
+    *tp++ = t0;
+    *rp++ = r;
+
+    for (x = w - 2; x > 0; --x) {
+      *tp++ = t1;
       *rp++ = r;
-
-      for (x = w - 2; x > 0; --x)
-        {
-          *tp++ = t1;
-          *rp++ = r;
-        }
-
-      *tp = t2;
-      *rp = r;
     }
+
+    *tp = t2;
+    *rp = r;
+  }
 }
 
-void
-rxvt_term::scr_overlay_off () noexcept
-{
+void rxvt_term::scr_overlay_off() noexcept {
   if (!ov.text)
     return;
 
   want_refresh = 1;
 
-  for (int y = 0; y < ov.h; y++)
-    {
-      delete [] ov.text[y];
-      delete [] ov.rend[y];
-    }
+  for (int y = 0; y < ov.h; y++) {
+    delete[] ov.text[y];
+    delete[] ov.rend[y];
+  }
 
-  delete [] ov.text; ov.text = 0;
-  delete [] ov.rend; ov.rend = 0;
+  delete[] ov.text;
+  ov.text = 0;
+  delete[] ov.rend;
+  ov.rend = 0;
 }
 
-void
-rxvt_term::scr_overlay_set (int x, int y, text_t text, rend_t rend) noexcept
-{
+void rxvt_term::scr_overlay_set(int x, int y, text_t text,
+                                rend_t rend) noexcept {
   if (!ov.text || x >= ov.w - 2 || y >= ov.h - 2)
     return;
 
@@ -4132,57 +3713,50 @@ rxvt_term::scr_overlay_set (int x, int y, text_t text, rend_t rend) noexcept
   ov.rend[y][x] = rend;
 }
 
-void
-rxvt_term::scr_overlay_set (int x, int y, const char *s) noexcept
-{
+void rxvt_term::scr_overlay_set(int x, int y, const char *s) noexcept {
   while (*s)
-    scr_overlay_set (x++, y, *s++);
+    scr_overlay_set(x++, y, *s++);
 }
 
-void
-rxvt_term::scr_overlay_set (int x, int y, const wchar_t *s) noexcept
-{
-  while (*s)
-    {
-      text_t t = *s++;
-      int width = WCWIDTH (t);
+void rxvt_term::scr_overlay_set(int x, int y, const wchar_t *s) noexcept {
+  while (*s) {
+    text_t t = *s++;
+    int width = WCWIDTH(t);
 
-      while (width--)
-        {
-          scr_overlay_set (x++, y, t);
-          t = NOCHAR;
-        }
+    while (width--) {
+      scr_overlay_set(x++, y, t);
+      t = NOCHAR;
     }
+  }
 }
 
-void
-rxvt_term::scr_swap_overlay () noexcept
-{
+void rxvt_term::scr_swap_overlay() noexcept {
   if (!ov.text)
     return;
 
   // hide cursor if it is within the overlay area
-  if (IN_RANGE_EXC (screen.cur.col - ov.x, 0, ov.w)
-      && IN_RANGE_EXC (screen.cur.row - ov.y, 0, ov.h))
+  if (IN_RANGE_EXC(screen.cur.col - ov.x, 0, ov.w) &&
+      IN_RANGE_EXC(screen.cur.row - ov.y, 0, ov.h))
     screen.flags &= ~Screen_VisibleCursor;
 
   // swap screen mem with overlay
-  for (int y = ov.h; y--; )
-    {
-      text_t *t1 = ov.text[y];
-      rend_t *r1 = ov.rend[y];
+  for (int y = ov.h; y--;) {
+    text_t *t1 = ov.text[y];
+    rend_t *r1 = ov.rend[y];
 
-      text_t *t2 = ROW(y + ov.y + view_start).t + ov.x;
-      rend_t *r2 = ROW(y + ov.y + view_start).r + ov.x;
+    text_t *t2 = ROW(y + ov.y + view_start).t + ov.x;
+    rend_t *r2 = ROW(y + ov.y + view_start).r + ov.x;
 
-      for (int x = ov.w; x--; )
-        {
-          text_t t = *t1; *t1++ = *t2; *t2++ = t;
-          rend_t r = *r1; *r1++ = *r2; *r2++ = SET_FONT (r, FONTSET (r)->find_font (t));
-        }
+    for (int x = ov.w; x--;) {
+      text_t t = *t1;
+      *t1++ = *t2;
+      *t2++ = t;
+      rend_t r = *r1;
+      *r1++ = *r2;
+      *r2++ = SET_FONT(r, FONTSET(r)->find_font(t));
     }
+  }
 }
 
 #endif
 /* ------------------------------------------------------------------------- */
-

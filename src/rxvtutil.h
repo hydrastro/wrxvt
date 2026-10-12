@@ -12,54 +12,58 @@
 #include "emman.h"
 
 // various utility functions
-template<typename T, typename U> static inline void min_it (T &a, U b) { a = a < (T)b ? a : (T)b; }
-template<typename T, typename U> static inline void max_it (T &a, U b) { a = a > (T)b ? a : (T)b; }
+template <typename T, typename U> static inline void min_it(T &a, U b) {
+  a = a < (T)b ? a : (T)b;
+}
+template <typename T, typename U> static inline void max_it(T &a, U b) {
+  a = a > (T)b ? a : (T)b;
+}
 
-template<typename T, typename U, typename V> static inline T    clamp    (T  v, U a, V b) { return v < (T)a ? a : v >(T)b ? b : v; }
-template<typename T, typename U, typename V> static inline void clamp_it (T &v, U a, V b) {    v = v < (T)a ? a : v >(T)b ? b : v; }
+template <typename T, typename U, typename V>
+static inline T clamp(T v, U a, V b) {
+  return v<(T)a ? a : v>(T) b ? b : v;
+}
+template <typename T, typename U, typename V>
+static inline void clamp_it(T &v, U a, V b) {
+  v = v<(T)a ? a : v>(T) b ? b : v;
+}
 
 // linear interpolation
-template<typename T, typename U, typename P>
-static inline T
-lerp (T a, U b, P p)
-{
+template <typename T, typename U, typename P>
+static inline T lerp(T a, U b, P p) {
   return (long(a) * long(100 - p) + long(b) * long(p) + 50) / 100;
 }
 
 // return a very temporary (and never deallocated) buffer. keep small.
-void *rxvt_temp_buf (int len);
+void *rxvt_temp_buf(int len);
 
-template<typename T>
-static inline T *
-rxvt_temp_buf (int len)
-{
-  return (T *)rxvt_temp_buf (len * sizeof (T));
+template <typename T> static inline T *rxvt_temp_buf(int len) {
+  return (T *)rxvt_temp_buf(len * sizeof(T));
 }
 
 // in range including end
-#define IN_RANGE_INC(val,beg,end) \
-  ((unsigned int)(val) - (unsigned int)(beg) <= (unsigned int)(end) - (unsigned int)(beg))
+#define IN_RANGE_INC(val, beg, end)                                            \
+  ((unsigned int)(val) - (unsigned int)(beg) <=                                \
+   (unsigned int)(end) - (unsigned int)(beg))
 
 // in range excluding end
-#define IN_RANGE_EXC(val,beg,end) \
-  ((unsigned int)(val) - (unsigned int)(beg) <  (unsigned int)(end) - (unsigned int)(beg))
+#define IN_RANGE_EXC(val, beg, end)                                            \
+  ((unsigned int)(val) - (unsigned int)(beg) <                                 \
+   (unsigned int)(end) - (unsigned int)(beg))
 
 // for m >= -n, ensure remainder lies between 0..n-1
-#define MOD(m,n) (((m) + (n)) % (n))
+#define MOD(m, n) (((m) + (n)) % (n))
 
 // makes dynamically allocated objects zero-initialised
-struct zero_initialized
-{
-  void *operator new (size_t s);
-  void operator delete (void *p, size_t s);
+struct zero_initialized {
+  void *operator new(size_t s);
+  void operator delete(void *p, size_t s);
 };
 
-struct stringvec : simplevec<char *>
-{
-  ~stringvec ()
-  {
-    for (char **c = begin (); c != end (); c++)
-      free (*c);
+struct stringvec : simplevec<char *> {
+  ~stringvec() {
+    for (char **c = begin(); c != end(); c++)
+      free(*c);
   }
 };
 
@@ -83,4 +87,3 @@ struct rxvt_vec : simplevec<void *>
 typedef estl::scoped_array<char> auto_str;
 
 #endif
-

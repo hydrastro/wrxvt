@@ -21,68 +21,58 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *----------------------------------------------------------------------*/
 
-#include "../config.h"		/* NECESSARY */
-#include "rxvt.h"		/* NECESSARY */
+#include "../config.h" /* NECESSARY */
+#include "rxvt.h"      /* NECESSARY */
 
 /*----------------------------------------------------------------------*/
 #if defined(XTERM_SCROLLBAR)
 
-#define x_stp_width	8
-#define x_stp_height	2
-const unsigned char x_stp_bits[] = { 0xaa, 0x55 };
+#define x_stp_width 8
+#define x_stp_height 2
+const unsigned char x_stp_bits[] = {0xaa, 0x55};
 
-int
-scrollBar_t::show_xterm (int update)
-{
+int scrollBar_t::show_xterm(int update) {
   int xsb = 0;
   int sbwidth = width - 1;
 
-  if ((init & SB_STYLE_XTERM) == 0)
-    {
-      XGCValues       gcvalue;
+  if ((init & SB_STYLE_XTERM) == 0) {
+    XGCValues gcvalue;
 
-      init |= SB_STYLE_XTERM;
-      gcvalue.stipple = XCreateBitmapFromData (term->dpy, win,
-                                               (char *)x_stp_bits, x_stp_width,
-                                               x_stp_height);
-      if (!gcvalue.stipple)
-        rxvt_fatal ("can't create bitmap\n");
+    init |= SB_STYLE_XTERM;
+    gcvalue.stipple = XCreateBitmapFromData(term->dpy, win, (char *)x_stp_bits,
+                                            x_stp_width, x_stp_height);
+    if (!gcvalue.stipple)
+      rxvt_fatal("can't create bitmap\n");
 
-      gcvalue.fill_style = FillOpaqueStippled;
-      gcvalue.foreground = term->pix_colors_focused[Color_scroll];
-      gcvalue.background = term->pix_colors_focused[Color_bg];
+    gcvalue.fill_style = FillOpaqueStippled;
+    gcvalue.foreground = term->pix_colors_focused[Color_scroll];
+    gcvalue.background = term->pix_colors_focused[Color_bg];
 
-      xscrollbarGC = XCreateGC (term->dpy, win,
-                                GCForeground | GCBackground
-                                | GCFillStyle | GCStipple, &gcvalue);
-      gcvalue.foreground = term->pix_colors_focused[Color_border];
-      ShadowGC = XCreateGC (term->dpy, win, GCForeground, &gcvalue);
-    }
+    xscrollbarGC = XCreateGC(
+        term->dpy, win, GCForeground | GCBackground | GCFillStyle | GCStipple,
+        &gcvalue);
+    gcvalue.foreground = term->pix_colors_focused[Color_border];
+    ShadowGC = XCreateGC(term->dpy, win, GCForeground, &gcvalue);
+  }
 
-  xsb = term->option (Opt_scrollBar_right) ? 1 : 0;
+  xsb = term->option(Opt_scrollBar_right) ? 1 : 0;
 
-  if (update)
-    {
-      if (last_top < top)
-        XClearArea (term->dpy, win,
-                    xsb, last_top,
-                    sbwidth, (top - last_top), False);
+  if (update) {
+    if (last_top < top)
+      XClearArea(term->dpy, win, xsb, last_top, sbwidth, (top - last_top),
+                 False);
 
-      if (bot < last_bot)
-        XClearArea (term->dpy, win,
-                    xsb, bot,
-                    sbwidth, (last_bot - bot), False);
-    }
-  else
-    XClearWindow (term->dpy, win);
+    if (bot < last_bot)
+      XClearArea(term->dpy, win, xsb, bot, sbwidth, (last_bot - bot), False);
+  } else
+    XClearWindow(term->dpy, win);
 
   /* scrollbar slider */
-  XFillRectangle (term->dpy, win, xscrollbarGC,
-                  xsb + 1, top, sbwidth - 2, bot - top);
+  XFillRectangle(term->dpy, win, xscrollbarGC, xsb + 1, top, sbwidth - 2,
+                 bot - top);
 
-  XDrawLine (term->dpy, win, ShadowGC,
-             xsb ? 0 : sbwidth, beg,
-             xsb ? 0 : sbwidth, end);
+  XDrawLine(term->dpy, win, ShadowGC, xsb ? 0 : sbwidth, beg, xsb ? 0 : sbwidth,
+            end);
   return 1;
 }
 #endif /* XTERM_SCROLLBAR */

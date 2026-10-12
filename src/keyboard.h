@@ -26,56 +26,59 @@
 
 #ifdef KEYSYM_RESOURCE
 
+#include "rxvtutil.h"
+#include <X11/Xlib.h>
 #include <inttypes.h>
 
-#include "rxvtutil.h"
+#define KEYSYM_HASH_BITS 4 /* lowest #bits of keysym is used as hash key */
+#define KEYSYM_HASH_BUCKETS (1 << KEYSYM_HASH_BITS)
+#define KEYSYM_HASH_MASK (KEYSYM_HASH_BUCKETS - 1)
 
-#define KEYSYM_HASH_BITS        4       /* lowest #bits of keysym is used as hash key */
-#define KEYSYM_HASH_BUCKETS     (1 << KEYSYM_HASH_BITS)
-#define KEYSYM_HASH_MASK        (KEYSYM_HASH_BUCKETS - 1)
-
-#define MetaMask                0x0100
-#define NumLockMask             0x0200
-#define AppKeypadMask           0x0400
-#define Level3Mask              0x0800 // currently not supported
-#define OtherModMask            (ShiftMask | LockMask | ControlMask \
-                                | Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask)
+#define MetaMask 0x0100
+#define NumLockMask 0x0200
+#define AppKeypadMask 0x0400
+#define Level3Mask 0x0800 // currently not supported
+#define OtherModMask                                                           \
+  (ShiftMask | LockMask | ControlMask | Mod1Mask | Mod2Mask | Mod3Mask |       \
+   Mod4Mask | Mod5Mask)
 
 #if OtherModMask > 0xff
-# error FATAL: X modifiers might clash with rxvt-unicode ones
+#error FATAL: X modifiers might clash with rxvt-unicode ones
 #endif
 
 struct rxvt_term;
 
-struct keysym_t
-{
+struct keysym_t {
   enum keysym_type {
-    STRING, BUILTIN, BUILTIN_STRING,
+    STRING,
+    BUILTIN,
+    BUILTIN_STRING,
   };
 
-  KeySym      keysym;
+  KeySym keysym;
   /* only the lower 8 bits of state are used for matching according to X.h */
   /* the higher bits are preserved for Meta/NumLock keys */
   /* which are mapped to corresponding lower bits at register time */
-  uint16_t    state;    /* indicates each modifiers' DOWN/UP status         */
+  uint16_t state; /* indicates each modifiers' DOWN/UP status         */
   keysym_type type;
-  char        *str;      /* the key's definition encoded in UTF-8 */
+  char *str; /* the key's definition encoded in UTF-8 */
 };
 
-class keyboard_manager
-{
+class keyboard_manager {
 public:
-  keyboard_manager ();
-  ~keyboard_manager ();
+  keyboard_manager();
+  ~keyboard_manager();
 
-  void unregister_action (KeySym keysym, unsigned int state);
-  void register_action (KeySym keysym, unsigned int state, const wchar_t *ws);
-  void register_done ();        // call this to make newly registered key bindings take effect
-  keysym_t *lookup_keysym (rxvt_term *term, KeySym keysym, unsigned int state);
-  bool dispatch (rxvt_term *term, KeySym keysym, unsigned int state, const char *kbuf, int len);
+  void unregister_action(KeySym keysym, unsigned int state);
+  void register_action(KeySym keysym, unsigned int state, const wchar_t *ws);
+  void register_done(); // call this to make newly registered key bindings take
+                        // effect
+  keysym_t *lookup_keysym(rxvt_term *term, KeySym keysym, unsigned int state);
+  bool dispatch(rxvt_term *term, KeySym keysym, unsigned int state,
+                const char *kbuf, int len);
 
 private:
-  int find_keysym (KeySym keysym, unsigned int state);
+  int find_keysym(KeySym keysym, unsigned int state);
 
 private:
   uint16_t hash[KEYSYM_HASH_BUCKETS];

@@ -1,72 +1,49 @@
 // all resource indices, used by rxvt.h and rxvtperl.xs
 
- def(loginShell)
- def(multiClickTime)
- def(iconic)
- def(visualBell)
- def(mapAlert)
- def(reverseVideo)
- def(utmpInhibit)
- def(scrollBar)
- def(scrollBar_right)
- def(scrollBar_floating)
- def(meta8)
- def(scrollTtyOutput)
- def(scrollTtyKeypress)
- def(transparent)
- def(scrollWithBuffer)
- def(jumpScroll)
- def(skipScroll)
- def(mouseWheelScrollPage)
+def(loginShell) def(multiClickTime) def(iconic) def(visualBell) def(mapAlert)
+    def(reverseVideo) def(utmpInhibit) def(scrollBar) def(scrollBar_right)
+        def(scrollBar_floating) def(meta8) def(scrollTtyOutput)
+            def(scrollTtyKeypress) def(transparent) def(scrollWithBuffer) def(
+                jumpScroll) def(skipScroll) def(mouseWheelScrollPage)
 #if POINTER_BLANK
- def(pointerBlank)
+                def(pointerBlank)
 #else
- nodef(pointerBlank)
+                nodef(pointerBlank)
 #endif
- def(cursorBlink)
- def(secondaryScreen)
- def(secondaryScroll)
- def(pastableTabs)
- def(cursorUnderline)
+                    def(cursorBlink) def(secondaryScreen) def(secondaryScroll)
+                        def(pastableTabs) def(cursorUnderline)
 #if ENABLE_FRILLS
- def(tripleclickwords)
- def(disablePasteBrackets)
- def(borderLess) // mwm borderless hints
+                            def(tripleclickwords) def(disablePasteBrackets)
+                                def(borderLess) // mwm borderless hints
 #endif
 #if ENABLE_FRILLS
- def(insecure)   // insecure esc sequences
- def(share)      // share the terminal on a web page at startup
- def(hold)       // hold window open after exit
- def(override_redirect)
- def(urgentOnBell)
+    def(insecure) // insecure esc sequences
+    def(share)    // share the terminal on a web page at startup
+    def(hold)     // hold window open after exit
+    def(override_redirect) def(urgentOnBell)
 #else
- nodef(insecure)
- nodef(hold)
- nodef(override_redirect)
- nodef(urgentOnBell)
+                            nodef(insecure) nodef(hold) nodef(override_redirect)
+                                nodef(urgentOnBell)
 #endif
 #ifdef BUILTIN_GLYPHS
- def(skipBuiltinGlyphs) // do not use internal glyphs
+        def(skipBuiltinGlyphs) // do not use internal glyphs
 #else
- nodef(skipBuiltinGlyphs)
+                                    nodef(skipBuiltinGlyphs)
 #endif
 #if ENABLE_STYLES
- def(intensityStyles)   // font styles imply intensity
+    def(intensityStyles) // font styles imply intensity
 #else
- nodef(intensityStyles)
+                                        nodef(intensityStyles)
 #endif
 #if ISO_14755
- def(iso14755)
- def(iso14755_52)
+    def(iso14755) def(iso14755_52)
 #else
- nodef(iso14755)
- nodef(iso14755_52)
+                                            nodef(iso14755) nodef(iso14755_52)
 #endif
- def(console)
+        def(console)
 #if XFT
- def(buffered)
+            def(buffered)
 #else
- nodef(buffered)
+                                                    nodef(buffered)
 #endif
- def(dockapp)
-
+                def(dockapp)

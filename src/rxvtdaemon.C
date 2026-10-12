@@ -20,73 +20,65 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *----------------------------------------------------------------------*/
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
-#include <inttypes.h>
-#include <unistd.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 
 #include "../config.h"
 #include "rxvtdaemon.h"
 
-char *rxvt_connection::unix_sockname ()
-{
+char *rxvt_connection::unix_sockname() {
   char name[PATH_MAX];
-  const char *path = getenv ("RXVT_SOCKET");
+  const char *path = getenv("RXVT_SOCKET");
 
-  if (!path)
-    {
-      struct utsname u;
-      uname (&u);
+  if (!path) {
+    struct utsname u;
+    uname(&u);
 
-      path = getenv ("HOME");
-      if (!path)
-        path = "/tmp";
+    path = getenv("HOME");
+    if (!path)
+      path = "/tmp";
 
-      snprintf (name, PATH_MAX, "%s/.urxvt", path);
-      mkdir (name, 0777);
+    snprintf(name, PATH_MAX, "%s/.urxvt", path);
+    mkdir(name, 0777);
 
-      // named after the binary (wrxvtd-HOST), so urxvtd and wrxvtd can
-      // both run without taking each other's socket
-      snprintf (name, PATH_MAX, "%s/.urxvt/" RXVTNAME "d-%s",
-                path,
-                u.nodename);
+    // named after the binary (wrxvtd-HOST), so urxvtd and wrxvtd can
+    // both run without taking each other's socket
+    snprintf(name, PATH_MAX, "%s/.urxvt/" RXVTNAME "d-%s", path, u.nodename);
 
-      path = name;
-    }
+    path = name;
+  }
 
-  return strdup (path);
+  return strdup(path);
 }
 
-void rxvt_connection::send (const char *data, int len)
-{
+void rxvt_connection::send(const char *data, int len) {
   uint8_t s[2];
 
   if (len > 65535)
     len = 65535;
 
-  s[0] = len >> 8; s[1] = len;
+  s[0] = len >> 8;
+  s[1] = len;
 
-  write (fd, s, 2);
-  write (fd, data, len);
+  write(fd, s, 2);
+  write(fd, data, len);
 }
 
-void rxvt_connection::send (const char *data)
-{
-  send (data, strlen (data));
-}
+void rxvt_connection::send(const char *data) { send(data, strlen(data)); }
 
-bool rxvt_connection::recv (auto_str &data, int *len)
-{
+bool rxvt_connection::recv(auto_str &data, int *len) {
   uint8_t s[2];
   int l;
 
-  if (read (fd, s, 2) != 2)
+  if (read(fd, s, 2) != 2)
     return false;
 
   l = (s[0] << 8) + s[1];
@@ -96,9 +88,9 @@ bool rxvt_connection::recv (auto_str &data, int *len)
   if (len)
     *len = l;
 
-  data.reset (new char[l + 1]);
+  data.reset(new char[l + 1]);
 
-  if (read (fd, data, l) != l)
+  if (read(fd, data, l) != l)
     return false;
 
   data[l] = 0;
@@ -106,26 +98,24 @@ bool rxvt_connection::recv (auto_str &data, int *len)
   return true;
 }
 
-void rxvt_connection::send (int data)
-{
+void rxvt_connection::send(int data) {
   uint8_t s[4];
 
-  s[0] = data >> 24; s[1] = data >> 16; s[2] = data >> 8; s[3] = data;
+  s[0] = data >> 24;
+  s[1] = data >> 16;
+  s[2] = data >> 8;
+  s[3] = data;
 
-  write (fd, s, 4);
+  write(fd, s, 4);
 }
 
-bool rxvt_connection::recv (int &data)
-{
+bool rxvt_connection::recv(int &data) {
   uint8_t s[4];
 
-  if (read (fd, s, 4) != 4)
+  if (read(fd, s, 4) != 4)
     return false;
 
   data = (((((s[0] << 8) | s[1]) << 8) | s[2]) << 8) | s[3];
 
   return true;
 }
-
-
-

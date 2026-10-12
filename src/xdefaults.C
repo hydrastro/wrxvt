@@ -29,14 +29,14 @@
 #include "version.h"
 
 #ifdef KEYSYM_RESOURCE
-# include "keyboard.h"
+#include "keyboard.h"
 #endif
 
 /* place holders used for parsing command-line options */
-#define Optflag_Reverse              1
-#define Optflag_Boolean              2
-#define Optflag_Switch               4
-#define Optflag_Info                 8
+#define Optflag_Reverse 1
+#define Optflag_Boolean 2
+#define Optflag_Switch 4
+#define Optflag_Info 8
 
 /* monolithic option/resource structure: */
 /*
@@ -46,254 +46,298 @@
  */
 
 /* INFO () - descriptive information only */
-#define INFO(opt, arg, desc)					\
-    {0, Optflag_Info, -1, NULL, (opt), (arg), (desc)}
+#define INFO(opt, arg, desc) {0, Optflag_Info, -1, NULL, (opt), (arg), (desc)}
 
-#define RINFO(kw, arg)						\
-    {0, Optflag_Info, -1, (kw), NULL, (arg), NULL}
+#define RINFO(kw, arg) {0, Optflag_Info, -1, (kw), NULL, (arg), NULL}
 
 /* STRG () - command-line option, with/without resource */
-#define STRG(rsp, kw, opt, arg, desc)				\
-    {0, 0, (rsp), (kw), (opt), (arg), (desc)}
+#define STRG(rsp, kw, opt, arg, desc) {0, 0, (rsp), (kw), (opt), (arg), (desc)}
 
 /* RSTRG () - resource/long-option */
-#define RSTRG(rsp, kw, arg)					\
-    {0, 0, (rsp), (kw), NULL, (arg), NULL}
+#define RSTRG(rsp, kw, arg) {0, 0, (rsp), (kw), NULL, (arg), NULL}
 
 /* BOOL () - regular boolean `-/+' flag */
-#define BOOL(rsp, kw, opt, option, flag, desc)			\
-    { (option), (Optflag_Boolean | (flag)), (rsp), (kw), (opt), NULL, (desc)}
+#define BOOL(rsp, kw, opt, option, flag, desc)                                 \
+  {(option), (Optflag_Boolean | (flag)), (rsp), (kw), (opt), NULL, (desc)}
 
 /* SWCH () - `-' flag */
-#define SWCH(opt, option, flag, desc)				\
-    { (option), (Optflag_Switch | (flag)), -1, NULL, (opt), NULL, (desc)}
+#define SWCH(opt, option, flag, desc)                                          \
+  {(option), (Optflag_Switch | (flag)), -1, NULL, (opt), NULL, (desc)}
 
 /* convenient macros */
-#define optList_isString(i)						\
-    (optList[i].flag == 0)
-#define optList_isBool(i)						\
-    (optList[i].flag & Optflag_Boolean)
-#define optList_isReverse(i)						\
-    (optList[i].flag & Optflag_Reverse)
-#define optList_isInfo(i)						\
-    (optList[i].flag & Optflag_Info)
+#define optList_isString(i) (optList[i].flag == 0)
+#define optList_isBool(i) (optList[i].flag & Optflag_Boolean)
+#define optList_isReverse(i) (optList[i].flag & Optflag_Reverse)
+#define optList_isInfo(i) (optList[i].flag & Optflag_Info)
 
-static const struct
-  {
-    const uint8_t   index;      /* Option index */
-    const uint8_t   flag;	/* Option flag */
-    const int16_t   doff;	/* resource value index or -1 */
-    const char     *kw;		/* keyword */
-    const char     *opt;	/* option */
-    const char     *arg;	/* argument */
-    const char     *desc;	/* description */
-  }
-optList[] = {
-              STRG (Rs_display_name, NULL, "d", NULL, NULL),	/* short form */
-              STRG (Rs_display_name, NULL, "display", "string", "X server to contact"),
-              STRG (Rs_term_name, "termName", "tn", "string", "value of the TERM environment variable"),
-              STRG (Rs_geometry, NULL, "g", NULL, NULL),	/* short form */
-              STRG (Rs_geometry, "geometry", "geometry", "geometry", "size (in characters) and position"),
-              SWCH ("C", Opt_console, 0, "intercept console messages"),
-              SWCH ("iconic", Opt_iconic, 0, "start iconic"),
-              SWCH ("ic", Opt_iconic, 0, NULL),	/* short form */
-              STRG (Rs_chdir, "chdir", "cd", "string", "start shell in this directory"),
-              RSTRG (Rs_notifyCommand, "notifyCommand", "string"),
-              RSTRG (Rs_shareAddress, "shareAddress", "address"),
-              RSTRG (Rs_sharePort, "sharePort", "number"),
-              RSTRG (Rs_shareCertificate, "shareCertificate", "file|auto"),
-              RSTRG (Rs_shareKey, "shareKey", "file"),
-              STRG (Rs_record, NULL, "record", "file", "record the terminal to an asciinema file"),
-              RSTRG (Rs_recordDirectory, "recordDirectory", "directory"),
-              RSTRG (Rs_scrollbackCommand, "scrollbackCommand", "command"),
-              RSTRG (Rs_notifyLongCommand, "notifyLongCommand", "seconds"),
-              RSTRG (Rs_imageMemory, "imageMemory", "MiB"),
-              SWCH ("dockapp", Opt_dockapp, 0, "start as dockapp"),
-              BOOL (Rs_reverseVideo, "reverseVideo", "rv", Opt_reverseVideo, 0, "reverse video"),
-              BOOL (Rs_loginShell, "loginShell", "ls", Opt_loginShell, 0, "login shell"),
-              STRG (Rs_multiClickTime, "multiClickTime", "mc", "number", "maximum time (in ms) between multi-click selections"),
-              BOOL (Rs_jumpScroll, "jumpScroll", "j", Opt_jumpScroll, 0, "jump scrolling"),
-              BOOL (Rs_skipScroll, "skipScroll", "ss", Opt_skipScroll, 0, "skip scrolling"),
-              BOOL (Rs_pastableTabs, "pastableTabs", "ptab", Opt_pastableTabs, 0, "tab characters are pastable"),
-              RSTRG (Rs_scrollstyle, "scrollstyle", "mode"),
-              BOOL (Rs_scrollBar, "scrollBar", "sb", Opt_scrollBar, 0, "scrollbar"),
-              BOOL (Rs_scrollBar_right, "scrollBar_right", "sr", Opt_scrollBar_right, 0, "scrollbar right"),
-              BOOL (Rs_scrollBar_floating, "scrollBar_floating", "st", Opt_scrollBar_floating, 0, "scrollbar without a trough"),
-              RSTRG (Rs_scrollBar_align, "scrollBar_align", "mode"),
-              STRG (Rs_scrollBar_thickness, "thickness", "sbt", "number", "scrollbar thickness/width in pixels"),
-              BOOL (Rs_scrollTtyOutput, "scrollTtyOutput", NULL, Opt_scrollTtyOutput, 0, NULL),
-              BOOL (Rs_scrollTtyOutput, NULL, "si",  Opt_scrollTtyOutput, Optflag_Reverse, "scroll-on-tty-output inhibit"),
-              BOOL (Rs_scrollTtyKeypress, "scrollTtyKeypress", "sk", Opt_scrollTtyKeypress, 0, "scroll-on-keypress"),
-              BOOL (Rs_scrollWithBuffer, "scrollWithBuffer", "sw", Opt_scrollWithBuffer, 0, "scroll-with-buffer"),
+static const struct {
+  const uint8_t index; /* Option index */
+  const uint8_t flag;  /* Option flag */
+  const int16_t doff;  /* resource value index or -1 */
+  const char *kw;      /* keyword */
+  const char *opt;     /* option */
+  const char *arg;     /* argument */
+  const char *desc;    /* description */
+} optList[] = {
+    STRG(Rs_display_name, NULL, "d", NULL, NULL), /* short form */
+    STRG(Rs_display_name, NULL, "display", "string", "X server to contact"),
+    STRG(Rs_term_name, "termName", "tn", "string",
+         "value of the TERM environment variable"),
+    STRG(Rs_geometry, NULL, "g", NULL, NULL), /* short form */
+    STRG(Rs_geometry, "geometry", "geometry", "geometry",
+         "size (in characters) and position"),
+    SWCH("C", Opt_console, 0, "intercept console messages"),
+    SWCH("iconic", Opt_iconic, 0, "start iconic"),
+    SWCH("ic", Opt_iconic, 0, NULL), /* short form */
+    STRG(Rs_chdir, "chdir", "cd", "string", "start shell in this directory"),
+    RSTRG(Rs_notifyCommand, "notifyCommand", "string"),
+    RSTRG(Rs_shareAddress, "shareAddress", "address"),
+    RSTRG(Rs_sharePort, "sharePort", "number"),
+    RSTRG(Rs_shareCertificate, "shareCertificate", "file|auto"),
+    RSTRG(Rs_shareKey, "shareKey", "file"),
+    STRG(Rs_record, NULL, "record", "file",
+         "record the terminal to an asciinema file"),
+    RSTRG(Rs_recordDirectory, "recordDirectory", "directory"),
+    RSTRG(Rs_scrollbackCommand, "scrollbackCommand", "command"),
+    RSTRG(Rs_notifyLongCommand, "notifyLongCommand", "seconds"),
+    RSTRG(Rs_imageMemory, "imageMemory", "MiB"),
+    SWCH("dockapp", Opt_dockapp, 0, "start as dockapp"),
+    BOOL(Rs_reverseVideo, "reverseVideo", "rv", Opt_reverseVideo, 0,
+         "reverse video"),
+    BOOL(Rs_loginShell, "loginShell", "ls", Opt_loginShell, 0, "login shell"),
+    STRG(Rs_multiClickTime, "multiClickTime", "mc", "number",
+         "maximum time (in ms) between multi-click selections"),
+    BOOL(Rs_jumpScroll, "jumpScroll", "j", Opt_jumpScroll, 0, "jump scrolling"),
+    BOOL(Rs_skipScroll, "skipScroll", "ss", Opt_skipScroll, 0,
+         "skip scrolling"),
+    BOOL(Rs_pastableTabs, "pastableTabs", "ptab", Opt_pastableTabs, 0,
+         "tab characters are pastable"),
+    RSTRG(Rs_scrollstyle, "scrollstyle", "mode"),
+    BOOL(Rs_scrollBar, "scrollBar", "sb", Opt_scrollBar, 0, "scrollbar"),
+    BOOL(Rs_scrollBar_right, "scrollBar_right", "sr", Opt_scrollBar_right, 0,
+         "scrollbar right"),
+    BOOL(Rs_scrollBar_floating, "scrollBar_floating", "st",
+         Opt_scrollBar_floating, 0, "scrollbar without a trough"),
+    RSTRG(Rs_scrollBar_align, "scrollBar_align", "mode"),
+    STRG(Rs_scrollBar_thickness, "thickness", "sbt", "number",
+         "scrollbar thickness/width in pixels"),
+    BOOL(Rs_scrollTtyOutput, "scrollTtyOutput", NULL, Opt_scrollTtyOutput, 0,
+         NULL),
+    BOOL(Rs_scrollTtyOutput, NULL, "si", Opt_scrollTtyOutput, Optflag_Reverse,
+         "scroll-on-tty-output inhibit"),
+    BOOL(Rs_scrollTtyKeypress, "scrollTtyKeypress", "sk", Opt_scrollTtyKeypress,
+         0, "scroll-on-keypress"),
+    BOOL(Rs_scrollWithBuffer, "scrollWithBuffer", "sw", Opt_scrollWithBuffer, 0,
+         "scroll-with-buffer"),
 #if OFF_FOCUS_FADING
-              STRG (Rs_fade, "fading", "fade", "number", "fade colors by number % when losing focus"),
-              STRG (Rs_color + Color_fade, "fadeColor", "fadecolor", "color", "target color for off-focus fading"),
+    STRG(Rs_fade, "fading", "fade", "number",
+         "fade colors by number % when losing focus"),
+    STRG(Rs_color + Color_fade, "fadeColor", "fadecolor", "color",
+         "target color for off-focus fading"),
 #endif
-              BOOL (Rs_utmpInhibit, "utmpInhibit", "ut", Opt_utmpInhibit, 0, "utmp inhibit"),
+    BOOL(Rs_utmpInhibit, "utmpInhibit", "ut", Opt_utmpInhibit, 0,
+         "utmp inhibit"),
 #ifndef NO_BELL
-# if ENABLE_FRILLS
-              BOOL (Rs_urgentOnBell, "urgentOnBell", NULL, Opt_urgentOnBell, 0, NULL),
-# endif
-              BOOL (Rs_visualBell, "visualBell", "vb", Opt_visualBell, 0, "visual bell"),
-# if ! defined(NO_MAPALERT) && defined(MAPALERT_OPTION)
-              BOOL (Rs_mapAlert, "mapAlert", NULL, Opt_mapAlert, 0, NULL),
-# endif
+#if ENABLE_FRILLS
+    BOOL(Rs_urgentOnBell, "urgentOnBell", NULL, Opt_urgentOnBell, 0, NULL),
+#endif
+    BOOL(Rs_visualBell, "visualBell", "vb", Opt_visualBell, 0, "visual bell"),
+#if !defined(NO_MAPALERT) && defined(MAPALERT_OPTION)
+    BOOL(Rs_mapAlert, "mapAlert", NULL, Opt_mapAlert, 0, NULL),
+#endif
 #endif
 #ifdef META8_OPTION
-              BOOL (Rs_meta8, "meta8", NULL, Opt_meta8, 0, NULL),
+    BOOL(Rs_meta8, "meta8", NULL, Opt_meta8, 0, NULL),
 #endif
 #ifdef MOUSE_WHEEL
-              BOOL (Rs_mouseWheelScrollPage, "mouseWheelScrollPage", NULL, Opt_mouseWheelScrollPage, 0, NULL),
+    BOOL(Rs_mouseWheelScrollPage, "mouseWheelScrollPage", NULL,
+         Opt_mouseWheelScrollPage, 0, NULL),
 #endif
 #if ENABLE_FRILLS
-              BOOL (Rs_disablePasteBrackets, "disablePasteBrackets", "dpb", Opt_disablePasteBrackets, 0, "paste bracket suppression"),
-              BOOL (Rs_tripleclickwords, "tripleclickwords", "tcw", Opt_tripleclickwords, 0, "triple click word selection"),
-              BOOL (Rs_insecure, "insecure", "insecure", Opt_insecure, 0, "enable possibly insecure escape sequences"),
-              SWCH ("share", Opt_share, 0, "share the terminal on a web page"),
-              BOOL (Rs_cursorUnderline, "cursorUnderline", "uc", Opt_cursorUnderline, 0, "underline cursor"),
+    BOOL(Rs_disablePasteBrackets, "disablePasteBrackets", "dpb",
+         Opt_disablePasteBrackets, 0, "paste bracket suppression"),
+    BOOL(Rs_tripleclickwords, "tripleclickwords", "tcw", Opt_tripleclickwords,
+         0, "triple click word selection"),
+    BOOL(Rs_insecure, "insecure", "insecure", Opt_insecure, 0,
+         "enable possibly insecure escape sequences"),
+    SWCH("share", Opt_share, 0, "share the terminal on a web page"),
+    BOOL(Rs_cursorUnderline, "cursorUnderline", "uc", Opt_cursorUnderline, 0,
+         "underline cursor"),
 #endif
 #if CURSOR_BLINK
-              BOOL (Rs_cursorBlink, "cursorBlink", "bc", Opt_cursorBlink, 0, "blinking cursor"),
+    BOOL(Rs_cursorBlink, "cursorBlink", "bc", Opt_cursorBlink, 0,
+         "blinking cursor"),
 #endif
 #ifdef POINTER_BLANK
-              BOOL (Rs_pointerBlank, "pointerBlank", "pb", Opt_pointerBlank, 0, "switch off pointer after delay"),
+    BOOL(Rs_pointerBlank, "pointerBlank", "pb", Opt_pointerBlank, 0,
+         "switch off pointer after delay"),
 #endif
-              STRG (Rs_color + Color_bg, "background", "bg", "color", "background color"),
-              STRG (Rs_color + Color_fg, "foreground", "fg", "color", "foreground color"),
-              RSTRG (Rs_color + minCOLOR + 0, "color0", "color"),
-              RSTRG (Rs_color + minCOLOR + 1, "color1", "color"),
-              RSTRG (Rs_color + minCOLOR + 2, "color2", "color"),
-              RSTRG (Rs_color + minCOLOR + 3, "color3", "color"),
-              RSTRG (Rs_color + minCOLOR + 4, "color4", "color"),
-              RSTRG (Rs_color + minCOLOR + 5, "color5", "color"),
-              RSTRG (Rs_color + minCOLOR + 6, "color6", "color"),
-              RSTRG (Rs_color + minCOLOR + 7, "color7", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 0, "color8", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 1, "color9", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 2, "color10", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 3, "color11", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 4, "color12", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 5, "color13", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 6, "color14", "color"),
-              RSTRG (Rs_color + minBrightCOLOR + 7, "color15", "color"),
+    STRG(Rs_color + Color_bg, "background", "bg", "color", "background color"),
+    STRG(Rs_color + Color_fg, "foreground", "fg", "color", "foreground color"),
+    RSTRG(Rs_color + minCOLOR + 0, "color0", "color"),
+    RSTRG(Rs_color + minCOLOR + 1, "color1", "color"),
+    RSTRG(Rs_color + minCOLOR + 2, "color2", "color"),
+    RSTRG(Rs_color + minCOLOR + 3, "color3", "color"),
+    RSTRG(Rs_color + minCOLOR + 4, "color4", "color"),
+    RSTRG(Rs_color + minCOLOR + 5, "color5", "color"),
+    RSTRG(Rs_color + minCOLOR + 6, "color6", "color"),
+    RSTRG(Rs_color + minCOLOR + 7, "color7", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 0, "color8", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 1, "color9", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 2, "color10", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 3, "color11", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 4, "color12", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 5, "color13", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 6, "color14", "color"),
+    RSTRG(Rs_color + minBrightCOLOR + 7, "color15", "color"),
 #if !ENABLE_MINIMAL
-# include "colorres.h"
+#include "colorres.h"
 #endif
 #ifndef NO_BOLD_UNDERLINE_REVERSE
-              RSTRG (Rs_color + Color_BD, "colorBD", "color"),
-              RSTRG (Rs_color + Color_IT, "colorIT", "color"),
-              RSTRG (Rs_color + Color_UL, "colorUL", "color"),
-              RSTRG (Rs_color + Color_RV, "colorRV", "color"),
+    RSTRG(Rs_color + Color_BD, "colorBD", "color"),
+    RSTRG(Rs_color + Color_IT, "colorIT", "color"),
+    RSTRG(Rs_color + Color_UL, "colorUL", "color"),
+    RSTRG(Rs_color + Color_RV, "colorRV", "color"),
 #endif /* ! NO_BOLD_UNDERLINE_REVERSE */
 #if ENABLE_FRILLS
-              RSTRG (Rs_color + Color_underline, "underlineColor", "color"),
+    RSTRG(Rs_color + Color_underline, "underlineColor", "color"),
 #endif
-              RSTRG (Rs_color + Color_scroll, "scrollColor", "color"),
+    RSTRG(Rs_color + Color_scroll, "scrollColor", "color"),
 #ifdef RXVT_SCROLLBAR
-              RSTRG (Rs_color + Color_trough, "troughColor", "color"),
+    RSTRG(Rs_color + Color_trough, "troughColor", "color"),
 #endif
 #ifdef OPTION_HC
-              STRG (Rs_color + Color_HC, "highlightColor", "hc", "color", "highlight color"),
-              RSTRG (Rs_color + Color_HTC, "highlightTextColor", "color"),
+    STRG(Rs_color + Color_HC, "highlightColor", "hc", "color",
+         "highlight color"),
+    RSTRG(Rs_color + Color_HTC, "highlightTextColor", "color"),
 #endif
 #ifndef NO_CURSORCOLOR
-              STRG (Rs_color + Color_cursor, "cursorColor", "cr", "color", "cursor color"),
-              /* command-line option = resource name */
-              RSTRG (Rs_color + Color_cursor2, "cursorColor2", "color"),
+    STRG(Rs_color + Color_cursor, "cursorColor", "cr", "color", "cursor color"),
+    /* command-line option = resource name */
+    RSTRG(Rs_color + Color_cursor2, "cursorColor2", "color"),
 #endif /* NO_CURSORCOLOR */
-              STRG (Rs_color + Color_pointer_fg, "pointerColor", "pr", "color", "pointer color"),
-              STRG (Rs_color + Color_pointer_bg, "pointerColor2", "pr2", "color", "pointer bg color"),
-              STRG (Rs_color + Color_border, "borderColor", "bd", "color", "border color"),
+    STRG(Rs_color + Color_pointer_fg, "pointerColor", "pr", "color",
+         "pointer color"),
+    STRG(Rs_color + Color_pointer_bg, "pointerColor2", "pr2", "color",
+         "pointer bg color"),
+    STRG(Rs_color + Color_border, "borderColor", "bd", "color", "border color"),
 #if ENABLE_EWMH
-              STRG (Rs_iconfile, "iconFile", "icon", "file", "path to application icon image"),
+    STRG(Rs_iconfile, "iconFile", "icon", "file",
+         "path to application icon image"),
 #endif
 #ifdef HAVE_XMU
-              RSTRG (Rs_pointerShape, "pointerShape", "string"),
+    RSTRG(Rs_pointerShape, "pointerShape", "string"),
 #endif
-              /* fonts: command-line option = resource name */
-              STRG (Rs_font, "font", "fn", "fontname", "normal text font"),
+    /* fonts: command-line option = resource name */
+    STRG(Rs_font, "font", "fn", "fontname", "normal text font"),
 #if ENABLE_STYLES
-              STRG (Rs_boldFont, "boldFont", "fb", "fontname", "bold font"),
-              STRG (Rs_italicFont, "italicFont", "fi", "fontname", "italic font"),
-              STRG (Rs_boldItalicFont, "boldItalicFont", "fbi", "fontname", "bold italic font"),
-              BOOL (Rs_intensityStyles, "intensityStyles", "is", Opt_intensityStyles, 0, "font styles imply intensity changes"),
+    STRG(Rs_boldFont, "boldFont", "fb", "fontname", "bold font"),
+    STRG(Rs_italicFont, "italicFont", "fi", "fontname", "italic font"),
+    STRG(Rs_boldItalicFont, "boldItalicFont", "fbi", "fontname",
+         "bold italic font"),
+    BOOL(Rs_intensityStyles, "intensityStyles", "is", Opt_intensityStyles, 0,
+         "font styles imply intensity changes"),
 #endif
 #if USE_XIM
-              STRG (Rs_inputMethod, "inputMethod", "im", "name", "name of input method"),
-              STRG (Rs_preeditType, "preeditType", "pt", "style", "input style: style = OverTheSpot|OffTheSpot|Root"),
-              STRG (Rs_imLocale, "imLocale", "imlocale", "string", "locale to use for input method"),
-              STRG (Rs_imFont, "imFont", "imfont", "fontname", "fontset for styles OverTheSpot and OffTheSpot"),
+    STRG(Rs_inputMethod, "inputMethod", "im", "name", "name of input method"),
+    STRG(Rs_preeditType, "preeditType", "pt", "style",
+         "input style: style = OverTheSpot|OffTheSpot|Root"),
+    STRG(Rs_imLocale, "imLocale", "imlocale", "string",
+         "locale to use for input method"),
+    STRG(Rs_imFont, "imFont", "imfont", "fontname",
+         "fontset for styles OverTheSpot and OffTheSpot"),
 #endif /* USE_XIM */
-              STRG (Rs_name, NULL, "name", "string", "client instance, icon, and title strings"),
-              STRG (Rs_title, "title", "title", "string", "title name for window"),
-              STRG (Rs_title, NULL, "T", NULL, NULL),	/* short form */
-              STRG (Rs_iconName, "iconName", "n", "string", "icon name for window"),
-              STRG (Rs_saveLines, "saveLines", "sl", "number", "number of scrolled lines to save"),
+    STRG(Rs_name, NULL, "name", "string",
+         "client instance, icon, and title strings"),
+    STRG(Rs_title, "title", "title", "string", "title name for window"),
+    STRG(Rs_title, NULL, "T", NULL, NULL), /* short form */
+    STRG(Rs_iconName, "iconName", "n", "string", "icon name for window"),
+    STRG(Rs_saveLines, "saveLines", "sl", "number",
+         "number of scrolled lines to save"),
 #if ENABLE_XEMBED
-              STRG (Rs_embed, NULL, "embed", "windowid", "window id to embed terminal in"),
+    STRG(Rs_embed, NULL, "embed", "windowid", "window id to embed terminal in"),
 #endif
 #if XFT
-              BOOL (Rs_buffered, "buffered", NULL, Opt_buffered, 0, NULL),
+    BOOL(Rs_buffered, "buffered", NULL, Opt_buffered, 0, NULL),
 #endif
 #if ENABLE_FRILLS
-              STRG (Rs_refreshRate, "refreshRate", "fps", "number", "refresh rate / frames per second"),
-              STRG (Rs_depth, "depth", "depth", "number", "depth of visual to request"),
-              STRG (Rs_visual, "visual", "visual", "number", "visual id to request"),
-              RSTRG (Rs_transient_for, "transient-for", "windowid"),
-              BOOL (Rs_override_redirect, "override-redirect", "override-redirect", Opt_override_redirect, 0, "override-redirect on the terminal window"),
-              STRG (Rs_pty_fd, NULL, "pty-fd", "fileno", "file descriptor of pty to use"),
-              BOOL (Rs_hold, "hold", "hold", Opt_hold, 0, "retain window after shell exit"),
-              STRG (Rs_ext_bwidth, "externalBorder", "w", "number", "external border in pixels"),
-              STRG (Rs_ext_bwidth, NULL, "bw", NULL, NULL),
-              STRG (Rs_ext_bwidth, NULL, "borderwidth", NULL, NULL),
-              STRG (Rs_int_bwidth, "internalBorder", "b", "number", "internal border in pixels"),
-              BOOL (Rs_borderLess, "borderLess", "bl", Opt_borderLess, 0, "borderless window"),
-              STRG (Rs_lineSpace, "lineSpace", "lsp", "number", "number of extra pixels between rows"),
-              STRG (Rs_letterSpace, "letterSpace", "letsp", "number", "letter spacing adjustment"),
+    STRG(Rs_refreshRate, "refreshRate", "fps", "number",
+         "refresh rate / frames per second"),
+    STRG(Rs_depth, "depth", "depth", "number", "depth of visual to request"),
+    STRG(Rs_visual, "visual", "visual", "number", "visual id to request"),
+    RSTRG(Rs_transient_for, "transient-for", "windowid"),
+    BOOL(Rs_override_redirect, "override-redirect", "override-redirect",
+         Opt_override_redirect, 0, "override-redirect on the terminal window"),
+    STRG(Rs_pty_fd, NULL, "pty-fd", "fileno", "file descriptor of pty to use"),
+    BOOL(Rs_hold, "hold", "hold", Opt_hold, 0,
+         "retain window after shell exit"),
+    STRG(Rs_ext_bwidth, "externalBorder", "w", "number",
+         "external border in pixels"),
+    STRG(Rs_ext_bwidth, NULL, "bw", NULL, NULL),
+    STRG(Rs_ext_bwidth, NULL, "borderwidth", NULL, NULL),
+    STRG(Rs_int_bwidth, "internalBorder", "b", "number",
+         "internal border in pixels"),
+    BOOL(Rs_borderLess, "borderLess", "bl", Opt_borderLess, 0,
+         "borderless window"),
+    STRG(Rs_lineSpace, "lineSpace", "lsp", "number",
+         "number of extra pixels between rows"),
+    STRG(Rs_letterSpace, "letterSpace", "letsp", "number",
+         "letter spacing adjustment"),
 #endif
 #ifdef BUILTIN_GLYPHS
-              BOOL (Rs_skipBuiltinGlyphs, "skipBuiltinGlyphs", "sbg", Opt_skipBuiltinGlyphs, 0, "use of font glyphs instead of internal glyphs"),
+    BOOL(Rs_skipBuiltinGlyphs, "skipBuiltinGlyphs", "sbg",
+         Opt_skipBuiltinGlyphs, 0,
+         "use of font glyphs instead of internal glyphs"),
 #endif
 #ifdef POINTER_BLANK
-              RSTRG (Rs_pointerBlankDelay, "pointerBlankDelay", "number"),
+    RSTRG(Rs_pointerBlankDelay, "pointerBlankDelay", "number"),
 #endif
 #ifndef NO_BACKSPACE_KEY
-              RSTRG (Rs_backspace_key, "backspacekey", "string"),
+    RSTRG(Rs_backspace_key, "backspacekey", "string"),
 #endif
 #ifndef NO_DELETE_KEY
-              RSTRG (Rs_delete_key, "deletekey", "string"),
+    RSTRG(Rs_delete_key, "deletekey", "string"),
 #endif
 #ifdef PRINTPIPE
-              RSTRG (Rs_print_pipe, "print-pipe", "string"),
+    RSTRG(Rs_print_pipe, "print-pipe", "string"),
 #endif
-              STRG (Rs_modifier, "modifier", "mod", "modifier", "meta modifier = alt|meta|hyper|super|mod1|...|mod5"),
-              RSTRG (Rs_cutchars, "cutchars", "string"),
-              RSTRG (Rs_answerbackstring, "answerbackString", "string"),
+    STRG(Rs_modifier, "modifier", "mod", "modifier",
+         "meta modifier = alt|meta|hyper|super|mod1|...|mod5"),
+    RSTRG(Rs_cutchars, "cutchars", "string"),
+    RSTRG(Rs_answerbackstring, "answerbackString", "string"),
 #ifndef NO_SECONDARY_SCREEN
-              BOOL (Rs_secondaryScreen, "secondaryScreen", "ssc", Opt_secondaryScreen, 0, "secondary screen"),
-              BOOL (Rs_secondaryScroll, "secondaryScroll", "ssr", Opt_secondaryScroll, 0, "secondary screen scroll"),
+    BOOL(Rs_secondaryScreen, "secondaryScreen", "ssc", Opt_secondaryScreen, 0,
+         "secondary screen"),
+    BOOL(Rs_secondaryScroll, "secondaryScroll", "ssr", Opt_secondaryScroll, 0,
+         "secondary screen scroll"),
 #endif
 #if ENABLE_FRILLS
-              STRG (Rs_rewrapMode, "rewrapMode", "rm", "string", "rewrap mode (auto, always, never)"),
+    STRG(Rs_rewrapMode, "rewrapMode", "rm", "string",
+         "rewrap mode (auto, always, never)"),
 #endif
 #if ENABLE_PERL
-              RSTRG (Rs_perl_lib, "perl-lib", "string"), //, "colon-separated directories with extension scripts"),TODO
-              RSTRG (Rs_perl_eval, "perl-eval", "perl-eval"), // "string", "code to be evaluated after all extensions have been loaded"),TODO
-              RSTRG (Rs_perl_ext_1, "perl-ext-common", "string"), //, "colon-separated list of perl extensions to enable"),TODO
-              STRG (Rs_perl_ext_2, "perl-ext", "pe", "string", "colon-separated list of perl extensions to enable for this instance"),
+    RSTRG(Rs_perl_lib, "perl-lib", "string"), //, "colon-separated directories
+                                              // with extension scripts"),TODO
+    RSTRG(Rs_perl_eval, "perl-eval",
+          "perl-eval"), // "string", "code to be evaluated after all extensions
+                        // have been loaded"),TODO
+    RSTRG(
+        Rs_perl_ext_1, "perl-ext-common",
+        "string"), //, "colon-separated list of perl extensions to enable"),TODO
+    STRG(Rs_perl_ext_2, "perl-ext", "pe", "string",
+         "colon-separated list of perl extensions to enable for this instance"),
 #endif
 #if ISO_14755
-              BOOL (Rs_iso14755, "iso14755", NULL, Opt_iso14755, 0, NULL),
-              BOOL (Rs_iso14755_52, "iso14755_52", NULL, Opt_iso14755_52, 0, NULL),
+    BOOL(Rs_iso14755, "iso14755", NULL, Opt_iso14755, 0, NULL),
+    BOOL(Rs_iso14755_52, "iso14755_52", NULL, Opt_iso14755_52, 0, NULL),
 #endif
 #ifndef NO_RESOURCES
-              RINFO ("xrm", "string"),
+    RINFO("xrm", "string"),
 #endif
 #ifdef KEYSYM_RESOURCE
-              RINFO ("keysym.sym", "keysym"),
+    RINFO("keysym.sym", "keysym"),
 #endif
-              INFO ("e", "command arg ...", "command to execute")
-            };
+    INFO("e", "command arg ...", "command to execute")};
 
 #undef INFO
 #undef RINFO
@@ -302,7 +346,9 @@ optList[] = {
 #undef SWCH
 #undef BOOL
 
-static const char releasestring[] = "wrxvt (" RXVTNAME ") v" VERSION ", based on rxvt-unicode " UPSTREAM_VERSION " - released: " DATE "\n";
+static const char releasestring[] =
+    "wrxvt (" RXVTNAME ") v" VERSION ", based on rxvt-unicode " UPSTREAM_VERSION
+    " - released: " DATE "\n";
 static const char optionsstring[] = "options: "
 #if ENABLE_PERL
                                     "perl,"
@@ -404,254 +450,222 @@ static const char optionsstring[] = "options: "
 #if defined(XTERM_SCROLLBAR)
                                     "+xterm"
 #endif
-                                    "\nUsage: ";		/* Usage */
+                                    "\nUsage: "; /* Usage */
 
 #define INDENT 28
 
-const char rxvt_term::resval_undef [] = "<undef>";
-const char rxvt_term::resval_on []    = "on";
-const char rxvt_term::resval_off []   = "off";
+const char rxvt_term::resval_undef[] = "<undef>";
+const char rxvt_term::resval_on[] = "on";
+const char rxvt_term::resval_off[] = "off";
 
 /*{{{ usage: */
 /*----------------------------------------------------------------------*/
-void
-rxvt_term::rxvt_usage (int type)
-{
+void rxvt_term::rxvt_usage(int type) {
   unsigned int i, col;
 
-  rxvt_log ("%s%s%s", releasestring, optionsstring, RXVTNAME);
+  rxvt_log("%s%s%s", releasestring, optionsstring, RXVTNAME);
 
-  switch (type)
-    {
-      case 0:			/* brief listing */
-        rxvt_log (" [-help] [--help]\n");
+  switch (type) {
+  case 0: /* brief listing */
+    rxvt_log(" [-help] [--help]\n");
 
-        for (col = 1, i = 0; i < ecb_array_length (optList); i++)
-          if (optList[i].desc != NULL)
-            {
-              int len = 0;
+    for (col = 1, i = 0; i < ecb_array_length(optList); i++)
+      if (optList[i].desc != NULL) {
+        int len = 0;
 
-              if (optList[i].arg)
-                len = strlen (optList[i].arg) + 1;
+        if (optList[i].arg)
+          len = strlen(optList[i].arg) + 1;
 
-              assert (optList[i].opt != NULL);
-              len += 4 + strlen (optList[i].opt) + (optList_isBool (i) ? 2 : 0);
-              col += len;
+        assert(optList[i].opt != NULL);
+        len += 4 + strlen(optList[i].opt) + (optList_isBool(i) ? 2 : 0);
+        col += len;
 
-              if (col > 79)
-                {
-                  /* assume regular width */
-                  rxvt_log ("\n");
-                  col = 1 + len;
-                }
+        if (col > 79) {
+          /* assume regular width */
+          rxvt_log("\n");
+          col = 1 + len;
+        }
 
-              rxvt_log (" [-%s%s", (optList_isBool (i) ? "/+" : ""), optList[i].opt);
+        rxvt_log(" [-%s%s", (optList_isBool(i) ? "/+" : ""), optList[i].opt);
 
-              if (optList[i].arg)
-                rxvt_log (" %s]", optList[i].arg);
-              else
-                rxvt_log ("]");
-            }
-        break;
+        if (optList[i].arg)
+          rxvt_log(" %s]", optList[i].arg);
+        else
+          rxvt_log("]");
+      }
+    break;
 
-      case 1:			/* full command-line listing */
-        rxvt_log (" [options] [-e command args]\n\nwhere options include:\n");
+  case 1: /* full command-line listing */
+    rxvt_log(" [options] [-e command args]\n\nwhere options include:\n");
 
-        for (i = 0; i < ecb_array_length (optList); i++)
-          if (optList[i].desc != NULL)
-            {
-              assert (optList[i].opt != NULL);
-              rxvt_log ("  %s%s %-*s%s%s\n",
-                         (optList_isBool (i) ? "-/+" : "-"), optList[i].opt,
-                         (INDENT - strlen (optList[i].opt)
-                          + (optList_isBool (i) ? 0 : 2)),
-                         (optList[i].arg ? optList[i].arg : ""),
-                         (optList_isBool (i) ? "turn on/off " : ""),
-                         optList[i].desc);
-            }
+    for (i = 0; i < ecb_array_length(optList); i++)
+      if (optList[i].desc != NULL) {
+        assert(optList[i].opt != NULL);
+        rxvt_log(
+            "  %s%s %-*s%s%s\n", (optList_isBool(i) ? "-/+" : "-"),
+            optList[i].opt,
+            (INDENT - strlen(optList[i].opt) + (optList_isBool(i) ? 0 : 2)),
+            (optList[i].arg ? optList[i].arg : ""),
+            (optList_isBool(i) ? "turn on/off " : ""), optList[i].desc);
+      }
 
 #if ENABLE_PERL
-        rxvt_perl.init (this);
-        rxvt_perl.usage (this, 1);
+    rxvt_perl.init(this);
+    rxvt_perl.usage(this, 1);
 #endif
 
-        rxvt_log ("\n  --help to list long-options");
-        break;
+    rxvt_log("\n  --help to list long-options");
+    break;
 
-      case 2:			/* full resource listing */
-        rxvt_log (" [options] [-e command args]\n\n"
-                   "where resources (long-options) include:\n");
+  case 2: /* full resource listing */
+    rxvt_log(" [options] [-e command args]\n\n"
+             "where resources (long-options) include:\n");
 
-        for (i = 0; i < ecb_array_length (optList); i++)
-          if (optList[i].kw != NULL)
-            {
-              // color16 to color255: one line
-              if (!strncmp (optList[i].kw, "color", 5) && atoi (optList[i].kw + 5) >= 16)
-                {
-                  if (atoi (optList[i].kw + 5) == 16)
-                    {
-                      char kw[32];
-                      snprintf (kw, sizeof (kw), "color16 .. color%d", maxTermCOLOR - minCOLOR);
-                      rxvt_log ("  %s: %*scolor\n", kw, (int)(INDENT + 2 - strlen (kw)), "");
-                    }
-                  continue;
-                }
+    for (i = 0; i < ecb_array_length(optList); i++)
+      if (optList[i].kw != NULL) {
+        // color16 to color255: one line
+        if (!strncmp(optList[i].kw, "color", 5) &&
+            atoi(optList[i].kw + 5) >= 16) {
+          if (atoi(optList[i].kw + 5) == 16) {
+            char kw[32];
+            snprintf(kw, sizeof(kw), "color16 .. color%d",
+                     maxTermCOLOR - minCOLOR);
+            rxvt_log("  %s: %*scolor\n", kw, (int)(INDENT + 2 - strlen(kw)),
+                     "");
+          }
+          continue;
+        }
 
-            rxvt_log ("  %s: %*s%s\n",
-                    optList[i].kw,
-                    (INDENT + 2 - strlen (optList[i].kw)), "", /* XXX */
-                    (optList_isBool (i) ? "boolean" : optList[i].arg));
-            }
+        rxvt_log("  %s: %*s%s\n", optList[i].kw,
+                 (INDENT + 2 - strlen(optList[i].kw)), "", /* XXX */
+                 (optList_isBool(i) ? "boolean" : optList[i].arg));
+      }
 
 #if ENABLE_PERL
-        rxvt_perl.init (this);
-        rxvt_perl.usage (this, 2);
+    rxvt_perl.init(this);
+    rxvt_perl.usage(this, 2);
 #endif
 
-        rxvt_log ("\n  -help to list options");
-        break;
-    }
+    rxvt_log("\n  -help to list options");
+    break;
+  }
 
-  rxvt_log ("\n\n");
-  rxvt_exit_failure ();
+  rxvt_log("\n\n");
+  rxvt_exit_failure();
 }
 
 /*}}} */
 
 /*{{{ get command-line options before getting resources */
-const char **
-rxvt_term::get_options (int argc, const char *const *argv)
-{
+const char **rxvt_term::get_options(int argc, const char *const *argv) {
   int i, bad_option = 0;
 
-  for (i = 1; i < argc; i++)
-    {
-      unsigned int entry, longopt = 0;
-      const char *opt;
-      int flag;
+  for (i = 1; i < argc; i++) {
+    unsigned int entry, longopt = 0;
+    const char *opt;
+    int flag;
 
-      opt = argv[i];
+    opt = argv[i];
 
-      if (*opt == '-')
-        {
-          flag = 1;
+    if (*opt == '-') {
+      flag = 1;
 
-          if (*++opt == '-')
-            longopt = *opt++;	/* long option */
-        }
-      else if (*opt == '+')
-        {
-          flag = 0;
+      if (*++opt == '-')
+        longopt = *opt++; /* long option */
+    } else if (*opt == '+') {
+      flag = 0;
 
-          if (*++opt == '+')
-            longopt = *opt++;	/* long option */
-        }
-      else
-        {
-          bad_option = 1;
-          rxvt_warn ("\"%s\": malformed option.\n", opt);
-          continue;
-        }
-
-      if (!strcmp (opt, "help"))
-        rxvt_usage (longopt ? 2 : 1);
-
-      if (!strcmp (opt, "h"))
-        rxvt_usage (0);
-
-      /* feature: always try to match long-options */
-      for (entry = 0; entry < ecb_array_length (optList); entry++)
-        if ((optList[entry].kw && !strcmp (opt, optList[entry].kw))
-            || (!longopt
-                && optList[entry].opt && !strcmp (opt, optList[entry].opt)))
-          break;
-
-      if (entry < ecb_array_length (optList)
-          && !optList_isInfo (entry))
-        {
-          if (optList_isReverse (entry))
-            flag = !flag;
-
-          if (optList_isString (entry))
-            {
-              /*
-               * special cases are handled in init_resources () to allow
-               * X resources to set these values before we settle for
-               * default values
-               */
-
-              if (optList[entry].doff != -1)
-                {
-                  if (flag && i + 1 == argc)
-                    rxvt_fatal ("option '%s' requires an argument, aborting.\n", argv [i]);
-
-                  rs[optList[entry].doff] = flag ? argv[++i] : resval_undef;
-                }
-            }
-          else
-            {
-              /* boolean value */
-              set_option (optList[entry].index, flag);
-
-              if (optList[entry].doff != -1)
-                rs[optList[entry].doff] = flag ? resval_on : resval_off;
-            }
-        }
-#ifndef NO_RESOURCES
-      else if (!strcmp (opt, "xrm"))
-        {
-          if (i + 1 < argc)
-            XrmPutLineResource (&option_db, argv[++i]);
-        }
-#endif
-#ifdef KEYSYM_RESOURCE
-      else if (!strncmp (opt, "keysym.", sizeof ("keysym.") - 1))
-        {
-          if (i + 1 < argc)
-            {
-              char *res = rxvt_temp_buf<char> (strlen (opt) + strlen (argv[++i]) + 6);
-              sprintf (res, "*.%s: %s\n", opt, argv[i]);
-              XrmPutLineResource (&option_db, res);
-            }
-        }
-#endif
-      else if (!strcmp (opt, "e"))
-        {
-          if (i + 1 < argc)
-            return (const char **)argv + i + 1;
-
-          rxvt_warn ("option '-e' requires an argument, aborting.\n");
-          bad_option = 1;
-        }
-      else
-        {
-#if ENABLE_PERL
-          rxvt_perl.init (this);
-
-          if (int flags = rxvt_perl.parse_resource (this, opt, true, longopt, flag, argv [i + 1]))
-            {
-              if (flags & rxvt_perl.RESOURCE_ARG)
-                {
-                  if (i + 1 == argc)
-                    {
-                      rxvt_warn ("option '%s' requires an argument.\n", argv [i]);
-                      bad_option = 1;
-                    }
-                  else
-                    ++i;
-                }
-            }
-          else
-#endif
-            {
-              rxvt_warn ("\"%s\": unknown or malformed option.\n", opt);
-              bad_option = 1;
-            }
-        }
+      if (*++opt == '+')
+        longopt = *opt++; /* long option */
+    } else {
+      bad_option = 1;
+      rxvt_warn("\"%s\": malformed option.\n", opt);
+      continue;
     }
 
+    if (!strcmp(opt, "help"))
+      rxvt_usage(longopt ? 2 : 1);
+
+    if (!strcmp(opt, "h"))
+      rxvt_usage(0);
+
+    /* feature: always try to match long-options */
+    for (entry = 0; entry < ecb_array_length(optList); entry++)
+      if ((optList[entry].kw && !strcmp(opt, optList[entry].kw)) ||
+          (!longopt && optList[entry].opt && !strcmp(opt, optList[entry].opt)))
+        break;
+
+    if (entry < ecb_array_length(optList) && !optList_isInfo(entry)) {
+      if (optList_isReverse(entry))
+        flag = !flag;
+
+      if (optList_isString(entry)) {
+        /*
+         * special cases are handled in init_resources () to allow
+         * X resources to set these values before we settle for
+         * default values
+         */
+
+        if (optList[entry].doff != -1) {
+          if (flag && i + 1 == argc)
+            rxvt_fatal("option '%s' requires an argument, aborting.\n",
+                       argv[i]);
+
+          rs[optList[entry].doff] = flag ? argv[++i] : resval_undef;
+        }
+      } else {
+        /* boolean value */
+        set_option(optList[entry].index, flag);
+
+        if (optList[entry].doff != -1)
+          rs[optList[entry].doff] = flag ? resval_on : resval_off;
+      }
+    }
+#ifndef NO_RESOURCES
+    else if (!strcmp(opt, "xrm")) {
+      if (i + 1 < argc)
+        XrmPutLineResource(&option_db, argv[++i]);
+    }
+#endif
+#ifdef KEYSYM_RESOURCE
+    else if (!strncmp(opt, "keysym.", sizeof("keysym.") - 1)) {
+      if (i + 1 < argc) {
+        char *res = rxvt_temp_buf<char>(strlen(opt) + strlen(argv[++i]) + 6);
+        sprintf(res, "*.%s: %s\n", opt, argv[i]);
+        XrmPutLineResource(&option_db, res);
+      }
+    }
+#endif
+    else if (!strcmp(opt, "e")) {
+      if (i + 1 < argc)
+        return (const char **)argv + i + 1;
+
+      rxvt_warn("option '-e' requires an argument, aborting.\n");
+      bad_option = 1;
+    } else {
+#if ENABLE_PERL
+      rxvt_perl.init(this);
+
+      if (int flags = rxvt_perl.parse_resource(this, opt, true, longopt, flag,
+                                               argv[i + 1])) {
+        if (flags & rxvt_perl.RESOURCE_ARG) {
+          if (i + 1 == argc) {
+            rxvt_warn("option '%s' requires an argument.\n", argv[i]);
+            bad_option = 1;
+          } else
+            ++i;
+        }
+      } else
+#endif
+      {
+        rxvt_warn("\"%s\": unknown or malformed option.\n", opt);
+        bad_option = 1;
+      }
+    }
+  }
+
   if (bad_option)
-    rxvt_usage (0);
+    rxvt_usage(0);
 
   return 0;
 }
@@ -661,10 +675,8 @@ rxvt_term::get_options (int argc, const char *const *argv)
 /*----------------------------------------------------------------------*/
 
 #ifdef KEYSYM_RESOURCE
-static void
-rxvt_define_key (rxvt_term *term, const char *k, const char *v)
-{
-  term->bind_action (k, v);
+static void rxvt_define_key(rxvt_term *term, const char *k, const char *v) {
+  term->bind_action(k, v);
 }
 
 /*
@@ -672,46 +684,30 @@ rxvt_define_key (rxvt_term *term, const char *k, const char *v)
  * rxvt*keysym.0xFFFF: "\177"
  */
 
-struct keysym_vocabulary_t
-{
-  const char    *name;
+struct keysym_vocabulary_t {
+  const char *name;
   unsigned short len;
   unsigned short value;
 };
-static const keysym_vocabulary_t keysym_vocabulary[] =
-{
-  { "ISOLevel3", 9, Level3Mask    },
-  { "AppKeypad", 9, AppKeypadMask },
-  { "Control",   7, ControlMask   },
-  { "NumLock",   7, NumLockMask   },
-  { "Shift",     5, ShiftMask     },
-  { "Meta",      4, MetaMask      },
-  { "Lock",      4, LockMask      },
-  { "Mod1",      4, Mod1Mask      },
-  { "Mod2",      4, Mod2Mask      },
-  { "Mod3",      4, Mod3Mask      },
-  { "Mod4",      4, Mod4Mask      },
-  { "Mod5",      4, Mod5Mask      },
-  { "I",         1, Level3Mask    },
-  { "K",         1, AppKeypadMask },
-  { "C",         1, ControlMask   },
-  { "N",         1, NumLockMask   },
-  { "S",         1, ShiftMask     },
-  { "M",         1, MetaMask      },
-  { "A",         1, MetaMask      },
-  { "L",         1, LockMask      },
-  { "1",         1, Mod1Mask      },
-  { "2",         1, Mod2Mask      },
-  { "3",         1, Mod3Mask      },
-  { "4",         1, Mod4Mask      },
-  { "5",         1, Mod5Mask      },
+static const keysym_vocabulary_t keysym_vocabulary[] = {
+    {"ISOLevel3", 9, Level3Mask}, {"AppKeypad", 9, AppKeypadMask},
+    {"Control", 7, ControlMask},  {"NumLock", 7, NumLockMask},
+    {"Shift", 5, ShiftMask},      {"Meta", 4, MetaMask},
+    {"Lock", 4, LockMask},        {"Mod1", 4, Mod1Mask},
+    {"Mod2", 4, Mod2Mask},        {"Mod3", 4, Mod3Mask},
+    {"Mod4", 4, Mod4Mask},        {"Mod5", 4, Mod5Mask},
+    {"I", 1, Level3Mask},         {"K", 1, AppKeypadMask},
+    {"C", 1, ControlMask},        {"N", 1, NumLockMask},
+    {"S", 1, ShiftMask},          {"M", 1, MetaMask},
+    {"A", 1, MetaMask},           {"L", 1, LockMask},
+    {"1", 1, Mod1Mask},           {"2", 1, Mod2Mask},
+    {"3", 1, Mod3Mask},           {"4", 1, Mod4Mask},
+    {"5", 1, Mod5Mask},
 };
 
-int
-rxvt_term::parse_keysym (const char *str, unsigned int &state)
-{
+int rxvt_term::parse_keysym(const char *str, unsigned int &state) {
   int sym;
-  const char *key = strrchr (str, '-');
+  const char *key = strrchr(str, '-');
 
   state = 0;
 
@@ -725,88 +721,80 @@ rxvt_term::parse_keysym (const char *str, unsigned int &state)
     return -1;
 
   // parse modifiers
-  while (str < key)
-    {
-      unsigned int i;
+  while (str < key) {
+    unsigned int i;
 
-      for (i = 0; i < ecb_array_length (keysym_vocabulary); ++i)
-        {
-          if (strncmp (str, keysym_vocabulary [i].name, keysym_vocabulary [i].len) == 0)
-            {
-              state |= keysym_vocabulary[i].value;
-              str += keysym_vocabulary[i].len;
-              break;
-            }
-        }
-
-      if (i >= ecb_array_length (keysym_vocabulary))
-        return -1;
-
-      if (*str == '-')
-        ++str;
+    for (i = 0; i < ecb_array_length(keysym_vocabulary); ++i) {
+      if (strncmp(str, keysym_vocabulary[i].name, keysym_vocabulary[i].len) ==
+          0) {
+        state |= keysym_vocabulary[i].value;
+        str += keysym_vocabulary[i].len;
+        break;
+      }
     }
+
+    if (i >= ecb_array_length(keysym_vocabulary))
+      return -1;
+
+    if (*str == '-')
+      ++str;
+  }
 
   // convert keysym name to keysym number
-  if ((sym = XStringToKeysym (str)) == None)
-    {
-      // fallback on hexadecimal parsing
-      char *end;
-      sym = strtol (str, &end, 16);
-      if (*end)
-        return -1;
-    }
+  if ((sym = XStringToKeysym(str)) == None) {
+    // fallback on hexadecimal parsing
+    char *end;
+    sym = strtol(str, &end, 16);
+    if (*end)
+      return -1;
+  }
 
   return sym;
 }
 
-int
-rxvt_term::bind_action (const char *str, const char *arg)
-{
+int rxvt_term::bind_action(const char *str, const char *arg) {
   int sym;
   unsigned int state;
 
-  if (*arg == '\0' || (sym = parse_keysym (str, state)) == -1)
+  if (*arg == '\0' || (sym = parse_keysym(str, state)) == -1)
     return -1;
 
-  wchar_t *ws = rxvt_mbstowcs (arg);
-  if (!HOOK_INVOKE ((this, HOOK_REGISTER_COMMAND, DT_INT, sym, DT_INT, state, DT_WCS_LEN, ws, wcslen (ws), DT_END)))
-    keyboard->register_action (sym, state, ws);
+  wchar_t *ws = rxvt_mbstowcs(arg);
+  if (!HOOK_INVOKE((this, HOOK_REGISTER_COMMAND, DT_INT, sym, DT_INT, state,
+                    DT_WCS_LEN, ws, wcslen(ws), DT_END)))
+    keyboard->register_action(sym, state, ws);
 
-  free (ws);
+  free(ws);
   return 1;
 }
 
 #endif /* KEYSYM_RESOURCE */
 
-static char *
-get_res (XrmDatabase database, const char *program, const char *option)
-{
+static char *get_res(XrmDatabase database, const char *program,
+                     const char *option) {
   char resource[512];
   char *type;
   XrmValue result;
 
-  snprintf (resource, sizeof (resource), "%s.%s", program, option);
-  XrmGetResource (database, resource, resource, &type, &result);
+  snprintf(resource, sizeof(resource), "%s.%s", program, option);
+  XrmGetResource(database, resource, resource, &type, &result);
 
   return result.addr;
 }
 
-const char *
-rxvt_term::x_resource (const char *name)
-{
-  XrmDatabase database = XrmGetDatabase (dpy);
+const char *rxvt_term::x_resource(const char *name) {
+  XrmDatabase database = XrmGetDatabase(dpy);
 
-  const char *p = get_res (database, rs[Rs_name], name);
-  const char *p0 = get_res (database, "!INVALIDPROGRAMMENAMEDONTMATCH!", name);
+  const char *p = get_res(database, rs[Rs_name], name);
+  const char *p0 = get_res(database, "!INVALIDPROGRAMMENAMEDONTMATCH!", name);
 
-  if (p == NULL || (p0 && strcmp (p, p0) == 0))
-    {
-      p = get_res (database, RESCLASS, name);
+  if (p == NULL || (p0 && strcmp(p, p0) == 0)) {
+    p = get_res(database, RESCLASS, name);
 #ifdef RESFALLBACK
-      if (p == NULL || (p0 && strcmp (p, p0) == 0))
-        p = get_res (database, RESFALLBACK, name);
+    if (p == NULL || (p0 && strcmp(p, p0) == 0))
+      p = get_res(database, RESFALLBACK, name);
 #endif
-    }
+  }
 
   if (p == NULL && p0)
     p = p0;
@@ -814,49 +802,42 @@ rxvt_term::x_resource (const char *name)
   return p;
 }
 
-void
-rxvt_term::extract_resources ()
-{
+void rxvt_term::extract_resources() {
 #ifndef NO_RESOURCES
   // (the display always has a database, an empty one without any
   // resources: the options go into it, where the keysym resources and
   // perl look later)
-  XrmDatabase database = XrmGetDatabase (dpy);
-  XrmMergeDatabases (option_db, &database);
+  XrmDatabase database = XrmGetDatabase(dpy);
+  XrmMergeDatabases(option_db, &database);
   option_db = NULL;
   /*
    * Query resources for options that affect us
    */
-  for (int entry = 0; entry < ecb_array_length (optList); entry++)
-    {
-      int s;
-      const char *kw = optList[entry].kw;
+  for (int entry = 0; entry < ecb_array_length(optList); entry++) {
+    int s;
+    const char *kw = optList[entry].kw;
 
-      if (kw == NULL || rs[optList[entry].doff] != NULL)
-        continue; // previously set
+    if (kw == NULL || rs[optList[entry].doff] != NULL)
+      continue; // previously set
 
-      const char *p = x_resource (kw);
+    const char *p = x_resource(kw);
 
-      if (p)
-        {
-          p = strdup (p);
-          allocated.push_back ((void *)p);
-          rs[optList[entry].doff] = p;
+    if (p) {
+      p = strdup(p);
+      allocated.push_back((void *)p);
+      rs[optList[entry].doff] = p;
 
-          if (optList_isBool (entry))
-            {
-              s = strcasecmp (p, "TRUE") == 0
-                  || strcasecmp (p, "YES") == 0
-                  || strcasecmp (p, "ON") == 0
-                  || strcasecmp (p, "1") == 0;
+      if (optList_isBool(entry)) {
+        s = strcasecmp(p, "TRUE") == 0 || strcasecmp(p, "YES") == 0 ||
+            strcasecmp(p, "ON") == 0 || strcasecmp(p, "1") == 0;
 
-              if (optList_isReverse (entry))
-                s = !s;
+        if (optList_isReverse(entry))
+          s = !s;
 
-              set_option (optList[entry].index, s);
-            }
-        }
+        set_option(optList[entry].index, s);
+      }
     }
+  }
 #endif /* NO_RESOURCES */
 }
 
@@ -868,59 +849,53 @@ rxvt_term::extract_resources ()
  * that asked for colour scheme reports (mode 2031) get one if the
  * background went from dark to light or back.
  */
-void
-rxvt_term::resources_cb (XEvent &ev)
-{
-  if (ev.type == PropertyNotify && ev.xproperty.atom == XA_RESOURCE_MANAGER)
-    {
-      // xrdb may change it more than once: wait until it's done
-      resources_reload_ev.set (0.1);
-      resources_reload_ev.start ();
-    }
+void rxvt_term::resources_cb(XEvent &ev) {
+  if (ev.type == PropertyNotify && ev.xproperty.atom == XA_RESOURCE_MANAGER) {
+    // xrdb may change it more than once: wait until it's done
+    resources_reload_ev.set(0.1);
+    resources_reload_ev.start();
+  }
 }
 
-void
-rxvt_term::resources_reload_cb (ev::timer &w, int revents)
-{
-  make_current ();
+void rxvt_term::resources_reload_cb(ev::timer &w, int revents) {
+  make_current();
 
-  XrmDatabase database = display->get_resources (true);
+  XrmDatabase database = display->get_resources(true);
   if (!database)
     return;
 
-  for (unsigned int entry = 0; entry < ecb_array_length (optList); entry++)
-    {
-      int idx = optList[entry].doff - Rs_color;
-      const char *kw = optList[entry].kw;
+  for (unsigned int entry = 0; entry < ecb_array_length(optList); entry++) {
+    int idx = optList[entry].doff - Rs_color;
+    const char *kw = optList[entry].kw;
 
-      if (!kw || idx < 0 || idx >= NRS_COLORS || colors_from_options[idx])
-        continue;
+    if (!kw || idx < 0 || idx >= NRS_COLORS || colors_from_options[idx])
+      continue;
 
-      const char *value = get_res (database, rs[Rs_name], kw);
-      if (!value)
-        value = get_res (database, RESCLASS, kw);
+    const char *value = get_res(database, rs[Rs_name], kw);
+    if (!value)
+      value = get_res(database, RESCLASS, kw);
 #ifdef RESFALLBACK
-      if (!value)
-        value = get_res (database, RESFALLBACK, kw);
+    if (!value)
+      value = get_res(database, RESFALLBACK, kw);
 #endif
 
-      // a colour no longer set keeps its value
-      if (!value || !*value || (initial_colors[idx] && !strcmp (initial_colors[idx], value)))
-        continue;
+    // a colour no longer set keeps its value
+    if (!value || !*value ||
+        (initial_colors[idx] && !strcmp(initial_colors[idx], value)))
+      continue;
 
-      char *copy = strdup (value);
-      allocated.push_back ((void *)copy);
-      initial_colors[idx] = copy;
-      set_window_color (idx, copy);
-    }
+    char *copy = strdup(value);
+    allocated.push_back((void *)copy);
+    initial_colors[idx] = copy;
+    set_window_color(idx, copy);
+  }
 
-  XrmDestroyDatabase (database);
-  refresh_check ();
+  XrmDestroyDatabase(database);
+  refresh_check();
 }
 #endif
 
-struct rxvt_enumerate_closure
-{
+struct rxvt_enumerate_closure {
   rxvt_term *term;
   void (*cb)(rxvt_term *, const char *, const char *);
   int specific; // iterate over only a specific subhierarchy
@@ -932,113 +907,106 @@ struct rxvt_enumerate_closure
  *      "rxvt" "keysym" "0xFF01"
  *   value will be a string
  */
-static int
-rxvt_enumerate_helper (
-   XrmDatabase *database ecb_unused,
-   XrmBindingList bindings ecb_unused,
-   XrmQuarkList quarks,
-   XrmRepresentation *type ecb_unused,
-   XrmValue *value,
-   XPointer closure
-)
-{
+static int rxvt_enumerate_helper(XrmDatabase *database ecb_unused,
+                                 XrmBindingList bindings ecb_unused,
+                                 XrmQuarkList quarks,
+                                 XrmRepresentation *type ecb_unused,
+                                 XrmValue *value, XPointer closure) {
   const rxvt_enumerate_closure *data = (const rxvt_enumerate_closure *)closure;
 
-  if (*quarks == NULLQUARK) return False;
+  if (*quarks == NULLQUARK)
+    return False;
 
   // if the quark list starts with a tightly bound quark, we skip it,
   // as it exactly matched the prefix. Otherwise, it matched because
   // it started with "*", in which case we assume the prefix is part
   // of the "*".
-  if (*bindings == XrmBindTightly)
-    {
-      ++quarks, ++bindings; // skip if this is a fixed prefix, rather than a *-match
-      if (*quarks == NULLQUARK) return False;
-    }
+  if (*bindings == XrmBindTightly) {
+    ++quarks,
+        ++bindings; // skip if this is a fixed prefix, rather than a *-match
+    if (*quarks == NULLQUARK)
+      return False;
+  }
 
   // specific, a bit misleadingly named, is used when a specific "subclass"
   // is iterated over, e.g. "keysym", and is used to skip one more
   // component, as well as all generic prefixes
   // this is a bit of a hack, ideally, keysym (the only user) should use its
   // own iteration function, but this ought to be less bloated
-  if (data->specific)
-    {
-      ++quarks, ++bindings;
-      if (*quarks == NULLQUARK) return False;
-    }
+  if (data->specific) {
+    ++quarks, ++bindings;
+    if (*quarks == NULLQUARK)
+      return False;
+  }
 
   char *pattern;
   if (quarks[1] == NULLQUARK)
-    pattern = XrmQuarkToString (quarks[0]); // single component, fast path
-  else
+    pattern = XrmQuarkToString(quarks[0]); // single component, fast path
+  else {
+    // multiple components, slow path - should be rare, don't optimize for speed
+    int size = 0;
+
+    for (int i = 0; quarks[i] != NULLQUARK; ++i)
+      size += strlen(XrmQuarkToString(quarks[i])) + 1;
+
+    pattern = rxvt_temp_buf<char>(size + 1);
+
+    // now print all components
     {
-      // multiple components, slow path - should be rare, don't optimize for speed
-      int size = 0;
+      char *cur = pattern;
 
       for (int i = 0; quarks[i] != NULLQUARK; ++i)
-        size += strlen (XrmQuarkToString (quarks[i])) + 1;
-
-      pattern = rxvt_temp_buf<char> (size + 1);
-
-      // now print all components
-      {
-        char *cur = pattern;
-
-        for (int i = 0; quarks[i] != NULLQUARK; ++i)
-          cur += sprintf (cur, ".%s", XrmQuarkToString (quarks[i]));
-      }
-
-      ++pattern; // skip initial dot
+        cur += sprintf(cur, ".%s", XrmQuarkToString(quarks[i]));
     }
 
-  data->cb (data->term, pattern, (char *)value->addr);
+    ++pattern; // skip initial dot
+  }
+
+  data->cb(data->term, pattern, (char *)value->addr);
 
   return False;
 }
 
-void
-rxvt_term::enumerate_resources (void (*cb)(rxvt_term *, const char *, const char *), const char *name_p, const char *class_p)
-{
+void rxvt_term::enumerate_resources(void (*cb)(rxvt_term *, const char *,
+                                               const char *),
+                                    const char *name_p, const char *class_p) {
   /*
    * [R5 or later]: enumerate the resource database
    */
-  assert (!name_p == !class_p); // both must be specified, or missing
+  assert(!name_p == !class_p); // both must be specified, or missing
 
 #ifdef KEYSYM_RESOURCE
-  rxvt_enumerate_closure closure = { this, cb, name_p ? 1 : 0 };
+  rxvt_enumerate_closure closure = {this, cb, name_p ? 1 : 0};
 
-  XrmDatabase database = XrmGetDatabase (dpy);
+  XrmDatabase database = XrmGetDatabase(dpy);
   XrmName name_prefix[3];
   XrmClass class_prefix[3];
 
-  name_prefix[1] = name_p ? XrmStringToName (name_p) : NULLQUARK;
+  name_prefix[1] = name_p ? XrmStringToName(name_p) : NULLQUARK;
   name_prefix[2] = NULLQUARK;
-  class_prefix[1] = class_p ? XrmStringToName (class_p) : NULLQUARK;
+  class_prefix[1] = class_p ? XrmStringToName(class_p) : NULLQUARK;
   class_prefix[2] = NULLQUARK;
 
-# ifdef RESFALLBACK
-  name_prefix[0] = class_prefix[0] = XrmStringToName (RESFALLBACK);
-  XrmEnumerateDatabase (database, name_prefix, class_prefix,
-                        XrmEnumAllLevels, rxvt_enumerate_helper, (XPointer)&closure);
-# endif
+#ifdef RESFALLBACK
+  name_prefix[0] = class_prefix[0] = XrmStringToName(RESFALLBACK);
+  XrmEnumerateDatabase(database, name_prefix, class_prefix, XrmEnumAllLevels,
+                       rxvt_enumerate_helper, (XPointer)&closure);
+#endif
 
-  name_prefix[0] = class_prefix[0] = XrmStringToName (RESCLASS);
-  XrmEnumerateDatabase (database, name_prefix, class_prefix,
-                        XrmEnumAllLevels, rxvt_enumerate_helper, (XPointer)&closure);
+  name_prefix[0] = class_prefix[0] = XrmStringToName(RESCLASS);
+  XrmEnumerateDatabase(database, name_prefix, class_prefix, XrmEnumAllLevels,
+                       rxvt_enumerate_helper, (XPointer)&closure);
 
-  name_prefix[0] = class_prefix[0] = XrmStringToName (rs[Rs_name]);
-  XrmEnumerateDatabase (database, name_prefix, class_prefix,
-                        XrmEnumAllLevels, rxvt_enumerate_helper, (XPointer)&closure);
+  name_prefix[0] = class_prefix[0] = XrmStringToName(rs[Rs_name]);
+  XrmEnumerateDatabase(database, name_prefix, class_prefix, XrmEnumAllLevels,
+                       rxvt_enumerate_helper, (XPointer)&closure);
 #endif
 }
 
-void
-rxvt_term::extract_keysym_resources ()
-{
+void rxvt_term::extract_keysym_resources() {
 #ifdef KEYSYM_RESOURCE
-  enumerate_keysym_resources (rxvt_define_key);
+  enumerate_keysym_resources(rxvt_define_key);
 #endif
 }
 
 /*----------------------- end-of-file (C source) -----------------------*/
-

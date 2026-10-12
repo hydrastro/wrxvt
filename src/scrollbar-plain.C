@@ -21,51 +21,42 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *----------------------------------------------------------------------*/
 
-#include "../config.h"		/* NECESSARY */
-#include "rxvt.h"		/* NECESSARY */
+#include "../config.h" /* NECESSARY */
+#include "rxvt.h"      /* NECESSARY */
 
 /*----------------------------------------------------------------------*/
 #if defined(PLAIN_SCROLLBAR)
 
-int
-scrollBar_t::show_plain (int update)
-{
+int scrollBar_t::show_plain(int update) {
   int xsb = 0;
   int sbwidth = width - 1;
 
-  if ((init & SB_STYLE_PLAIN) == 0)
-    {
-      XGCValues gcvalue;
+  if ((init & SB_STYLE_PLAIN) == 0) {
+    XGCValues gcvalue;
 
-      init |= SB_STYLE_PLAIN;
-      gcvalue.foreground = term->pix_colors_focused[Color_scroll];
+    init |= SB_STYLE_PLAIN;
+    gcvalue.foreground = term->pix_colors_focused[Color_scroll];
 
-      pscrollbarGC = XCreateGC (term->dpy, win, GCForeground, &gcvalue);
-    }
+    pscrollbarGC = XCreateGC(term->dpy, win, GCForeground, &gcvalue);
+  }
 
-  xsb = term->option (Opt_scrollBar_right) ? 1 : 0;
+  xsb = term->option(Opt_scrollBar_right) ? 1 : 0;
 
-  if (update)
-    {
-      if (last_top < top)
-        XClearArea (term->dpy, win,
-                    0, last_top,
-                    sbwidth + 1, top - last_top, False);
+  if (update) {
+    if (last_top < top)
+      XClearArea(term->dpy, win, 0, last_top, sbwidth + 1, top - last_top,
+                 False);
 
-      if (bot < last_bot)
-        XClearArea (term->dpy, win,
-                    0, bot,
-                    sbwidth + 1, last_bot - bot, False);
-    }
-  else
-    XClearWindow (term->dpy, win);
+    if (bot < last_bot)
+      XClearArea(term->dpy, win, 0, bot, sbwidth + 1, last_bot - bot, False);
+  } else
+    XClearWindow(term->dpy, win);
 
   /* scrollbar slider */
-  XFillRectangle (term->dpy, win, pscrollbarGC,
-                  1 - xsb, top, sbwidth, bot - top);
+  XFillRectangle(term->dpy, win, pscrollbarGC, 1 - xsb, top, sbwidth,
+                 bot - top);
 
   return 1;
 }
 
 #endif
-

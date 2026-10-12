@@ -4,24 +4,22 @@
 #include <limits.h>
 
 #ifndef PATH_MAX
-# define PATH_MAX 16384
+#define PATH_MAX 16384
 #endif
 
 #include "rxvtutil.h"
 
-struct rxvt_connection
-{
+struct rxvt_connection {
   int fd;
 
-  static char *unix_sockname ();
+  static char *unix_sockname();
 
-  void send (const char *data, int len);
-  void send (const char *data);
-  void send (int data);
+  void send(const char *data, int len);
+  void send(const char *data);
+  void send(int data);
 
-  bool recv (auto_str &data, int *len = 0);
-  bool recv (int &data);
+  bool recv(auto_str &data, int *len = 0);
+  bool recv(int &data);
 };
 
 #endif
-
