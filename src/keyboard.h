@@ -26,9 +26,10 @@
 
 #ifdef KEYSYM_RESOURCE
 
+#include <inttypes.h>
+
 #include "rxvtutil.h"
 #include <X11/Xlib.h>
-#include <inttypes.h>
 
 #define KEYSYM_HASH_BITS 4 /* lowest #bits of keysym is used as hash key */
 #define KEYSYM_HASH_BUCKETS (1 << KEYSYM_HASH_BITS)

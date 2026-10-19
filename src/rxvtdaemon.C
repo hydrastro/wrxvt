@@ -20,16 +20,16 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *----------------------------------------------------------------------*/
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
-#include <errno.h>
 #include <inttypes.h>
+#include <unistd.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
-#include <unistd.h>
 
 #include "../config.h"
 #include "rxvtdaemon.h"

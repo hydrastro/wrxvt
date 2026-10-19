@@ -21,14 +21,14 @@
  *----------------------------------------------------------------------*/
 
 #include "../config.h"
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <unistd.h>
 
 #include <libptytty.h>
 

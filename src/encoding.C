@@ -160,11 +160,6 @@ static uint32_t cs_unicode_16_from_unicode(unicode_t unicode) {
 
 // #define ENCODING_EU
 
-#include "table/iso8859_10.h"
-#include "table/iso8859_11.h"
-#include "table/iso8859_13.h"
-#include "table/iso8859_14.h"
-#include "table/iso8859_16.h"
 #include "table/iso8859_2.h"
 #include "table/iso8859_3.h"
 #include "table/iso8859_4.h"
@@ -173,6 +168,11 @@ static uint32_t cs_unicode_16_from_unicode(unicode_t unicode) {
 #include "table/iso8859_7.h"
 #include "table/iso8859_8.h"
 #include "table/iso8859_9.h"
+#include "table/iso8859_10.h"
+#include "table/iso8859_11.h"
+#include "table/iso8859_13.h"
+#include "table/iso8859_14.h"
+#include "table/iso8859_16.h"
 
 #include "table/koi8_r.h"
 #include "table/koi8_u.h"
@@ -184,13 +184,11 @@ static uint32_t cs_unicode_16_from_unicode(unicode_t unicode) {
 // #define ENCODING_ZH
 
 #include "table/big5.h"
-#include "table/gb2312_1980_0.h"
 #include "table/gbk_0.h"
+#include "table/gb2312_1980_0.h"
 
 // #define ENCODING_ZH_EXT
 
-#include "table/big5_ext.h"
-#include "table/big5_plus.h"
 #include "table/cns11643_1992_1.h"
 #include "table/cns11643_1992_2.h"
 #include "table/cns11643_1992_3.h"
@@ -199,6 +197,8 @@ static uint32_t cs_unicode_16_from_unicode(unicode_t unicode) {
 #include "table/cns11643_1992_6.h"
 #include "table/cns11643_1992_7.h"
 #include "table/cns11643_1992_f.h"
+#include "table/big5_ext.h"
+#include "table/big5_plus.h"
 
 // #define ENCODING_VN
 

@@ -27,11 +27,11 @@
 
 #if ENABLE_HINTS
 
-#include <X11/keysym.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <X11/keysym.h>
 
 #include "rxvtbuf.h"
 

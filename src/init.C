@@ -35,11 +35,11 @@
  */
 
 #include "../config.h" /* NECESSARY */
-#include "feature.h"
-#include "init.h"
-#include "keyboard.h"
 #include "rxvt.h" /* NECESSARY */
 #include "rxvtutil.h"
+#include "init.h"
+#include "keyboard.h"
+#include "feature.h"
 #include <X11/Xlib.h>
 
 #include <limits>
@@ -70,8 +70,8 @@
 
 #ifdef DISPLAY_IS_IP
 /* On Solaris link with -lsocket and -lnsl */
-#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 /* these next two are probably only on Sun (not Solaris) */
 #ifdef HAVE_SYS_SOCKIO_H
@@ -81,10 +81,10 @@
 #include <sys/byteorder.h>
 #endif
 
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <netinet/in.h>
 
 static char *ecb_cold rxvt_network_display(const char *display) {
   char buffer[1024], *rval = NULL;

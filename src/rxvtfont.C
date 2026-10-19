@@ -21,8 +21,8 @@
 
 #include "../config.h"
 #include "rxvt.h"
-#include "rxvtfont.h"
 #include "rxvtutil.h"
+#include "rxvtfont.h"
 
 #include <stdlib.h>
 
@@ -1173,8 +1173,8 @@ void rxvt_font_x11::draw(rxvt_drawable &d, int x, int y, const text_t *text,
 #if XFT
 
 #if ENABLE_EMOJI_SEQUENCES
-#include <hb-ft.h>
 #include <hb.h>
+#include <hb-ft.h>
 #include <map>
 #include <vector>
 #endif

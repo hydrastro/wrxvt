@@ -27,12 +27,12 @@
 
 #include <stdlib.h>
 
-#include <fcntl.h>
 #include <unistd.h>
+#include <fcntl.h>
 
+#include <sys/utsname.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/utsname.h>
 
 #if XFT
 #include <X11/extensions/Xrender.h>

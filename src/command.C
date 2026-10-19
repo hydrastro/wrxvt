@@ -48,19 +48,19 @@
 
 /*{{{ includes: */
 #include "../config.h"
-#include "command.h"
 #include "rxvt.h"
-#include "rxvtbuf.h"
 #include "rxvtperl.h"
 #include "version.h"
+#include "command.h"
+#include "rxvtbuf.h"
 
 #ifdef KEYSYM_RESOURCE
 #include "keyboard.h"
 #endif
 
-#include <X11/XKBlib.h>
-#include <fcntl.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <X11/XKBlib.h>
 #include <sys/wait.h>
 
 #if LINUX_YIELD_HACK

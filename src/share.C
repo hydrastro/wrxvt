@@ -34,25 +34,25 @@
 
 #if ENABLE_SHARE
 
-#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <ifaddrs.h>
 #include <limits.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 
 #if HAVE_OPENSSL
+#include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
-#include <openssl/ssl.h>
 #include <openssl/x509v3.h>
 #endif
 

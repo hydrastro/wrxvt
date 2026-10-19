@@ -1,18 +1,18 @@
 #ifndef RXVT_H_ /* include once only */
 #define RXVT_H_
 
+#include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <stdio.h>
 #include <stdlib.h>
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
-#include <assert.h>
-#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
+#include <assert.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
@@ -32,8 +32,8 @@
 
 extern "C" {
 #include <X11/Xlib.h>
-#include <X11/Xresource.h>
 #include <X11/Xutil.h>
+#include <X11/Xresource.h>
 }
 
 #if UNICODE_3
@@ -73,10 +73,10 @@ typedef int32_t tlen_t_; // specifically for use in the line_t structure
 
 #include <limits.h>
 
-#include <X11/Xatom.h>
 #include <X11/cursorfont.h>
 #include <X11/keysym.h>
 #include <X11/keysymdef.h>
+#include <X11/Xatom.h>
 
 #if HAVE_PIXBUF
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -90,12 +90,12 @@ typedef int32_t tlen_t_; // specifically for use in the line_t structure
 #include "ecb.h"
 
 #include "encoding.h"
-#include "ev_cpp.h"
-#include "rxvtfont.h"
-#include "rxvtimg.h"
-#include "rxvttoolkit.h"
 #include "rxvtutil.h"
+#include "rxvtfont.h"
+#include "rxvttoolkit.h"
+#include "rxvtimg.h"
 #include "scrollbar.h"
+#include "ev_cpp.h"
 
 #include "rxvtperl.h"
 

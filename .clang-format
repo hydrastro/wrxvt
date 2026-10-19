@@ -1,0 +1,5 @@
+# LLVM style, but never sort #include lines: in urxvt the order matters
+# (command.h, for one, reads the options feature.h defines, so it has to
+# come after rxvt.h).
+BasedOnStyle: LLVM
+SortIncludes: Never

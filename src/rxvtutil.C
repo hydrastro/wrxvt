@@ -28,9 +28,9 @@
 // inclusion of any header.
 #include "emman.c"
 
-#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "rxvtutil.h"
 

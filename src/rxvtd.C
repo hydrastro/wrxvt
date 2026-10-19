@@ -21,17 +21,17 @@
  *----------------------------------------------------------------------*/
 
 #include "../config.h"
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/un.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 #if defined(ENABLE_FRILLS) && defined(_POSIX_MEMLOCK) && _POSIX_MEMLOCK > 0
 #define ENABLE_MLOCK 1

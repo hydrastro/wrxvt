@@ -1,8 +1,8 @@
 #ifndef SCROLLBAR_H
 #define SCROLLBAR_H
 
-#include "rxvtutil.h"
 #include <X11/Xlib.h>
+#include "rxvtutil.h"
 
 struct rxvt_term;
 

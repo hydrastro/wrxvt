@@ -33,11 +33,11 @@
  *---------------------------------------------------------------------*/
 
 #include "../config.h" /* NECESSARY */
-#include "feature.h"
+#include "rxvt.h" /* NECESSARY */
 #include "init.h"
 #include "keyboard.h"
-#include "rxvt.h" /* NECESSARY */
 #include "rxvtperl.h"
+#include "feature.h"
 #include <X11/Xlib.h>
 
 #include <limits>

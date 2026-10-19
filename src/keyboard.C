@@ -29,8 +29,8 @@
 
 #include <string.h>
 
-#include "keyboard.h"
 #include "rxvtperl.h"
+#include "keyboard.h"
 
 /* an intro to the data structure:
  *

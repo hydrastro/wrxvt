@@ -9,8 +9,8 @@
 #include <inttypes.h>
 
 #include "encoding.h"
-#include "rxvttoolkit.h"
 #include "rxvtutil.h"
+#include "rxvttoolkit.h"
 
 struct rxvt_term;
 

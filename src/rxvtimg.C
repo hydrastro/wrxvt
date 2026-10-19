@@ -21,10 +21,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *---------------------------------------------------------------------*/
 
+#include <string.h>
+#include <math.h>
 #include "../config.h"
 #include "rxvt.h"
-#include <math.h>
-#include <string.h>
 
 #if HAVE_IMG
 
