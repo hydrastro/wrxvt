@@ -4750,6 +4750,8 @@ bool rxvt_term::builtin_action(const char *name, const char *arg) {
 #if ENABLE_RECORD
     else if (!strcmp(arg, "copy-output"))
       copy_output();
+    else if (!strcmp(arg, "dump-output"))
+      dump_output();
 #endif
     else
       return false;
@@ -4757,6 +4759,21 @@ bool rxvt_term::builtin_action(const char *name, const char *arg) {
     refresh_check();
     return true;
   }
+
+#ifdef PRINTPIPE
+  // print:screen / print:all pipe the screen (or the whole scrollback)
+  // through the print-pipe resource, so it can be bound to any key.
+  if (!strcmp(name, "print")) {
+    if (!strcmp(arg, "screen"))
+      scr_printscreen(0);
+    else if (!strcmp(arg, "all"))
+      scr_printscreen(1);
+    else
+      return false;
+
+    return true;
+  }
+#endif
 
   return false;
 }

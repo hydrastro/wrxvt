@@ -1590,7 +1590,10 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen {
   void scrollback_pager();
   void scrollback_copy_all();
   void scrollback_dump();
+  void dump_text(const rxvt_buf &text, const char *prefix, const char *what);
+  bool last_output_text(rxvt_buf &text);
   void copy_output();
+  void dump_output();
 #endif
 
   // the shell's marks (OSC 133): the command running, for long-command

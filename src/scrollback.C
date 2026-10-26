@@ -107,16 +107,14 @@ void rxvt_term::scrollback_copy_all() {
 }
 
 /*
- * scrollback:dump: everything written so far to a timestamped file,
- * console-YYYYMMDD-HHMMSS.txt, under scrollbackDumpDirectory (by default
- * $XDG_STATE_HOME/wrxvt, else ~/.local/state/wrxvt). The path is shown as
- * a desktop notification.
+ * Write text to a timestamped file <prefix>-YYYYMMDD-HHMMSS.txt under
+ * scrollbackDumpDirectory (by default $XDG_STATE_HOME/wrxvt, else
+ * ~/.local/state/wrxvt). The path is shown as a desktop notification.
+ * Used by scrollback:dump (the whole thing) and prompt:dump-output (the
+ * last command).
  */
-void rxvt_term::scrollback_dump() {
-  rxvt_buf text;
-  all_text(this, text);
-  text.add('\n');
-
+void rxvt_term::dump_text(const rxvt_buf &text, const char *prefix,
+                          const char *what) {
   char dir[PATH_MAX];
   const char *set = rs[Rs_scrollbackDumpDirectory];
   const char *state = getenv("XDG_STATE_HOME");
@@ -141,9 +139,9 @@ void rxvt_term::scrollback_dump() {
 
   time_t now = time(0);
   struct tm tm;
-  char stamp[32];
-  strftime(stamp, sizeof stamp, "console-%Y%m%d-%H%M%S.txt",
-           localtime_r(&now, &tm));
+  char fmt[32], stamp[48];
+  snprintf(fmt, sizeof fmt, "%s-%%Y%%m%%d-%%H%%M%%S.txt", prefix);
+  strftime(stamp, sizeof stamp, fmt, localtime_r(&now, &tm));
 
   char path[PATH_MAX];
   snprintf(path, sizeof path, "%s/%s", dir, stamp);
@@ -160,24 +158,36 @@ void rxvt_term::scrollback_dump() {
   if (fd >= 0)
     close(fd);
 
-  if (ok)
-    notify_as("wrxvt: console saved", path);
-  else {
-    rxvt_warn("can't write the console to %s: %s\n", path, strerror(errno));
+  if (ok) {
+    char title[64];
+    snprintf(title, sizeof title, "wrxvt: %s saved", what);
+    notify_as(title, path);
+  } else {
+    rxvt_warn("can't write the %s to %s: %s\n", what, path, strerror(errno));
     if (fd >= 0)
       unlink(path);
   }
 }
 
 /*
- * prompt:copy-output: the output of the last command, between the shell's
- * marks (OSC 133 C, where it starts, and A, the next prompt), to the
- * clipboard and the primary selection. While a command runs, its output
- * so far. Shells that only mark prompts: what is between the last two.
+ * scrollback:dump: everything written so far to a file, console-*.txt.
  */
-void rxvt_term::copy_output() {
+void rxvt_term::scrollback_dump() {
+  rxvt_buf text;
+  all_text(this, text);
+  text.add('\n');
+  dump_text(text, "console", "console");
+}
+
+/*
+ * The output of the last command, between the shell's marks (OSC 133 C,
+ * where it starts, and A, the next prompt), as plain text. While a command
+ * runs, its output so far. Shells that only mark prompts: what is between
+ * the last two. Returns false when there is nothing to take.
+ */
+bool rxvt_term::last_output_text(rxvt_buf &text) {
   if (current_screen != PRIMARY)
-    return;
+    return false;
 
   int cur = screen.cur.row;
   int prompt = INT_MIN, output = INT_MIN, previous = INT_MIN;
@@ -209,9 +219,8 @@ void rxvt_term::copy_output() {
   else if (prompt != INT_MIN && previous != INT_MIN)
     begin = previous + 1, end = prompt; // only prompts are marked
   else
-    return;
+    return false;
 
-  rxvt_buf text;
   rows_text(text, begin, end, false, "\n", true);
 
   // without the empty lines at the end
@@ -221,9 +230,33 @@ void rxvt_term::copy_output() {
   if (text.data)
     text.data[text.len] = 0;
 
+  return true;
+}
+
+/*
+ * prompt:copy-output: the last command's output to the clipboard and the
+ * primary selection.
+ */
+void rxvt_term::copy_output() {
+  rxvt_buf text;
+  if (!last_output_text(text))
+    return;
   wchar_t *w = rxvt_utf8towcs(text.data ? text.data : "", text.len);
   set_selection(w, true, true);
   free(w);
+}
+
+/*
+ * prompt:dump-output: the last command's output to a file, output-*.txt.
+ */
+void rxvt_term::dump_output() {
+  rxvt_buf text;
+  if (!last_output_text(text)) {
+    notify_as("wrxvt", "no command output to save (needs shell integration)");
+    return;
+  }
+  text.add('\n');
+  dump_text(text, "output", "last command");
 }
 
 #endif

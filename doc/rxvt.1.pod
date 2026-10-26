@@ -1419,6 +1419,24 @@ the last two.
 
    URxvt.keysym.C-S-o: prompt:copy-output
 
+=item prompt:dump-output
+
+Like B<prompt:copy-output>, but writes the last command's output to a
+file, F<output-YYYYMMDD-HHMMSS.txt>, under B<scrollbackDumpDirectory>;
+the path is shown as a desktop notification. Both need a shell that
+marks its output (OSC 133, see B<PS0>/B<PS1> above).
+
+   URxvt.keysym.C-S-O: prompt:dump-output
+
+=item print:screen, print:all
+
+Send the screen (B<print:screen>) or the whole scrollback and screen
+(B<print:all>) through the B<print-pipe> command, so it can be bound to a
+key as well as reached with the Print key. For example, with
+C<print-pipe: cat >> ~/term.log>:
+
+   URxvt.keysym.C-S-p: print:all
+
 =item share:start, share:stop, share:toggle, share:control
 
 Start or stop sharing the terminal on a web page (see L<SHARING ON THE
