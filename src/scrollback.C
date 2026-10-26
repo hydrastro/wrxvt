@@ -114,39 +114,55 @@ void rxvt_term::scrollback_copy_all() {
  * last command).
  */
 void rxvt_term::dump_text(const rxvt_buf &text, const char *prefix,
-                          const char *what) {
-  char dir[PATH_MAX];
-  const char *set = rs[Rs_scrollbackDumpDirectory];
-  const char *state = getenv("XDG_STATE_HOME");
-  const char *home = getenv("HOME");
-  if (set && *set)
-    snprintf(dir, sizeof dir, "%s", set);
-  else if (state && *state)
-    snprintf(dir, sizeof dir, "%s/wrxvt", state);
-  else if (home && *home)
-    snprintf(dir, sizeof dir, "%s/.local/state/wrxvt", home);
-  else
-    snprintf(dir, sizeof dir, ".");
-
-  // mkdir -p, the last one private (same as share.C)
-  for (char *p = dir + 1; *p; p++)
-    if (*p == '/') {
-      *p = 0;
-      mkdir(dir, 0755);
-      *p = '/';
-    }
-  mkdir(dir, 0700);
-
+                          const char *what, const char *tmpl) {
+  char path[PATH_MAX];
   time_t now = time(0);
   struct tm tm;
-  char fmt[32], stamp[48];
-  snprintf(fmt, sizeof fmt, "%s-%%Y%%m%%d-%%H%%M%%S.txt", prefix);
-  strftime(stamp, sizeof stamp, fmt, localtime_r(&now, &tm));
+  localtime_r(&now, &tm);
 
-  char path[PATH_MAX];
-  snprintf(path, sizeof path, "%s/%s", dir, stamp);
+  // A per-action template (scrollbackDumpFile / promptDumpFile) sets the
+  // whole path and overwrites in place; it is strftime-expanded, and a
+  // leading ~ is the home directory. Without one, a fresh timestamped file
+  // <dir>/<prefix>-YYYYMMDD-HHMMSS.txt is written under the dump directory.
+  bool overwrite = tmpl && *tmpl;
+  if (overwrite) {
+    char expanded[PATH_MAX];
+    if (tmpl[0] == '~' && (tmpl[1] == '/' || tmpl[1] == '\0')) {
+      const char *home = getenv("HOME");
+      snprintf(expanded, sizeof expanded, "%s%s", home ? home : "", tmpl + 1);
+    } else
+      snprintf(expanded, sizeof expanded, "%s", tmpl);
+    strftime(path, sizeof path, expanded, &tm);
+  } else {
+    char dir[PATH_MAX];
+    const char *set = rs[Rs_scrollbackDumpDirectory];
+    const char *state = getenv("XDG_STATE_HOME");
+    const char *home = getenv("HOME");
+    if (set && *set)
+      snprintf(dir, sizeof dir, "%s", set);
+    else if (state && *state)
+      snprintf(dir, sizeof dir, "%s/wrxvt", state);
+    else if (home && *home)
+      snprintf(dir, sizeof dir, "%s/.local/state/wrxvt", home);
+    else
+      snprintf(dir, sizeof dir, ".");
+    char fmt[48], stamp[64];
+    snprintf(fmt, sizeof fmt, "%s-%%Y%%m%%d-%%H%%M%%S.txt", prefix);
+    strftime(stamp, sizeof stamp, fmt, &tm);
+    snprintf(path, sizeof path, "%s/%s", dir, stamp);
+  }
 
-  int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  // mkdir -p the directory the file lives in (0700 for a fresh default
+  // tree; existing directories a template points at are left as they are).
+  for (char *p = path + 1; *p; p++)
+    if (*p == '/') {
+      *p = 0;
+      mkdir(path, 0700);
+      *p = '/';
+    }
+
+  int flags = O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : O_EXCL);
+  int fd = open(path, flags, 0600);
   bool ok = fd >= 0;
   for (size_t done = 0; ok && done < text.len;) {
     ssize_t n = write(fd, text.data + done, text.len - done);
@@ -176,7 +192,7 @@ void rxvt_term::scrollback_dump() {
   rxvt_buf text;
   all_text(this, text);
   text.add('\n');
-  dump_text(text, "console", "console");
+  dump_text(text, "console", "console", rs[Rs_scrollbackDumpFile]);
 }
 
 /*
@@ -256,7 +272,7 @@ void rxvt_term::dump_output() {
     return;
   }
   text.add('\n');
-  dump_text(text, "output", "last command");
+  dump_text(text, "output", "last command", rs[Rs_promptDumpFile]);
 }
 
 #endif

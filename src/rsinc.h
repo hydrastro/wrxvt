@@ -2,7 +2,7 @@
 
 def(display_name) def(term_name) def(iconName) def(geometry) def(reverseVideo) def(
     chdir) def(notifyCommand) def(shareAddress) def(sharePort) def(shareCertificate)
-    def(shareKey) def(record) def(recordDirectory) def(scrollbackCommand) def(scrollbackDumpDirectory) def(
+    def(shareKey) def(record) def(recordDirectory) def(scrollbackCommand) def(scrollbackDumpDirectory) def(scrollbackDumpFile) def(promptDumpFile) def(
         notifyLongCommand) def(imageMemory) def(color) reserve(color,
                                                                TOTAL_COLORS) def(font)
 #if ENABLE_STYLES

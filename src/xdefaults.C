@@ -100,6 +100,8 @@ static const struct {
     RSTRG(Rs_recordDirectory, "recordDirectory", "directory"),
     RSTRG(Rs_scrollbackCommand, "scrollbackCommand", "command"),
     RSTRG(Rs_scrollbackDumpDirectory, "scrollbackDumpDirectory", "directory"),
+    RSTRG(Rs_scrollbackDumpFile, "scrollbackDumpFile", "path"),
+    RSTRG(Rs_promptDumpFile, "promptDumpFile", "path"),
     RSTRG(Rs_notifyLongCommand, "notifyLongCommand", "seconds"),
     RSTRG(Rs_imageMemory, "imageMemory", "MiB"),
     SWCH("dockapp", Opt_dockapp, 0, "start as dockapp"),

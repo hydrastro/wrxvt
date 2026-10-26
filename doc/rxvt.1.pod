@@ -1030,9 +1030,27 @@ removes the file when C<less> ends.
 
 =item B<scrollbackDumpDirectory:> I<directory>
 
-Where B<scrollback:dump> writes its F<console-*.txt> files. The default
-is F<$XDG_STATE_HOME/wrxvt> (or F<~/.local/state/wrxvt>), created if
-missing.
+Where B<scrollback:dump> and B<prompt:dump-output> write their
+F<console-*.txt> and F<output-*.txt> files when no explicit path is set
+(below). The default is F<$XDG_STATE_HOME/wrxvt> (or
+F<~/.local/state/wrxvt>), created if missing.
+
+=item B<scrollbackDumpFile:> I<path>
+
+=item B<promptDumpFile:> I<path>
+
+The exact path B<scrollback:dump> (everything) and B<prompt:dump-output>
+(the last command) write to, overriding the directory and the default
+name. A leading C<~> is your home directory, and the path is expanded
+with strftime(3), so date and time codes work:
+
+   URxvt.scrollbackDumpFile: ~/logs/console-%Y%m%d-%H%M%S.txt
+   URxvt.promptDumpFile:     ~/logs/last-output.txt
+
+Missing directories are created. Unlike the default timestamped names,
+an explicit path is overwritten each time (put a C<%H%M%S> in it to keep
+every dump). The last command's output needs a shell that marks it
+(OSC 133).
 
 =item B<termName:> I<termname>
 
