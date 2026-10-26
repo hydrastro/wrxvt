@@ -20,13 +20,9 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *----------------------------------------------------------------------*/
 
-// we include emman.c here to avoid relying on a C compiler, or
-// on the c++ compiler not complaining about .c, which is unlikely,
-// but...
-// This must be the first include, because the _GNU_SOURCE and
-// _XOPEN_SOURCE macros, used by emman.c, must be defined before
-// inclusion of any header.
-#include "emman.c"
+// emman (chunk_*) is its own translation unit, emman.C, compiled as C++
+// like everything else; its feature-test macros sit at the top of that
+// file, before its own system headers.
 
 #include <stdlib.h>
 #include <string.h>
