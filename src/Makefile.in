@@ -40,7 +40,7 @@ COMMON = \
 	screen.o scrollbar.o scrollbar-next.o scrollbar-rxvt.o \
 	scrollbar-xterm.o scrollbar-plain.o xdefaults.o encoding.o \
 	rxvttoolkit.o rxvtutil.o emman.o keyboard.o rxvtimg.o sixel.o graphics.o share.o record.o dnd.o scrollback.o hints.o \
-	ev_cpp.o @PERL_O@
+	ev.o @PERL_O@
 
 COMMON_DAEMON = rxvtdaemon.o
 
@@ -59,6 +59,12 @@ RCLOCK_BINNAME=$(DESTDIR)$(bindir)/urclock$(EXEEXT)
 # inference rules
 .C.o:
 	$(COMPILE) -c $<
+
+# libev ships as ev.c (an amalgamation: it includes ev_epoll.c etc itself).
+# Compile it on its own as C++, feeding it our EV_* config through libev's
+# own EV_CONFIG_H hook, so nothing has to #include "ev.c".
+ev.o: $(srcdir)/../libev/ev.c ev_config.h ../config.h
+	$(COMPILE) -DEV_CONFIG_H='"ev_config.h"' -x c++ -c $(srcdir)/../libev/ev.c -o $@
 
 #-------------------------------------------------------------------------
 
@@ -149,8 +155,6 @@ depend:
 
 # makedepend has trouble finding these
 emman.o: emman.C emman.h ecb.h ../config.h
-ev_cpp.o: ../libev/ev.c ../libev/ev_epoll.c ../libev/ev_kqueue.c ../libev/ev_linuxaio.c
-ev_cpp.o: ../libev/ev_poll.c ../libev/ev_port.c ../libev/ev_select.c ../libev/ev_win32.c
 
 
 # DO NOT DELETE: nice dependency list follows
@@ -176,8 +180,6 @@ encoding.o: table/cns11643_1992_f.h table/big5_ext.h table/big5_plus.h
 encoding.o: table/viscii.h table/jis0201_1976_0.h table/jis0208_1990_0.h
 encoding.o: table/jis0212_1990_0.h table/jis0213_1.h table/jis0213_2.h
 encoding.o: table/compose.h table/category.h
-ev_cpp.o: ev_cpp.h ../config.h ../libev/ev++.h ../libev/ev.h ../libev/ev.c
-ev_cpp.o: ../libev/ev_vars.h ../libev/ev_epoll.c ../libev/ev_select.c
 init.o: ../config.h rxvt.h feature.h ecb.h encoding.h rxvtutil.h estl.h
 init.o: emman.h rxvtfont.h rxvttoolkit.h ev_cpp.h ../config.h ../libev/ev++.h
 init.o: ../libev/ev.h callback.h rxvtimg.h scrollbar.h rxvtperl.h hookinc.h

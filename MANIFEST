@@ -54,7 +54,7 @@ src/feature.h
 src/hookinc.h
 src/init.C
 src/init.h
-src/ev_cpp.C
+src/ev_config.h
 src/ev_cpp.h
 src/keyboard.C
 src/keyboard.h
