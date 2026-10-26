@@ -750,6 +750,12 @@ int rxvt_term::parse_keysym(const char *str, unsigned int &state) {
       return -1;
   }
 
+  // With Shift held, a letter key delivers its uppercase keysym (Shift+d
+  // is D), so a binding written "Shift-Control-d" would never match. Bind
+  // the uppercase letter instead, so the intuitive lowercase form works.
+  if ((state & ShiftMask) && sym >= XK_a && sym <= XK_z)
+    sym -= XK_a - XK_A;
+
   return sym;
 }
 
