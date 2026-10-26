@@ -1191,7 +1191,10 @@ struct rxvt_font_xft : rxvt_font {
   FT_UInt glyph_cache[char_cache_max - char_cache_min + 1];
 #endif
 
-  rxvt_font_xft() { f = 0; }
+  rxvt_font_xft() {
+    f = 0;
+    color = false;
+  }
 
   void clear();
 
@@ -1207,6 +1210,9 @@ struct rxvt_font_xft : rxvt_font {
 
 protected:
   XftFont *f;
+  // FT_HAS_COLOR: a colour (emoji) font, whose glyphs are bitmaps
+  // scaled to the cell rather than ordinary outlines.
+  bool color;
 
 #if ENABLE_EMOJI_SEQUENCES
   struct emoji_glyph {
@@ -1293,6 +1299,7 @@ const rxvt_font_xft::emoji_seq &rxvt_font_xft::shape_emoji(text_t c) const {
 #endif
 
 void rxvt_font_xft::clear() {
+  color = false;
   if (f) {
     XftFontClose(term->dpy, f);
     f = 0;
@@ -1469,6 +1476,17 @@ bool rxvt_font_xft::load(const rxvt_fontprop &prop, bool force_prop) {
 
   FcPatternDestroy(match);
 
+  // Remember whether this is a colour (emoji) font: has_char then accepts
+  // its glyphs as-is, since the text-font width checks don't apply to them.
+  color = false;
+  if (f) {
+    FT_Face face = XftLockFace(f);
+    if (face) {
+      color = FT_HAS_COLOR(face);
+      XftUnlockFace(f);
+    }
+  }
+
 #if 0 // do it per-character
   if (prop.width != rxvt_fontprop::unset && width > prop.width)
     {
@@ -1517,6 +1535,13 @@ bool rxvt_font_xft::has_char(unicode_t unicode, const rxvt_fontprop *prop,
 
   if (!XftCharExists(term->dpy, f, chr))
     return false;
+
+  // A colour (emoji) font's glyph is a bitmap scaled to the cell. The
+  // width/overlap heuristics below are meant for text fonts and would
+  // wrongly reject a wide emoji when it is only a fallback font (as the
+  // primary), so a lone emoji such as U+2705 would vanish. Accept it.
+  if (color)
+    return true;
 
   if (!prop || prop->width == rxvt_fontprop::unset)
     return true;
@@ -1645,7 +1670,10 @@ void rxvt_font_xft::draw(rxvt_drawable &d, int x, int y, const text_t *text,
 #endif
       ep->glyph = glyph;
       ep->x = x_;
-      ep->y = y_ + ascent;
+      // A colour (emoji) fallback font carries its own ascent (often much
+      // larger than the text line), which would drop the glyph below the
+      // cell. Sit it on the terminal baseline, like the emoji-sequence path.
+      ep->y = y_ + (color ? term->fbase + (term->lineSpace >> 1) : ascent);
 
       // the xft font cell might differ from the terminal font cell,
       // in which case we use the average between the two.
