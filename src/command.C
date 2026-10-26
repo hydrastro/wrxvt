@@ -4705,11 +4705,27 @@ bool rxvt_term::builtin_action(const char *name, const char *arg) {
     return true;
   }
 
-  if (!strcmp(name, "scrollback") && !strcmp(arg, "pager")) {
-    scrollback_pager();
+#endif
+
+  if (!strcmp(name, "scrollback")) {
+    if (!strcmp(arg, "top"))
+      scr_changeview(top_row); // the oldest line kept
+    else if (!strcmp(arg, "bottom"))
+      scr_changeview(0); // back to the live screen
+#if ENABLE_RECORD
+    else if (!strcmp(arg, "pager"))
+      scrollback_pager();
+    else if (!strcmp(arg, "copy-all"))
+      scrollback_copy_all();
+    else if (!strcmp(arg, "dump"))
+      scrollback_dump();
+#endif
+    else
+      return false;
+
+    refresh_check();
     return true;
   }
-#endif
 
 #if ENABLE_HINTS
   if (!strcmp(name, "hints")) {

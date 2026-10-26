@@ -1588,6 +1588,8 @@ struct rxvt_term : zero_initialized, rxvt_vars, rxvt_screen {
   void record_output(const char *data, size_t len);
   void record_resize();
   void scrollback_pager();
+  void scrollback_copy_all();
+  void scrollback_dump();
   void copy_output();
 #endif
 

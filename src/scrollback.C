@@ -20,8 +20,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "rxvtbuf.h"
@@ -78,6 +81,92 @@ void rxvt_term::scrollback_pager() {
   spawn(full, path);
   free(full);
   free(path);
+}
+
+// The whole scrollback and the screen, as plain text (no colours), with
+// the trailing empty lines trimmed. Shared by copy-all and dump.
+static void all_text(rxvt_term *term, rxvt_buf &text) {
+  term->rows_text(text, term->top_row, term->nrow, false, "\n", true);
+  while (text.len && text.data[text.len - 1] == '\n')
+    text.len--;
+}
+
+/*
+ * scrollback:copy-all: everything written so far (the scrollback and the
+ * screen) to the clipboard and the primary selection, as plain text.
+ */
+void rxvt_term::scrollback_copy_all() {
+  rxvt_buf text;
+  all_text(this, text);
+  if (text.data)
+    text.data[text.len] = 0;
+
+  wchar_t *w = rxvt_utf8towcs(text.data ? text.data : "", text.len);
+  set_selection(w, true, true);
+  free(w);
+}
+
+/*
+ * scrollback:dump: everything written so far to a timestamped file,
+ * console-YYYYMMDD-HHMMSS.txt, under scrollbackDumpDirectory (by default
+ * $XDG_STATE_HOME/wrxvt, else ~/.local/state/wrxvt). The path is shown as
+ * a desktop notification.
+ */
+void rxvt_term::scrollback_dump() {
+  rxvt_buf text;
+  all_text(this, text);
+  text.add('\n');
+
+  char dir[PATH_MAX];
+  const char *set = rs[Rs_scrollbackDumpDirectory];
+  const char *state = getenv("XDG_STATE_HOME");
+  const char *home = getenv("HOME");
+  if (set && *set)
+    snprintf(dir, sizeof dir, "%s", set);
+  else if (state && *state)
+    snprintf(dir, sizeof dir, "%s/wrxvt", state);
+  else if (home && *home)
+    snprintf(dir, sizeof dir, "%s/.local/state/wrxvt", home);
+  else
+    snprintf(dir, sizeof dir, ".");
+
+  // mkdir -p, the last one private (same as share.C)
+  for (char *p = dir + 1; *p; p++)
+    if (*p == '/') {
+      *p = 0;
+      mkdir(dir, 0755);
+      *p = '/';
+    }
+  mkdir(dir, 0700);
+
+  time_t now = time(0);
+  struct tm tm;
+  char stamp[32];
+  strftime(stamp, sizeof stamp, "console-%Y%m%d-%H%M%S.txt",
+           localtime_r(&now, &tm));
+
+  char path[PATH_MAX];
+  snprintf(path, sizeof path, "%s/%s", dir, stamp);
+
+  int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  bool ok = fd >= 0;
+  for (size_t done = 0; ok && done < text.len;) {
+    ssize_t n = write(fd, text.data + done, text.len - done);
+    if (n <= 0)
+      ok = false;
+    else
+      done += n;
+  }
+  if (fd >= 0)
+    close(fd);
+
+  if (ok)
+    notify_as("wrxvt: console saved", path);
+  else {
+    rxvt_warn("can't write the console to %s: %s\n", path, strerror(errno));
+    if (fd >= 0)
+      unlink(path);
+  }
 }
 
 /*

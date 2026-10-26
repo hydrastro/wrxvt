@@ -1028,6 +1028,12 @@ What B<scrollback:pager> runs, with F</bin/sh> and the file as one more
 argument. The default opens it with C<less -R +G> in a new window and
 removes the file when C<less> ends.
 
+=item B<scrollbackDumpDirectory:> I<directory>
+
+Where B<scrollback:dump> writes its F<console-*.txt> files. The default
+is F<$XDG_STATE_HOME/wrxvt> (or F<~/.local/state/wrxvt>), created if
+missing.
+
 =item B<termName:> I<termname>
 
 Specifies the terminal type name to be set in the B<TERM> environment
@@ -1459,6 +1465,31 @@ The text goes through a file only you can read, removed when the pager
 ends (see B<scrollbackCommand>).
 
    URxvt.keysym.C-S-Prior: scrollback:pager
+
+=item scrollback:top, scrollback:bottom
+
+Scroll to the oldest line kept (B<top>) or back to the live screen
+(B<bottom>).
+
+   URxvt.keysym.C-S-Home: scrollback:top
+   URxvt.keysym.C-S-End:  scrollback:bottom
+
+=item scrollback:copy-all
+
+Everything written so far -- the scrollback and the screen -- to the
+clipboard and the primary selection, as plain text. (C<Control-a> alone
+is best left to the shell, where it moves to the start of the line, so a
+C<Control-Shift> binding is the safe choice.)
+
+   URxvt.keysym.C-S-a: scrollback:copy-all
+
+=item scrollback:dump
+
+Write everything written so far to a timestamped file,
+F<console-YYYYMMDD-HHMMSS.txt>, under B<scrollbackDumpDirectory>; the
+path is shown as a desktop notification.
+
+   URxvt.keysym.C-S-d: scrollback:dump
 
 =item EXTENSION:STRING
 

@@ -99,6 +99,7 @@ static const struct {
          "record the terminal to an asciinema file"),
     RSTRG(Rs_recordDirectory, "recordDirectory", "directory"),
     RSTRG(Rs_scrollbackCommand, "scrollbackCommand", "command"),
+    RSTRG(Rs_scrollbackDumpDirectory, "scrollbackDumpDirectory", "directory"),
     RSTRG(Rs_notifyLongCommand, "notifyLongCommand", "seconds"),
     RSTRG(Rs_imageMemory, "imageMemory", "MiB"),
     SWCH("dockapp", Opt_dockapp, 0, "start as dockapp"),
